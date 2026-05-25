@@ -1,36 +1,47 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { WorldView } from './components/WorldView';
 
 export function App() {
-  const [bootedAt] = useState(() => Date.now());
-
   useEffect(() => {
-    // Placeholder: Phase 0 just confirms mount. World layer arrives in Phase 1.
     // eslint-disable-next-line no-console
-    console.log('[skyhaven] react mounted at', new Date(bootedAt).toISOString());
-  }, [bootedAt]);
+    console.log('[skyhaven] react mounted');
+  }, []);
 
   return (
     <ErrorBoundary>
-      <main
-        style={{
-          minHeight: '100dvh',
-          display: 'grid',
-          placeItems: 'center',
-          textAlign: 'center',
-          padding: 24,
-        }}
-      >
-        <div>
-          <h1 style={{ fontSize: 32, letterSpacing: '0.12em', color: '#5AC8FA', margin: 0 }}>
-            SKYHAVEN
-          </h1>
-          <p style={{ color: '#94A3B8', marginTop: 12 }}>Wings of the World</p>
-          <p style={{ color: '#94A3B8', fontSize: 13, marginTop: 32 }}>
-            Phase 0 scaffold — world layer arrives in Phase 1
-          </p>
-        </div>
-      </main>
+      <WorldView />
+      <header style={topBar} aria-label="airline header">
+        <div style={brand}>SKYHAVEN</div>
+        <div style={subtitle}>Wings of the World</div>
+      </header>
     </ErrorBoundary>
   );
 }
+
+const topBar: React.CSSProperties = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  padding: '12px 16px',
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: 10,
+  pointerEvents: 'none',
+  background: 'linear-gradient(to bottom, rgba(11,17,32,0.7), rgba(11,17,32,0))',
+};
+
+const brand: React.CSSProperties = {
+  fontSize: 18,
+  fontWeight: 700,
+  letterSpacing: '0.18em',
+  color: '#5AC8FA',
+};
+
+const subtitle: React.CSSProperties = {
+  fontSize: 11,
+  letterSpacing: '0.18em',
+  color: '#94A3B8',
+  textTransform: 'uppercase',
+};
