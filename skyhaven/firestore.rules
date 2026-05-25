@@ -1,0 +1,35 @@
+rules_version = '2';
+
+// Phase 0 baseline. Tighten per-feature in Phases 11 (cloud save), 12 (leaderboards/social),
+// 13 (events). All player documents are keyed by uid; only the owner may read/write their own.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Player save mirror (Phase 11).
+    match /players/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Friend graph (Phase 12).
+    match /friendships/{docId} {
+      allow read: if request.auth != null
+        && (request.auth.uid == resource.data.aUid || request.auth.uid == resource.data.bUid);
+      allow create: if request.auth != null
+        && (request.auth.uid == request.resource.data.aUid || request.auth.uid == request.resource.data.bUid);
+      allow update, delete: if request.auth != null
+        && (request.auth.uid == resource.data.aUid || request.auth.uid == resource.data.bUid);
+    }
+
+    // Leaderboards (Phase 12) — writes go through Cloud Functions only; clients read.
+    match /leaderboards/{board}/entries/{uid} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Live-events defined by Remote Config / admin tooling (Phase 13).
+    match /events/{eventId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}

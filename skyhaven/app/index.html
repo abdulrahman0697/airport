@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#0B1120" />
+    <title>SkyHaven Tycoon</title>
+    <style>
+      html, body, #root { height: 100%; margin: 0; padding: 0; background: #0B1120; color: #F8FAFC; font-family: system-ui, -apple-system, sans-serif; overscroll-behavior: none; }
+      body { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+      #pre-react-splash { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #0B1120; z-index: 9999; transition: opacity 240ms ease; }
+      #pre-react-splash .wordmark { font-size: 28px; letter-spacing: 0.12em; color: #5AC8FA; opacity: 0.85; }
+      #pre-react-splash.hidden { opacity: 0; pointer-events: none; }
+    </style>
+    <script>
+      // Pre-React watchdog (BRD §2.6): if React fails to mount within 10s, force-reload.
+      // Cap at 3 attempts per session via sessionStorage.
+      (function () {
+        var KEY = 'skyhaven:watchdog:attempts';
+        var MAX = 3;
+        var TIMEOUT_MS = 10000;
+        var timer = setTimeout(function () {
+          var attempts = parseInt(sessionStorage.getItem(KEY) || '0', 10);
+          if (attempts < MAX) {
+            sessionStorage.setItem(KEY, String(attempts + 1));
+            location.reload();
+          } else {
+            var s = document.getElementById('pre-react-splash');
+            if (s) s.innerHTML = '<div style="text-align:center;padding:24px"><div style="font-size:18px;margin-bottom:8px">Could not start SkyHaven</div><div style="font-size:13px;opacity:0.7">Please reinstall or contact support.</div></div>';
+          }
+        }, TIMEOUT_MS);
+        window.__cancelPreReactWatchdog = function () {
+          clearTimeout(timer);
+          sessionStorage.removeItem(KEY);
+          var s = document.getElementById('pre-react-splash');
+          if (s) {
+            s.classList.add('hidden');
+            setTimeout(function () { s.remove(); }, 260);
+          }
+        };
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="pre-react-splash"><div class="wordmark">SKYHAVEN</div></div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

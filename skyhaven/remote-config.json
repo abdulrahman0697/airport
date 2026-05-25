@@ -1,0 +1,63 @@
+{
+  "conditions": [],
+  "parameters": {
+    "econ_global_yield_mult": {
+      "defaultValue": { "value": "1.0" },
+      "valueType": "NUMBER",
+      "description": "Global revenue multiplier applied to all routes."
+    },
+    "offline_rate_pct": {
+      "defaultValue": { "value": "0.5" },
+      "valueType": "NUMBER",
+      "description": "Offline-earning fraction of online rate (0..1)."
+    },
+    "offline_cap_hours": {
+      "defaultValue": { "value": "8" },
+      "valueType": "NUMBER",
+      "description": "Maximum offline accrual window in hours."
+    },
+    "fuel_demand_mult": {
+      "defaultValue": { "value": "1.0" },
+      "valueType": "NUMBER"
+    },
+    "fuel_contract_cost_mult": {
+      "defaultValue": { "value": "1.0" },
+      "valueType": "NUMBER"
+    },
+    "fuel_capacity_cost_mult": {
+      "defaultValue": { "value": "1.0" },
+      "valueType": "NUMBER"
+    },
+    "condition_decay_rate": {
+      "defaultValue": { "value": "1.0" },
+      "valueType": "NUMBER"
+    },
+    "repair_cost_mult": {
+      "defaultValue": { "value": "1.0" },
+      "valueType": "NUMBER"
+    },
+    "hub_bonus_per_level": {
+      "defaultValue": { "value": "0.05" },
+      "valueType": "NUMBER"
+    },
+    "interstitial_min_interval_seconds": {
+      "defaultValue": { "value": "180" },
+      "valueType": "NUMBER"
+    },
+    "rewarded_fuel_amount": {
+      "defaultValue": { "value": "500" },
+      "valueType": "NUMBER"
+    },
+    "min_supported_app_version": {
+      "defaultValue": { "value": "0.1.0" },
+      "valueType": "STRING"
+    },
+    "feature_flag_cargo": { "defaultValue": { "value": "true" }, "valueType": "BOOLEAN" },
+    "feature_flag_leaderboards": { "defaultValue": { "value": "false" }, "valueType": "BOOLEAN" },
+    "feature_flag_social": { "defaultValue": { "value": "false" }, "valueType": "BOOLEAN" },
+    "feature_flag_events": { "defaultValue": { "value": "false" }, "valueType": "BOOLEAN" }
+  },
+  "version": {
+    "description": "Phase 0 defaults — economy live-tuning lands as phases come online."
+  }
+}

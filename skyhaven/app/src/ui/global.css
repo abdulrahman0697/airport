@@ -1,0 +1,33 @@
+:root {
+  --bg-deep: #0B1120;
+  --bg-panel: #111A2E;
+  --glass: rgba(255, 255, 255, 0.06);
+  --accent-cyan: #5AC8FA;
+  --accent-gold: #F4C75B;
+  --accent-violet: #8B5CF6;
+  --warning: #F59E0B;
+  --success: #34D399;
+  --danger: #F87171;
+  --text-primary: #F8FAFC;
+  --text-muted: #94A3B8;
+
+  --eco-bronze: #B08D57;
+  --eco-silver: #C0C0C8;
+  --eco-gold: #F4C75B;
+  --eco-platinum: #E5E4E2;
+
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+button:focus-visible,
+a:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
