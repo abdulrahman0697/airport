@@ -1,14 +1,17 @@
 /**
  * Save / load via Capacitor Preferences (BRD §14).
  *
- * Atomic-ish write: we write the `.bak` key first, then the main key.
- * If the process dies between, on next load we fall through to the
- * `.bak` and recover the previous save. Both keys carry the same
- * `schemaVersion` so migration is consistent regardless of which we
- * end up restoring.
+ * Atomic-ish write: `.bak` key first, then the main key. If the process
+ * dies between, on next load we fall through to `.bak` and recover the
+ * previous save. Both keys carry the same `schemaVersion`.
  *
  * On web (dev preview), `@capacitor/preferences` transparently falls
  * back to `localStorage`. The same flush-on-visibility logic applies.
+ *
+ * Scheduler is a *throttle*, not a debounce: it writes at most once
+ * every `intervalMs`, and a dirty state is *guaranteed* to flush within
+ * that interval. A debounce is wrong here because every game tick would
+ * reset the timer — it would never fire.
  */
 
 import { Preferences } from '@capacitor/preferences';
@@ -35,8 +38,6 @@ export async function loadSave(): Promise<SaveState | null> {
 
 export async function writeSave(state: SaveState): Promise<void> {
   const value = JSON.stringify(state);
-  // .bak first so the main slot is only updated once we're sure the
-  // serialised string is valid and the platform accepted the write.
   await Preferences.set({ key: KEY_BAK, value });
   await Preferences.set({ key: KEY_MAIN, value });
 }
@@ -46,47 +47,53 @@ export async function clearSave(): Promise<void> {
   await Preferences.remove({ key: KEY_BAK });
 }
 
-/**
- * Debounced save scheduler.
- *
- * `schedule()` queues a flush in `debounceMs` ms; calling again before
- * the timer fires resets it. `flushNow()` bypasses the debounce and is
- * called from `visibilitychange → hidden` so the OS suspending the WebView
- * never strands an unsaved tick.
- */
+export interface SaveScheduler {
+  /** Mark the state dirty; a write will follow within `intervalMs`. */
+  schedule(): void;
+  /** Write the current state right now and resolve when the write completes. */
+  flushNow(): Promise<void>;
+  dispose(): void;
+}
+
 export function createSaveScheduler(
   getState: () => SaveState,
-  debounceMs = 1000,
-): { schedule: () => void; flushNow: () => Promise<void>; dispose: () => void } {
-  let timer: ReturnType<typeof setTimeout> | null = null;
+  intervalMs = 1000,
+): SaveScheduler {
+  let dirty = false;
   let inFlight: Promise<void> = Promise.resolve();
+  let disposed = false;
 
   const doWrite = async (): Promise<void> => {
+    dirty = false;
     const snapshot = getState();
     try {
       await writeSave(snapshot);
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('[skyhaven] save failed:', err);
+      dirty = true; // try again next tick
     }
   };
 
+  const intervalId = setInterval(() => {
+    if (!dirty || disposed) return;
+    inFlight = doWrite();
+  }, intervalMs);
+
   return {
     schedule(): void {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        timer = null;
-        inFlight = doWrite();
-      }, debounceMs);
+      dirty = true;
     },
     async flushNow(): Promise<void> {
-      if (timer) { clearTimeout(timer); timer = null; }
       await inFlight;
-      inFlight = doWrite();
-      await inFlight;
+      if (dirty) {
+        inFlight = doWrite();
+        await inFlight;
+      }
     },
     dispose(): void {
-      if (timer) { clearTimeout(timer); timer = null; }
+      disposed = true;
+      clearInterval(intervalId);
     },
   };
 }

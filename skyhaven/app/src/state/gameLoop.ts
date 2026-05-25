@@ -2,10 +2,12 @@
  * Game loop driver.
  *
  * - Runs a 10 Hz tick interval while the page is visible.
- * - On `visibilitychange → hidden`: flush-save immediately and stop ticks.
+ * - Save scheduler writes at most once per second; every tick marks the
+ *   state dirty.
+ * - On `visibilitychange → hidden`: stop ticks and await a final flush.
+ * - On `pagehide`: best-effort final flush (the OS may kill us mid-write).
  * - On `visibilitychange → visible`: compute elapsed real time since
- *   the last persisted `lastSeenTimestamp` and apply a single catch-up
- *   tick (Phase 9 swaps this for the Web Worker analytic path).
+ *   the persisted `lastSeenTimestamp` and apply a single catch-up tick.
  *
  * The clock is injected so tests can drive it deterministically.
  */
@@ -16,7 +18,6 @@ import { createSaveScheduler, loadSave } from './persistence';
 import { useGameStore } from './store';
 
 export interface GameLoopDeps {
-  /** Source of truth for "what real-time is it right now". */
   now: () => number;
 }
 
@@ -32,6 +33,8 @@ export function createGameLoop(deps: GameLoopDeps = { now: () => Date.now() }): 
   let intervalId: ReturnType<typeof setInterval> | null = null;
   let scheduler: ReturnType<typeof createSaveScheduler> | null = null;
   let onVisibility: (() => void) | null = null;
+  let onPageHide: (() => void) | null = null;
+  let onBeforeUnload: (() => void) | null = null;
 
   const runTick = (): void => {
     const now = deps.now();
@@ -45,11 +48,8 @@ export function createGameLoop(deps: GameLoopDeps = { now: () => Date.now() }): 
     const now = deps.now();
     const elapsedMs = Math.min(OFFLINE_CAP_MS, Math.max(0, now - cur.lastSeenTimestamp));
     if (elapsedMs <= 0) return;
-    // Phase 9 will replace this with the analytic Web-Worker path;
-    // for now a single big-dt tick gives correct-enough revenue accrual
-    // since the Phase 2 economy is purely linear (no fuel runout, no
-    // condition decay, no events). Equivalence with full-tick is tested.
     useGameStore.getState().applyTick({ nowMs: now, dtMs: elapsedMs });
+    scheduler?.schedule();
   };
 
   return {
@@ -60,34 +60,49 @@ export function createGameLoop(deps: GameLoopDeps = { now: () => Date.now() }): 
       const initial = restored ?? createInitialState(deps.now());
       useGameStore.getState().setState(initial);
 
-      // If we restored, account for the time the app was closed.
-      if (restored) catchUp();
-
       scheduler = createSaveScheduler(() => {
         const s = useGameStore.getState().state;
         if (!s) throw new Error('gameLoop: scheduler invoked without state');
         return s;
       });
 
+      if (restored) {
+        catchUp();
+        // Make sure the catch-up cash is persisted before the first tick window.
+        await scheduler.flushNow();
+      } else {
+        // First-ever launch — persist the bootstrap immediately so a
+        // force-kill in the next second still has something to load.
+        scheduler.schedule();
+        await scheduler.flushNow();
+      }
+
       intervalId = setInterval(runTick, TICK_MS);
 
       onVisibility = (): void => {
         if (document.visibilityState === 'hidden') {
           if (intervalId) { clearInterval(intervalId); intervalId = null; }
+          // Await is best-effort; if the OS suspends mid-write the
+          // scheduler's periodic write from the previous second will
+          // have left a recent save behind.
           void scheduler?.flushNow();
         } else {
           catchUp();
           if (!intervalId) intervalId = setInterval(runTick, TICK_MS);
         }
       };
+      onPageHide = (): void => { void scheduler?.flushNow(); };
+      onBeforeUnload = (): void => { void scheduler?.flushNow(); };
       document.addEventListener('visibilitychange', onVisibility);
-      // Also flush on page-hide for the most reliable native suspension path.
-      window.addEventListener('pagehide', () => void scheduler?.flushNow());
+      window.addEventListener('pagehide', onPageHide);
+      window.addEventListener('beforeunload', onBeforeUnload);
     },
 
     async stop(): Promise<void> {
       if (intervalId) { clearInterval(intervalId); intervalId = null; }
       if (onVisibility) { document.removeEventListener('visibilitychange', onVisibility); onVisibility = null; }
+      if (onPageHide) { window.removeEventListener('pagehide', onPageHide); onPageHide = null; }
+      if (onBeforeUnload) { window.removeEventListener('beforeunload', onBeforeUnload); onBeforeUnload = null; }
       if (scheduler) { await scheduler.flushNow(); scheduler.dispose(); scheduler = null; }
     },
   };
