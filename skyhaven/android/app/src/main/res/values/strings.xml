@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SkyHaven Tycoon</string>
+    <string name="title_activity_main">SkyHaven Tycoon</string>
+    <string name="package_name">com.skyhaven.tycoon</string>
+    <string name="custom_url_scheme">com.skyhaven.tycoon</string>
+</resources>
