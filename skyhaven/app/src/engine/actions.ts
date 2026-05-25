@@ -3,17 +3,19 @@
  *
  * Each action takes the current `SaveState` and returns a new state
  * with the action applied, or throws an `ActionError` when the action
- * is invalid (cash too low, tier locked, etc.). Throws are caught at
- * the store boundary and surfaced to the UI as toasts (Phase 5).
+ * is invalid (cash too low, tier locked, fuel limit, etc.). Throws are
+ * caught at the store boundary and surfaced to the UI as toasts.
  *
  * The store invokes these actions imperatively. They are pure so the
  * Web Worker can run them (offline action sequences are still TBD).
  */
 import { getAircraftDef } from '../data/aircraft';
 import { loadTopAirports } from '../data/airports';
-import { conditionBand } from './condition';
-import { repairCost } from './condition';
+import { FUEL_CAPACITY_TIERS, nextCapacityTier } from '../data/fuelCapacity';
+import { FUEL_CONTRACTS, getFuelContract } from '../data/fuelContracts';
+import { conditionBand, repairCost } from './condition';
 import { haversineKm } from './distance';
+import { aircraftBurnRate, hasFuelHeadroom, withRecomputedDemand } from './fuel';
 import { upgradeCost, UPGRADE_SPECS, type UpgradeKind } from './upgrades';
 import type { OwnedAircraft, Route, RoutePricing, SaveState } from './types';
 
@@ -27,8 +29,6 @@ export class ActionError extends Error {
 let nextAircraftUidCounter = 1;
 let nextRouteUidCounter = 1;
 function nextAircraftUid(state: SaveState): string {
-  // Find the highest existing ac-NNNN number so a freshly-loaded save
-  // doesn't recycle UIDs.
   for (const a of state.fleet) {
     const m = /^ac-(\d+)$/.exec(a.uid);
     if (m) {
@@ -71,7 +71,7 @@ export function buyAircraft(state: SaveState, defId: string): SaveState {
   return { ...state, cash: state.cash - def.basePurchaseCost, fleet: [...state.fleet, aircraft] };
 }
 
-// ─── Sell aircraft (for completeness; not surfaced in Phase 3 UI) ────
+// ─── Sell aircraft ───────────────────────────────────────────────────
 export function sellAircraft(state: SaveState, uid: string): SaveState {
   const idx = state.fleet.findIndex((a) => a.uid === uid);
   if (idx < 0) throw new ActionError('NO_AIRCRAFT', `No aircraft ${uid}`);
@@ -82,7 +82,7 @@ export function sellAircraft(state: SaveState, uid: string): SaveState {
   const refund = Math.round(def.basePurchaseCost * 0.5 * (a.condition / 100));
   const fleet = state.fleet.slice();
   fleet.splice(idx, 1);
-  return { ...state, cash: state.cash + refund, fleet };
+  return withRecomputedDemand({ ...state, cash: state.cash + refund, fleet });
 }
 
 // ─── Open route ──────────────────────────────────────────────────────
@@ -121,6 +121,16 @@ export function openRoute(
       `${def.displayName} max range ${def.rangeKm} km, route is ${Math.round(distanceKm)} km`);
   }
 
+  // Strict fuel gate (BRD §4.6 + locked decision): block if opening this
+  // route would push demand past supply.
+  const burn = aircraftBurnRate(aircraft);
+  if (!hasFuelHeadroom(state, burn)) {
+    throw new ActionError(
+      'FUEL_LIMIT',
+      `Need ${burn.toFixed(1)} more fuel/sec — secure a new contract first`,
+    );
+  }
+
   const cost = routeOpenCost(distanceKm);
   if (state.cash < cost) {
     throw new ActionError('INSUFFICIENT_CASH', `Need $${cost.toLocaleString()} to open this route`);
@@ -142,7 +152,12 @@ export function openRoute(
   const fleet = state.fleet.slice();
   fleet[aIdx] = { ...aircraft, routeId: route.id };
 
-  return { ...state, cash: state.cash - cost, fleet, routes: [...state.routes, route] };
+  return withRecomputedDemand({
+    ...state,
+    cash: state.cash - cost,
+    fleet,
+    routes: [...state.routes, route],
+  });
 }
 
 // ─── Close route ─────────────────────────────────────────────────────
@@ -156,7 +171,7 @@ export function closeRoute(state: SaveState, routeId: string): SaveState {
   const fleet = aIdx >= 0
     ? state.fleet.map((a, i) => (i === aIdx ? { ...a, routeId: null } : a))
     : state.fleet;
-  return { ...state, fleet, routes };
+  return withRecomputedDemand({ ...state, fleet, routes });
 }
 
 // ─── Set route pricing ───────────────────────────────────────────────
@@ -198,7 +213,6 @@ export function applyUpgrade(state: SaveState, aircraftUid: string, kind: Upgrad
     upgrades: { ...aircraft.upgrades, [kind]: curLevel + 1 },
   };
 
-  // Marketing upgrades immediately bump the load factor on any active route.
   let routes = state.routes;
   if (kind === 'marketing' && aircraft.routeId) {
     const rIdx = routes.findIndex((r) => r.id === aircraft.routeId);
@@ -215,7 +229,10 @@ export function applyUpgrade(state: SaveState, aircraftUid: string, kind: Upgrad
     }
   }
 
-  return { ...state, cash: state.cash - cost, fleet, routes };
+  const next = { ...state, cash: state.cash - cost, fleet, routes };
+  // Fuel Eff lowers burn → recompute demand. Other upgrades are no-ops
+  // for fuel but the helper short-circuits when the value is unchanged.
+  return kind === 'fuelEff' ? withRecomputedDemand(next) : next;
 }
 
 // ─── Repair aircraft ─────────────────────────────────────────────────
@@ -223,15 +240,56 @@ export function repairAircraft(state: SaveState, aircraftUid: string): SaveState
   const aIdx = state.fleet.findIndex((a) => a.uid === aircraftUid);
   if (aIdx < 0) throw new ActionError('NO_AIRCRAFT', `No aircraft ${aircraftUid}`);
   const aircraft = state.fleet[aIdx]!;
-  if (aircraft.condition >= 100) return state; // no-op
+  if (aircraft.condition >= 100) return state;
   const cost = repairCost(aircraft);
   if (state.cash < cost) {
     throw new ActionError('INSUFFICIENT_CASH', `Need $${cost.toLocaleString()} to repair`);
   }
   const fleet = state.fleet.slice();
   fleet[aIdx] = { ...aircraft, condition: 100 };
-  return { ...state, cash: state.cash - cost, fleet };
+  // A repaired aircraft can resume flight, so demand may need refresh
+  // (a previously condition-0 aircraft no longer contributes 0 demand).
+  return withRecomputedDemand({ ...state, cash: state.cash - cost, fleet });
 }
+
+// ─── Sign fuel contract ──────────────────────────────────────────────
+export function signFuelContract(state: SaveState, contractId: string): SaveState {
+  const def = getFuelContract(contractId);
+  if (!def) throw new ActionError('UNKNOWN_CONTRACT', `No contract ${contractId}`);
+  if (state.fuel.contracts.includes(contractId)) {
+    throw new ActionError('CONTRACT_ALREADY_SIGNED', `${def.name} already signed`);
+  }
+  if (state.cash < def.cost) {
+    throw new ActionError('INSUFFICIENT_CASH', `Need $${def.cost.toLocaleString()} for ${def.name}`);
+  }
+  return {
+    ...state,
+    cash: state.cash - def.cost,
+    fuel: {
+      ...state.fuel,
+      contracts: [...state.fuel.contracts, contractId],
+      supplyRate: state.fuel.supplyRate + def.supplyRatePerSec,
+    },
+  };
+}
+
+// ─── Upgrade fuel capacity ───────────────────────────────────────────
+export function upgradeFuelCapacity(state: SaveState): SaveState {
+  const next = nextCapacityTier(state.fuel.capacity);
+  if (!next) throw new ActionError('CAPACITY_MAXED', 'Fuel capacity already at max tier');
+  if (state.cash < next.cost) {
+    throw new ActionError('INSUFFICIENT_CASH', `Need $${next.cost.toLocaleString()}`);
+  }
+  return {
+    ...state,
+    cash: state.cash - next.cost,
+    fuel: { ...state.fuel, capacity: next.capacity },
+  };
+}
+
+// Re-export the tier table so the store / UI can render it without
+// importing the data module separately.
+export { FUEL_CAPACITY_TIERS, FUEL_CONTRACTS };
 
 /** Convenience selector for the UI's "needs attention" badge. */
 export function fleetSummary(state: SaveState): {

@@ -2,14 +2,17 @@
  * Bootstrap a fresh airline.
  *
  * Phase 2 starter state: one Tier-1 turboprop on one short regional route.
+ * Phase 4: also grants the free starter fuel contract and Level-0 capacity.
  * Phase 9's playable tutorial replaces the canned name / route with the
- * player's choices; until then we seed sensible defaults so the game has
- * something to render on first launch.
+ * player's choices.
  */
 
 import { AIRCRAFT_DEFS, getAircraftDef } from '../data/aircraft';
 import { loadTopAirports, type Airport } from '../data/airports';
+import { FUEL_CAPACITY_TIERS } from '../data/fuelCapacity';
+import { FUEL_CONTRACTS } from '../data/fuelContracts';
 import { haversineKm } from './distance';
+import { aircraftBurnRate } from './fuel';
 import type { OwnedAircraft, Route, SaveState } from './types';
 import { CURRENT_SCHEMA_VERSION } from './types';
 
@@ -18,21 +21,14 @@ const STARTER_TAIL_COLOR = '#5AC8FA';
 const STARTER_CODE = 'SH';
 const STARTER_CASH = 25_000;
 const STARTER_AIRCRAFT_DEF = 't1.atr42';
+const STARTER_CONTRACT = 'fc.starter';
 
-/**
- * Pick a short-range starting route from the top-500 airport set.
- *
- * Prefers a short hop in the busiest region (Europe) so the player sees
- * frequent flight completions; falls back to any pair within turboprop
- * range if Europe is unavailable in the dataset.
- */
 function pickStarterRoute(airports: readonly Airport[], maxKm: number):
   { origin: Airport; dest: Airport; distanceKm: number } | null {
   const europe = airports.filter((a) => a.region === 3 && a.sizeTier === 4);
   const candidates = europe.length >= 2 ? europe : airports.filter((a) => a.sizeTier === 4);
   if (candidates.length < 2) return null;
   let best: { origin: Airport; dest: Airport; distanceKm: number } | null = null;
-  // Deterministic pairing: pick the first viable short hop in IATA order.
   for (let i = 0; i < candidates.length; i++) {
     for (let j = i + 1; j < candidates.length; j++) {
       const a = candidates[i]!;
@@ -77,6 +73,10 @@ export function createInitialState(nowMs: number): SaveState {
       }]
     : [];
 
+  const starterContract = FUEL_CONTRACTS.find((c) => c.id === STARTER_CONTRACT)!;
+  const starterCapacity = FUEL_CAPACITY_TIERS[0]!.capacity;
+  const starterDemand = routes.length > 0 ? aircraftBurnRate(aircraft) : 0;
+
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
     lastSeenTimestamp: nowMs,
@@ -89,7 +89,13 @@ export function createInitialState(nowMs: number): SaveState {
     fleet: [aircraft],
     routes,
     hubs: [],
-    fuel: { reserve: 1000, capacity: 1000, supplyRate: 1000, demandRate: 0, contracts: [] },
+    fuel: {
+      reserve: starterCapacity, // start topped off
+      capacity: starterCapacity,
+      supplyRate: starterContract.supplyRatePerSec,
+      demandRate: starterDemand,
+      contracts: [STARTER_CONTRACT],
+    },
     unlockedRegions: [3],
     tierUnlocked: 1,
     vintage: [],

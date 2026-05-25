@@ -14,6 +14,12 @@
  *  - Condition decay per leg (BRD §4.2)
  *  - Cumulative-earnings tier-unlock gates (BRD §6.1)
  *  - Flight-hours accumulation in game-time hours
+ *
+ * Phase 4 adds:
+ *  - Fuel reserve evolution (supply − demand × dt, clamped to capacity)
+ *  - When reserve = 0 AND demand > supply, every assigned aircraft is
+ *    treated as fuel-starved and earns nothing this tick. Under strict
+ *    gating this only happens during fuel-price events (Phase 6).
  */
 
 import { getAircraftDef } from '../data/aircraft';
@@ -36,6 +42,19 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
     return { ...state, lastSeenTimestamp: ctx.nowMs };
   }
 
+  const dtSec = ctx.dtMs / 1000;
+  const fuel = state.fuel;
+  const netRate = fuel.supplyRate - fuel.demandRate;
+
+  // Evolve the reserve. Reserve fills under strict gating; the negative
+  // branch is the fuel-price-spike path covered by Phase 6 events.
+  let nextReserve = fuel.reserve + netRate * dtSec;
+  if (nextReserve < 0) nextReserve = 0;
+  if (nextReserve > fuel.capacity) nextReserve = fuel.capacity;
+
+  // Fleet is fuel-starved when the reserve is empty AND we'd dig deeper.
+  const fuelStarved = nextReserve <= 0 && netRate < 0;
+
   const fleetById = new Map(state.fleet.map((a) => [a.uid, a]));
   let cash = state.cash;
   let lifetime = state.lifetimeEarnings;
@@ -47,9 +66,11 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
     if (!aircraft) return r;
     const def = getAircraftDef(aircraft.defId);
     if (!def) return r;
+    if (aircraft.condition <= 0) return r;
+    if (fuelStarved) return r;
+
     const dur = legDurationMs(r, aircraft);
     if (!isFinite(dur) || dur <= 0) return r;
-    if (aircraft.condition <= 0) return r; // grounded; condition floor
 
     let progress = r.legProgress + ctx.dtMs / dur;
     let direction = r.legDirection;
@@ -57,19 +78,12 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
     let conditionDelta = 0;
     let revenueThisTick = 0;
 
-    // `gameHoursPerLeg`: real-world equivalent flight time for one leg.
-    // The aircraft accumulates flight-hours in game-time (i.e. real-
-    // world hours-equivalent), which is what conditionDecayRate is
-    // expressed in. With TIME_COMPRESSION=120, one real second of play
-    // is 2 game-hours of flight.
     const gameHoursPerLeg = (dur * TIME_COMPRESSION) / (3600 * 1000);
 
-    let legBudget = 50; // hard cap on legs per tick to prevent pathological loops
+    let legBudget = 50;
     while (progress >= 1 && legBudget-- > 0) {
       progress -= 1;
       direction = direction === 'outbound' ? 'inbound' : 'outbound';
-      // Read the current effective condition for this leg so decay
-      // accrued mid-tick is reflected in subsequent legs' revenue.
       const effectiveCondition = Math.max(0, aircraft.condition - conditionDelta);
       revenueThisTick += legRevenue(r, { ...aircraft, condition: effectiveCondition });
       hoursAccumulated += gameHoursPerLeg;
@@ -114,6 +128,7 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
     lifetimeEarnings: lifetime,
     fleet: nextFleet,
     routes: nextRoutes,
+    fuel: { ...fuel, reserve: nextReserve },
     tierUnlocked,
     lastSeenTimestamp: ctx.nowMs,
   };

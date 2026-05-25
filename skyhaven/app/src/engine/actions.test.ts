@@ -13,7 +13,16 @@ import { createInitialState } from './initialState';
 
 function freshState() {
   const s = createInitialState(0);
-  return { ...s, cash: 10_000_000_000, tierUnlocked: 4, lifetimeEarnings: 10_000_000_000 };
+  // Generous everything so we exercise the action logic without bumping
+  // into cash / tier / fuel gates. Fuel-gate behaviour has its own suite
+  // (fuel.test.ts).
+  return {
+    ...s,
+    cash: 10_000_000_000,
+    tierUnlocked: 4,
+    lifetimeEarnings: 10_000_000_000,
+    fuel: { ...s.fuel, supplyRate: 1_000_000, capacity: 10_000_000, reserve: 10_000_000 },
+  };
 }
 
 describe('buyAircraft', () => {

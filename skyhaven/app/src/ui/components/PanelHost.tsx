@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { create } from 'zustand';
 
-export type PanelId = 'fleet' | 'routes' | 'store' | 'crew' | null;
+export type PanelId = 'fleet' | 'routes' | 'fuel' | 'store' | 'crew' | null;
 
 interface PanelStore {
   active: PanelId;
@@ -18,6 +18,7 @@ export const usePanelStore = create<PanelStore>((set) => ({
 
 const FleetPanel = lazy(() => import('../panels/FleetPanel').then((m) => ({ default: m.FleetPanel })));
 const RoutesPanel = lazy(() => import('../panels/RoutesPanel').then((m) => ({ default: m.RoutesPanel })));
+const FuelPanel = lazy(() => import('../panels/FuelPanel').then((m) => ({ default: m.FuelPanel })));
 
 export function PanelHost() {
   const active = usePanelStore((s) => s.active);
@@ -47,6 +48,7 @@ export function PanelHost() {
           <Suspense fallback={<PanelFallback />}>
             {active === 'fleet' && <FleetPanel />}
             {active === 'routes' && <RoutesPanel />}
+            {active === 'fuel' && <FuelPanel />}
             {active === 'store' && <ComingSoonPanel name="Store" />}
             {active === 'crew' && <ComingSoonPanel name="Crew" />}
           </Suspense>

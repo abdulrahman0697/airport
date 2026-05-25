@@ -19,6 +19,8 @@ import {
   openRoute as openRouteAction,
   repairAircraft as repairAircraftAction,
   setRoutePricing as setRoutePricingAction,
+  signFuelContract as signFuelContractAction,
+  upgradeFuelCapacity as upgradeFuelCapacityAction,
 } from '../engine/actions';
 import { tick, type TickContext } from '../engine/tick';
 import type { RoutePricing, SaveState } from '../engine/types';
@@ -37,6 +39,8 @@ interface GameStore {
   setRoutePricing: (routeId: string, pricing: RoutePricing) => ActionResult;
   applyUpgrade: (aircraftUid: string, kind: UpgradeKind) => ActionResult;
   repairAircraft: (aircraftUid: string) => ActionResult;
+  signFuelContract: (contractId: string) => ActionResult;
+  upgradeFuelCapacity: () => ActionResult;
 }
 
 function runAction(
@@ -75,6 +79,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     runAction(set, get, (s) => applyUpgradeAction(s, aircraftUid, kind)),
   repairAircraft: (aircraftUid) =>
     runAction(set, get, (s) => repairAircraftAction(s, aircraftUid)),
+  signFuelContract: (contractId) =>
+    runAction(set, get, (s) => signFuelContractAction(s, contractId)),
+  upgradeFuelCapacity: () =>
+    runAction(set, get, (s) => upgradeFuelCapacityAction(s)),
 }));
 
 export type { GameStore };
