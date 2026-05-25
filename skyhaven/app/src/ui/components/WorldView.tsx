@@ -61,16 +61,17 @@ const hostStyle: React.CSSProperties = {
 
 const fpsBadge: React.CSSProperties = {
   position: 'absolute',
-  top: 8,
+  bottom: 76,
   right: 8,
   padding: '4px 8px',
-  fontSize: 11,
+  fontSize: 10,
   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
   color: '#94A3B8',
-  background: 'rgba(11, 17, 32, 0.6)',
+  background: 'rgba(11, 17, 32, 0.7)',
   border: '1px solid rgba(255,255,255,0.08)',
   borderRadius: 6,
   pointerEvents: 'none',
+  opacity: 0.7,
 };
 
 const errorOverlay: React.CSSProperties = {

@@ -142,46 +142,13 @@ const deduped = [...byIata.values()];
 // Sort by sizeTier desc, then by IATA for deterministic ordering.
 deduped.sort((a, b) => (b.sizeTier - a.sizeTier) || a.iata.localeCompare(b.iata));
 
-// Top-500: prefer large_airport (sizeTier 4), then largest available.
-// Cap so each region gets at least 30 to keep the map populated worldwide.
-const REGION_MIN = 30;
-const top = [];
+// "Top" set = every large_airport with scheduled service (~1,180).
+// We previously alphabetically truncated at 500 which silently dropped
+// LHR / LAX / MAD and other late-letter hubs. The full large set is
+// only ~140 KB gzipped and gives the map honest coverage of major hubs.
+const top = deduped.filter((a) => a.sizeTier === 4);
 const regionPick = new Map();
-function pickInto(arr, max) {
-  for (const a of deduped) {
-    if (arr.length >= max) break;
-    const cnt = regionPick.get(a.region) || 0;
-    if (cnt >= Math.ceil(max / 9) + 30 && arr.length > max * 0.6) continue;
-    arr.push(a);
-    regionPick.set(a.region, cnt + 1);
-  }
-}
-// Pass 1: all large_airports
-for (const a of deduped) {
-  if (a.sizeTier === 4 && top.length < 500) {
-    top.push(a);
-    regionPick.set(a.region, (regionPick.get(a.region) || 0) + 1);
-  }
-}
-// Pass 2: top up with mediums per region if short
-if (top.length < 500) {
-  for (const a of deduped) {
-    if (top.length >= 500) break;
-    if (a.sizeTier === 4) continue;
-    const cnt = regionPick.get(a.region) || 0;
-    if (cnt < REGION_MIN) {
-      top.push(a);
-      regionPick.set(a.region, cnt + 1);
-    }
-  }
-}
-// Pass 3: fill remainder
-for (const a of deduped) {
-  if (top.length >= 500) break;
-  if (a.sizeTier === 4) continue;
-  if (top.includes(a)) continue;
-  top.push(a);
-}
+for (const a of top) regionPick.set(a.region, (regionPick.get(a.region) || 0) + 1);
 
 top.sort((a, b) => a.iata.localeCompare(b.iata));
 

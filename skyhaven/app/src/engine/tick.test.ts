@@ -24,7 +24,7 @@ describe('tick — invariants', () => {
     expect(s1.cash).toBe(s0.cash);
   });
 
-  it('never makes cash decrease in Phase-2 economy', () => {
+  it('never makes cash decrease', () => {
     let s = createInitialState(0);
     for (let i = 0; i < 200; i++) {
       const before = s.cash;
@@ -33,25 +33,53 @@ describe('tick — invariants', () => {
     }
   });
 
-  it('200 small ticks ≈ one big tick of equal total dt (linear economy)', () => {
+  it('200 small ticks ≈ one big tick over a short window (pre-threshold)', () => {
+    // Keep the window short enough that condition stays above the 70%
+    // threshold for both paths — the linear regime where small ≈ big.
     const s0 = createInitialState(0);
     let small = s0;
     for (let i = 0; i < 200; i++) {
       small = tick(small, { nowMs: (i + 1) * 100, dtMs: 100 });
     }
     const big = tick(s0, { nowMs: 200 * 100, dtMs: 200 * 100 });
-    // Cash drift between the two paths should stay tiny — at most one
-    // half-leg's worth of revenue depending on where the leg boundary lands.
     expect(big.cash).toBeGreaterThan(0);
     expect(Math.abs(big.cash - small.cash)).toBeLessThan(small.cash * 0.5 + 1000);
     expect(big.lastSeenTimestamp).toBe(small.lastSeenTimestamp);
   });
 
-  it('completes a leg and credits revenue when progress crosses 1.0', () => {
+  it('credits revenue and accumulates flight hours over a long window', () => {
     const s0 = createInitialState(0);
-    // Hand the loop enough wall-clock time to fly several legs.
     const s1 = tick(s0, { nowMs: 600_000, dtMs: 600_000 });
     expect(s1.cash).toBeGreaterThan(s0.cash);
     expect(s1.lifetimeEarnings).toBeGreaterThan(0);
+    const ac = s1.fleet[0]!;
+    expect(ac.flightHoursAccumulated).toBeGreaterThan(0);
+  });
+
+  it('degrades condition over flight time', () => {
+    const s0 = createInitialState(0);
+    // 30 real-minutes = 60 game-hours; T1 decay 0.25/gh → -15% condition.
+    const s1 = tick(s0, { nowMs: 30 * 60 * 1000, dtMs: 30 * 60 * 1000 });
+    const ac = s1.fleet[0]!;
+    expect(ac.condition).toBeLessThan(100);
+    expect(ac.condition).toBeGreaterThan(50);
+  });
+
+  it('unlocks tier 2 once lifetime earnings cross $50K', () => {
+    const s0 = createInitialState(0);
+    // Bypass the starter income curve by handing the player enough
+    // lifetime earnings to be just under the gate, then verifying that
+    // a single tick of revenue pushes them past it.
+    const seeded = { ...s0, lifetimeEarnings: 49_000 };
+    const s1 = tick(seeded, { nowMs: 60_000, dtMs: 60_000 });
+    expect(s1.lifetimeEarnings).toBeGreaterThan(50_000);
+    expect(s1.tierUnlocked).toBeGreaterThanOrEqual(2);
+  });
+
+  it('refuses to fly an aircraft at 0% condition', () => {
+    let s = createInitialState(0);
+    s = { ...s, fleet: [{ ...s.fleet[0]!, condition: 0 }] };
+    const s1 = tick(s, { nowMs: 60_000, dtMs: 60_000 });
+    expect(s1.cash).toBe(s.cash); // no revenue when grounded
   });
 });
