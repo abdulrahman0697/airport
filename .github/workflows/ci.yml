@@ -60,7 +60,14 @@ jobs:
       - name: Gradle bundleDebug
         if: ${{ hashFiles('skyhaven/android/gradlew') != '' }}
         working-directory: skyhaven/android
-        run: ./gradlew bundleDebug --no-daemon
+        run: ./gradlew assembleDebug bundleDebug --no-daemon
+      - name: Upload debug APK
+        if: ${{ hashFiles('skyhaven/android/gradlew') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: skyhaven-debug-apk
+          path: skyhaven/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
       - name: Upload debug AAB
         if: ${{ hashFiles('skyhaven/android/gradlew') != '' }}
         uses: actions/upload-artifact@v4
