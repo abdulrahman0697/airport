@@ -38,20 +38,38 @@ export async function loadSave(nowMs: number): Promise<SaveState | null> {
 }
 
 /**
- * After loading, if any scheduler timestamps are absurdly far in the
- * past (e.g. a save migrated with a buggy v1→v2 that defaulted them
- * to 0), bump them forward so the next tick doesn't iterate billions
- * of catch-up rolls.
+ * After loading, normalise the new schema fields so the engine and
+ * React selectors never have to handle `undefined`. The most subtle
+ * symptom is React error #185: a selector like `s.activeEvents ?? []`
+ * returns a *new* `[]` literal on every read when the field is
+ * undefined, which makes `useSyncExternalStore` see a churning
+ * snapshot and re-render in a tight loop.
+ *
+ * Also corrects scheduler timestamps that are absurdly far in the past
+ * (e.g. a save migrated with a buggy v1→v2 that defaulted them to 0)
+ * so the next tick doesn't iterate billions of catch-up rolls.
  */
 function rebaseSchedulerFields(state: SaveState, nowMs: number): SaveState {
-  const stale = (ts: number): boolean => ts < nowMs - 24 * 3600 * 1000;
-  if (!stale(state.nextEventCheckMs) && !stale(state.nextCollectibleSpawnMs)) {
+  const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+  const stale = (ts: unknown): boolean => !isNumber(ts) || ts < nowMs - 24 * 3600 * 1000;
+  const activeEvents = Array.isArray(state.activeEvents) ? state.activeEvents : [];
+  const collectibles = Array.isArray(state.collectibles) ? state.collectibles : [];
+  const nextEventCheckMs = stale(state.nextEventCheckMs) ? nowMs + 60_000 : state.nextEventCheckMs;
+  const nextCollectibleSpawnMs = stale(state.nextCollectibleSpawnMs) ? nowMs + 90_000 : state.nextCollectibleSpawnMs;
+  if (
+    activeEvents === state.activeEvents
+    && collectibles === state.collectibles
+    && nextEventCheckMs === state.nextEventCheckMs
+    && nextCollectibleSpawnMs === state.nextCollectibleSpawnMs
+  ) {
     return state;
   }
   return {
     ...state,
-    nextEventCheckMs: stale(state.nextEventCheckMs) ? nowMs + 60_000 : state.nextEventCheckMs,
-    nextCollectibleSpawnMs: stale(state.nextCollectibleSpawnMs) ? nowMs + 90_000 : state.nextCollectibleSpawnMs,
+    activeEvents,
+    collectibles,
+    nextEventCheckMs,
+    nextCollectibleSpawnMs,
   };
 }
 

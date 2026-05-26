@@ -34,9 +34,17 @@ export function WorldView() {
           stage.setCollectibles(s.collectibles);
         }
 
-        const loop = (): void => {
+        // Throttle the FPS readout to ~1 Hz. Updating per-frame triggers
+        // a React re-render of WorldView at 60 fps which compounds with
+        // other 10 Hz tick subscribers; the debug HUD doesn't need that
+        // resolution.
+        let lastFpsAt = 0;
+        const loop = (now: number): void => {
           if (!stageRef.current) return;
-          setFps(Math.round(stageRef.current.fps()));
+          if (now - lastFpsAt > 1000) {
+            setFps(Math.round(stageRef.current.fps()));
+            lastFpsAt = now;
+          }
           raf = requestAnimationFrame(loop);
         };
         raf = requestAnimationFrame(loop);

@@ -17,7 +17,13 @@ export class ErrorBoundary extends Component<Props, State> {
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
     // eslint-disable-next-line no-console
-    console.error('[skyhaven] root error boundary caught', error, info);
+    console.error('[skyhaven] root error boundary caught', error?.message ?? error);
+    // eslint-disable-next-line no-console
+    console.error('[skyhaven] component stack:', info?.componentStack);
+    if (error?.stack) {
+      // eslint-disable-next-line no-console
+      console.error('[skyhaven] error stack:', error.stack);
+    }
     // Phase 11+: forward to Crashlytics via @capacitor-firebase/crashlytics.
   }
 

@@ -46,11 +46,24 @@ function uniform(seed: number): number {
 }
 
 function tickEvents(state: SaveState, ctx: TickContext): {
-  events: ActiveEvent[];
+  events: readonly ActiveEvent[];
   seed: number;
   nextCheckMs: number;
 } {
-  const remaining = expireEvents(state.activeEvents, ctx.nowMs);
+  // Preserve the array reference if no event expires this tick.
+  // Otherwise `state.activeEvents` would churn references every tick
+  // (filter always returns a new array) and downstream subscribers
+  // re-render at 10 Hz for no reason.
+  let events: readonly ActiveEvent[] = state.activeEvents;
+  let anyExpired = false;
+  for (let i = 0; i < state.activeEvents.length; i++) {
+    const e = state.activeEvents[i]!;
+    if (ctx.nowMs >= e.startedAt + e.durationMs) { anyExpired = true; break; }
+  }
+  if (anyExpired) {
+    events = expireEvents(state.activeEvents, ctx.nowMs);
+  }
+
   let seed = state.seed;
   let nextCheckMs = state.nextEventCheckMs;
   // Defensive: if a save migrated or loaded with a far-past scheduler
@@ -60,7 +73,6 @@ function tickEvents(state: SaveState, ctx: TickContext): {
   if (nextCheckMs < ctx.nowMs - MAX_CATCHUP_ROLLS * EVENT_CHECK_INTERVAL_MS) {
     nextCheckMs = ctx.nowMs - MAX_CATCHUP_ROLLS * EVENT_CHECK_INTERVAL_MS;
   }
-  let events = remaining;
   let iterations = 0;
   while (ctx.nowMs >= nextCheckMs && iterations < MAX_CATCHUP_ROLLS) {
     const { newSeed, event } = rollEvent(seed, state.unlockedRegions, nextCheckMs);
@@ -73,20 +85,24 @@ function tickEvents(state: SaveState, ctx: TickContext): {
 }
 
 function tickCollectibles(state: SaveState, ctx: TickContext, seed: number): {
-  collectibles: Collectible[];
+  collectibles: readonly Collectible[];
   seed: number;
   nextSpawnMs: number;
 } {
-  const remaining = state.collectibles.filter((c) => ctx.nowMs < c.expiresAt);
+  let collectibles: readonly Collectible[] = state.collectibles;
+  let anyExpired = false;
+  for (let i = 0; i < state.collectibles.length; i++) {
+    if (ctx.nowMs >= state.collectibles[i]!.expiresAt) { anyExpired = true; break; }
+  }
+  if (anyExpired) {
+    collectibles = state.collectibles.filter((c) => ctx.nowMs < c.expiresAt);
+  }
   let s = seed;
   let nextSpawnMs = state.nextCollectibleSpawnMs;
-  // Same defensive clamp as `tickEvents`: keep the catch-up window
-  // bounded if the persisted timestamp slips past `rebaseSchedulerFields`.
   const MAX_CATCHUP_SPAWNS = 16;
   if (nextSpawnMs < ctx.nowMs - MAX_CATCHUP_SPAWNS * COLLECTIBLE_INTERVAL_MS) {
     nextSpawnMs = ctx.nowMs - MAX_CATCHUP_SPAWNS * COLLECTIBLE_INTERVAL_MS;
   }
-  let collectibles = remaining;
   let iterations = 0;
   while (ctx.nowMs >= nextSpawnMs && iterations < MAX_CATCHUP_SPAWNS) {
     s = nextSeed(s);

@@ -72,9 +72,21 @@ function runAction(
   }
 }
 
+/**
+ * Defensive normalisation for any state that lands in the store from
+ * persistence. The engine's tick already produces valid shapes; this
+ * guards against partially-formed saves loaded from older builds.
+ */
+function normaliseState(next: SaveState): SaveState {
+  const activeEvents = Array.isArray(next.activeEvents) ? next.activeEvents : [];
+  const collectibles = Array.isArray(next.collectibles) ? next.collectibles : [];
+  if (activeEvents === next.activeEvents && collectibles === next.collectibles) return next;
+  return { ...next, activeEvents, collectibles };
+}
+
 export const useGameStore = create<GameStore>((set, get) => ({
   state: null,
-  setState: (next): void => set({ state: next }),
+  setState: (next): void => set({ state: normaliseState(next) }),
   applyTick: (ctx): void => {
     const cur = get().state;
     if (!cur) return;
@@ -114,9 +126,20 @@ export const selectLifetime = (s: GameStore): number => s.state?.lifetimeEarning
 export const selectAirlineName = (s: GameStore): string => s.state?.airlineName ?? '';
 export const selectTailColor = (s: GameStore): string => s.state?.tailColor ?? '#5AC8FA';
 export const selectTier = (s: GameStore): number => s.state?.tierUnlocked ?? 1;
-export const selectFleet = (s: GameStore) => s.state?.fleet ?? [];
-export const selectRoutes = (s: GameStore) => s.state?.routes ?? [];
-export const selectHubs = (s: GameStore) => s.state?.hubs ?? [];
-export const selectUnlockedRegions = (s: GameStore) => s.state?.unlockedRegions ?? [];
-export const selectActiveEvents = (s: GameStore) => s.state?.activeEvents ?? [];
-export const selectCollectibles = (s: GameStore) => s.state?.collectibles ?? [];
+// Frozen empty arrays shared by every selector that needs a fallback.
+// Using a fresh `[]` literal in `?? []` makes `useSyncExternalStore`
+// see a different snapshot on every read and tight-loops the
+// re-render path (React error #185).
+const EMPTY_OWNED_AIRCRAFT = Object.freeze([]) as readonly SaveState['fleet'][number][];
+const EMPTY_ROUTES = Object.freeze([]) as readonly SaveState['routes'][number][];
+const EMPTY_HUBS = Object.freeze([]) as readonly SaveState['hubs'][number][];
+const EMPTY_NUMBERS = Object.freeze([]) as readonly number[];
+const EMPTY_EVENTS = Object.freeze([]) as readonly SaveState['activeEvents'][number][];
+const EMPTY_COLLECTIBLES = Object.freeze([]) as readonly SaveState['collectibles'][number][];
+
+export const selectFleet = (s: GameStore) => s.state?.fleet ?? EMPTY_OWNED_AIRCRAFT;
+export const selectRoutes = (s: GameStore) => s.state?.routes ?? EMPTY_ROUTES;
+export const selectHubs = (s: GameStore) => s.state?.hubs ?? EMPTY_HUBS;
+export const selectUnlockedRegions = (s: GameStore) => s.state?.unlockedRegions ?? EMPTY_NUMBERS;
+export const selectActiveEvents = (s: GameStore) => s.state?.activeEvents ?? EMPTY_EVENTS;
+export const selectCollectibles = (s: GameStore) => s.state?.collectibles ?? EMPTY_COLLECTIBLES;

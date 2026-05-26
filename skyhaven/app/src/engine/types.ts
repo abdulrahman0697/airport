@@ -127,9 +127,9 @@ export interface SaveState {
   tierUnlocked: number;
 
   /** Live events currently affecting the airline (Phase 6 §4.12). */
-  activeEvents: ActiveEvent[];
+  activeEvents: readonly ActiveEvent[];
   /** Drifting roaming collectibles awaiting a tap (Phase 6 §4.12). */
-  collectibles: Collectible[];
+  collectibles: readonly Collectible[];
   /** Epoch ms after which the next event-spawn roll should happen. */
   nextEventCheckMs: number;
   /** Epoch ms after which the next collectible-spawn roll should happen. */
