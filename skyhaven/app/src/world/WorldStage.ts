@@ -1,12 +1,13 @@
 import { Application, Container, Ticker } from 'pixi.js';
-import { loadTopAirports } from '../data/airports';
+import { loadTopAirports, type Airport } from '../data/airports';
 import type { Collectible, Route } from '../engine/types';
-import { createAirportPinsDeferred } from './AirportPins';
+import { createAirportPins, type AirportPinsLayer } from './AirportPins';
 import { ArcsLayer } from './Arcs';
 import { createBasemap } from './Basemap';
 import { Camera } from './Camera';
 import { createClouds, type CloudLayer } from './Clouds';
 import { CollectiblesLayer } from './Collectibles';
+import { createCountries } from './Countries';
 
 /**
  * Top-level Pixi world stage.
@@ -35,6 +36,8 @@ export interface WorldStage {
   setTailColor(hex: string): void;
   setCollectibles(items: readonly Collectible[]): void;
   setCollectibleTapHandler(fn: (id: string) => void): void;
+  setUnlockedRegions(regions: ReadonlySet<number>): void;
+  setAirportTapHandler(fn: (airport: Airport, screen: { x: number; y: number }) => void): void;
 }
 
 export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
@@ -81,32 +84,35 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
 
   const airports = loadTopAirports();
   const basemap = createBasemap();
+  const countries = createCountries();
   const clouds: CloudLayer = createClouds();
   const arcsLayer = new ArcsLayer(airports);
-  const { root: pins, ready: pinsReady } = createAirportPinsDeferred(airports, app.renderer);
 
-  // The world stage owns the tap dispatcher — the React layer registers
-  // its handler via `setCollectibleTapHandler`. Default is a no-op.
+  // Tap dispatchers — React registers handlers via setXxxTapHandler.
   let collectibleTapHandler: (id: string) => void = () => undefined;
+  let airportTapHandler: (airport: Airport, screen: { x: number; y: number }) => void = () => undefined;
+
+  const pinsLayer: AirportPinsLayer = createAirportPins(
+    airports,
+    app.renderer,
+    new Set<number>(),
+    0x5ac8fa,
+    (airport, screen) => airportTapHandler(airport, screen),
+  );
   const collectiblesLayer = new CollectiblesLayer(app.renderer, (id) => collectibleTapHandler(id));
 
   app.stage.eventMode = 'static';
   root.addChild(basemap);
+  root.addChild(countries);
   root.addChild(clouds.container);
   root.addChild(arcsLayer.container);
-  root.addChild(pins);
+  root.addChild(pinsLayer.container);
   root.addChild(collectiblesLayer.container);
   // eslint-disable-next-line no-console
-  console.info('[skyhaven] WorldStage layers ready (basemap + arcs); pins deferred', {
+  console.info('[skyhaven] WorldStage layers ready', {
     airports: airports.length,
     cameraScale: camera.state.scale.toFixed(3),
     cameraTxTy: [camera.state.tx.toFixed(0), camera.state.ty.toFixed(0)],
-  });
-  void pinsReady.then(() => {
-    // eslint-disable-next-line no-console
-    console.info('[skyhaven] WorldStage pins built and cached', {
-      chunks: pins.children.length,
-    });
   });
 
   function applyCamera(): void {
@@ -216,19 +222,35 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
       arcsLayer.tick(dtMs);
     }
     collectiblesLayer.tick(dtMs);
+    pinsLayer.tick(camera.state.scale);
     applyCamera();
   };
   app.ticker.add(onTick);
 
   applyCamera();
 
+  let tailColorNum = 0x5ac8fa;
+  let unlockedRegions: ReadonlySet<number> = new Set<number>();
+  function refreshPinRegions(): void {
+    pinsLayer.setUnlockedRegions(unlockedRegions, tailColorNum);
+  }
+
   return {
     app,
     fps: () => app.ticker.FPS,
     setRoutes: (routes) => arcsLayer.setRoutes(routes),
-    setTailColor: (hex) => arcsLayer.setTailColor(hex),
+    setTailColor: (hex) => {
+      arcsLayer.setTailColor(hex);
+      const n = parseInt(hex.replace('#', ''), 16);
+      if (Number.isFinite(n)) {
+        tailColorNum = n;
+        refreshPinRegions();
+      }
+    },
     setCollectibles: (items) => collectiblesLayer.setCollectibles(items),
     setCollectibleTapHandler: (fn) => { collectibleTapHandler = fn; },
+    setUnlockedRegions: (regions) => { unlockedRegions = regions; refreshPinRegions(); },
+    setAirportTapHandler: (fn) => { airportTapHandler = fn; },
     destroy: () => {
       app.ticker.remove(onTick);
       app.canvas.removeEventListener('pointerdown', onDown);
@@ -241,6 +263,7 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
       ro.disconnect();
       arcsLayer.destroy();
       collectiblesLayer.destroy();
+      pinsLayer.destroy();
       app.destroy(true, { children: true, texture: true });
     },
   };

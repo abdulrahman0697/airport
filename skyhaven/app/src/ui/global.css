@@ -54,7 +54,7 @@ a:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
     transparent 62%);
   background-size: 220% 100%;
   background-repeat: no-repeat;
-  animation: glass-shimmer 8s linear infinite;
+  animation: glass-shimmer 4s linear infinite;
 }
 
 /* Soft breathing pulse for highlight elements. */

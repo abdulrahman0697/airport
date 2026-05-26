@@ -27,10 +27,13 @@ const STARTER_CASH = 2_000_000;
 const STARTER_AIRCRAFT_DEF = 't1.atr42';
 const STARTER_CONTRACT = 'fc.starter';
 
-function pickStarterRoute(airports: readonly Airport[], maxKm: number):
-  { origin: Airport; dest: Airport; distanceKm: number } | null {
-  const europe = airports.filter((a) => a.region === 3 && a.sizeTier === 4);
-  const candidates = europe.length >= 2 ? europe : airports.filter((a) => a.sizeTier === 4);
+function pickStarterRoute(
+  airports: readonly Airport[],
+  homeRegion: number,
+  maxKm: number,
+): { origin: Airport; dest: Airport; distanceKm: number } | null {
+  const inRegion = airports.filter((a) => a.region === homeRegion && a.sizeTier === 4);
+  const candidates = inRegion.length >= 2 ? inRegion : airports.filter((a) => a.sizeTier === 4);
   if (candidates.length < 2) return null;
   let best: { origin: Airport; dest: Airport; distanceKm: number } | null = null;
   for (let i = 0; i < candidates.length; i++) {
@@ -49,10 +52,10 @@ function pickStarterRoute(airports: readonly Airport[], maxKm: number):
   return best;
 }
 
-export function createInitialState(nowMs: number): SaveState {
+export function createInitialState(nowMs: number, homeRegion = 3): SaveState {
   const airports = loadTopAirports();
   const def = getAircraftDef(STARTER_AIRCRAFT_DEF) ?? AIRCRAFT_DEFS[0]!;
-  const route = pickStarterRoute(airports, def.rangeKm);
+  const route = pickStarterRoute(airports, homeRegion, def.rangeKm);
 
   const aircraft: OwnedAircraft = {
     uid: 'ac-0001',
@@ -100,7 +103,7 @@ export function createInitialState(nowMs: number): SaveState {
       demandRate: starterDemand,
       contracts: [STARTER_CONTRACT],
     },
-    unlockedRegions: [3],
+    unlockedRegions: [homeRegion],
     tierUnlocked: 1,
     activeEvents: [],
     collectibles: [],

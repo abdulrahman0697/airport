@@ -5,6 +5,7 @@ import { getRegion } from '../../data/regions';
 import {
   selectTailColor,
   selectTier,
+  selectTutorialCompleted,
   selectUnlockedRegions,
   useGameStore,
 } from '../../state/store';
@@ -35,13 +36,19 @@ export function HeroMoments() {
   const tier = useGameStore(selectTier);
   const regions = useGameStore(selectUnlockedRegions);
   const tailColor = useGameStore(selectTailColor);
+  const tutorialCompleted = useGameStore(selectTutorialCompleted);
 
-  const prevTier = useRef(tier);
-  const prevRegions = useRef(regions);
+  // `seenTier` / `seenRegions` start unset and are populated the first
+  // time a real state load comes through. That way the first
+  // store-update transition (null → loaded) never fires a popup.
+  const seenTier = useRef<number | null>(null);
+  const seenRegions = useRef<Set<number> | null>(null);
   const [queue, setQueue] = useState<QueuedMoment[]>([]);
 
   useEffect(() => {
-    if (tier > prevTier.current) {
+    if (seenTier.current === null) { seenTier.current = tier; return; }
+    if (!tutorialCompleted) { seenTier.current = tier; return; }
+    if (tier > seenTier.current) {
       const newTier = tier;
       const examples = aircraftByTier(newTier).slice(0, 3).map((a) => a.displayName);
       setQueue((q) => [...q, {
@@ -54,15 +61,25 @@ export function HeroMoments() {
       }]);
       haptics.success();
     }
-    prevTier.current = tier;
-  }, [tier, tailColor]);
+    seenTier.current = tier;
+  }, [tier, tailColor, tutorialCompleted]);
 
   useEffect(() => {
-    // Detect any new region that wasn't there before.
-    const prev = new Set(prevRegions.current);
+    if (seenRegions.current === null) {
+      seenRegions.current = new Set(regions);
+      return;
+    }
+    if (!tutorialCompleted) {
+      // Still record any new regions silently so the tutorial doesn't
+      // trigger a stale popup the moment it completes.
+      for (const r of regions) seenRegions.current.add(r);
+      return;
+    }
+    const seen = seenRegions.current;
     const additions: number[] = [];
-    for (const r of regions) if (!prev.has(r)) additions.push(r);
+    for (const r of regions) if (!seen.has(r)) additions.push(r);
     if (additions.length > 0) {
+      for (const r of additions) seen.add(r);
       const newOnes = additions.map((id) => {
         const def = getRegion(id);
         return {
@@ -77,8 +94,7 @@ export function HeroMoments() {
       setQueue((q) => [...q, ...newOnes]);
       haptics.success();
     }
-    prevRegions.current = regions;
-  }, [regions, tailColor]);
+  }, [regions, tailColor, tutorialCompleted]);
 
   const top = queue[0] ?? null;
   const dismiss = (): void => setQueue((q) => q.slice(1));

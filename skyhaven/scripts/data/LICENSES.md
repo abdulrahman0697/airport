@@ -1,5 +1,19 @@
 # Data licenses
 
+## countries.geojson
+
+Source: **Natural Earth** (`ne_110m_admin_0_countries`)
+- URL: https://www.naturalearthdata.com/
+- Mirror: https://github.com/nvkelso/natural-earth-vector
+- License: **Public Domain** — https://www.naturalearthdata.com/about/terms-of-use/
+
+Not committed (gitignored). Regenerate with:
+
+```
+curl -sSL -o scripts/data/countries.geojson https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson
+node scripts/build-countries.mjs
+```
+
 ## airports.csv
 
 Source: **OurAirports** by David Megginson

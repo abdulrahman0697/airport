@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { useGameStore } from '../../state/store';
+import type { Airport } from '../../data/airports';
+import { selectUnlockedRegions, useGameStore } from '../../state/store';
 import type { WorldStage } from '../../world/WorldStage';
+import { AirportTooltip } from './AirportTooltip';
 
 export function WorldView() {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<WorldStage | null>(null);
   const [fps, setFps] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [tapped, setTapped] = useState<{ airport: Airport; x: number; y: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -23,21 +26,20 @@ export function WorldView() {
         }
         stageRef.current = stage;
 
-        // Initial push of routes, tail color, collectibles.
         stage.setCollectibleTapHandler((id) => {
           useGameStore.getState().claimCollectible(id);
+        });
+        stage.setAirportTapHandler((airport, screen) => {
+          setTapped({ airport, x: screen.x, y: screen.y });
         });
         const s = useGameStore.getState().state;
         if (s) {
           stage.setTailColor(s.tailColor);
+          stage.setUnlockedRegions(new Set<number>(s.unlockedRegions));
           stage.setRoutes(s.routes);
           stage.setCollectibles(s.collectibles);
         }
 
-        // Throttle the FPS readout to ~1 Hz. Updating per-frame triggers
-        // a React re-render of WorldView at 60 fps which compounds with
-        // other 10 Hz tick subscribers; the debug HUD doesn't need that
-        // resolution.
         let lastFpsAt = 0;
         const loop = (now: number): void => {
           if (!stageRef.current) return;
@@ -63,7 +65,7 @@ export function WorldView() {
     };
   }, []);
 
-  // Subscribe to routes, tail color, and collectibles; push into stage.
+  // Subscribe to store and push relevant slices into the stage.
   useEffect(() => {
     const unsub = useGameStore.subscribe((state, prev) => {
       const stage = stageRef.current;
@@ -77,9 +79,14 @@ export function WorldView() {
       if (!prev.state || state.state.collectibles !== prev.state.collectibles) {
         stage.setCollectibles(state.state.collectibles);
       }
+      if (!prev.state || state.state.unlockedRegions !== prev.state.unlockedRegions) {
+        stage.setUnlockedRegions(new Set<number>(state.state.unlockedRegions));
+      }
     });
     return unsub;
   }, []);
+
+  const unlocked = useGameStore(selectUnlockedRegions);
 
   return (
     <div style={hostStyle} ref={hostRef}>
@@ -92,6 +99,15 @@ export function WorldView() {
       <div style={fpsBadge} aria-hidden>
         {fps} fps
       </div>
+      {tapped && (
+        <AirportTooltip
+          airport={tapped.airport}
+          x={tapped.x}
+          y={tapped.y}
+          unlocked={unlocked.includes(tapped.airport.region)}
+          onClose={(): void => setTapped(null)}
+        />
+      )}
     </div>
   );
 }

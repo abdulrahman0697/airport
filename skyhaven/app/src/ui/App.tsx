@@ -9,6 +9,7 @@ import { EventPopup } from './components/EventPopup';
 import { FuelGauge } from './components/FuelGauge';
 import { GoalChainCard } from './components/GoalChainCard';
 import { HeroMoments } from './components/HeroMoments';
+import { IntroSplash } from './components/IntroSplash';
 import { OfflineSummary } from './components/OfflineSummary';
 import { Tutorial } from './components/Tutorial';
 import { VintageDropPopup } from './components/VintageDropPopup';
@@ -50,6 +51,7 @@ export function App() {
       <OfflineSummary />
       <DailyReward />
       <Tutorial />
+      <IntroSplash />
     </ErrorBoundary>
   );
 }

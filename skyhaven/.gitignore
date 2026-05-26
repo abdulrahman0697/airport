@@ -36,3 +36,4 @@ functions/.env
 
 # Raw data inputs (regenerate via scripts/build-airports.mjs)
 scripts/data/*.csv
+scripts/data/*.geojson

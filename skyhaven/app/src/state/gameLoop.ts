@@ -15,6 +15,7 @@
 import { applyDailyLogin } from '../engine/dailyLogin';
 import { createInitialState } from '../engine/initialState';
 import { TICK_MS } from '../engine/tick';
+import { detectHomeRegion } from './homeRegion';
 import { createSaveScheduler, loadSave } from './persistence';
 import { useGameStore } from './store';
 
@@ -70,7 +71,7 @@ export function createGameLoop(deps: GameLoopDeps = { now: () => Date.now() }): 
       if (intervalId) return;
 
       const restored = await loadSave(deps.now());
-      const baseInitial = restored ?? createInitialState(deps.now());
+      const baseInitial = restored ?? createInitialState(deps.now(), detectHomeRegion());
       // First-of-day login is deferred while the tutorial is running
       // so the modal doesn't overlap the playable walkthrough. When
       // the tutorial completes, App.tsx's effect re-runs applyDailyLogin
