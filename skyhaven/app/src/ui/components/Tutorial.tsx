@@ -389,45 +389,53 @@ const shellBottom: React.CSSProperties = {
 const card: React.CSSProperties = {
   width: '100%',
   maxWidth: 380,
-  background: 'linear-gradient(160deg, #2C3A6A, #1B2547)',
+  // Lit-up card: bright bluish-grey panel so the text reads cleanly
+  // against the dimmed world behind it. Doubled-up borders + a strong
+  // cyan halo so the eye locks on to it.
+  background: 'linear-gradient(160deg, #E8EEFB, #C8D4F0)',
   borderRadius: 16,
   padding: '16px 18px 18px',
-  border: '1px solid rgba(90,200,250,0.6)',
-  boxShadow: '0 18px 60px rgba(0,0,0,0.55), 0 0 36px rgba(90,200,250,0.32)',
+  border: '2px solid #5AC8FA',
+  boxShadow:
+    '0 18px 60px rgba(0,0,0,0.55), 0 0 0 4px rgba(90,200,250,0.18), 0 0 48px rgba(90,200,250,0.55)',
   pointerEvents: 'auto',
   zIndex: 203,
   position: 'relative',
+  color: '#0B1120',
 };
 const kicker: React.CSSProperties = {
   fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase',
-  color: '#CBD5E1',
+  color: '#475569',
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
   gap: 12,
+  fontWeight: 700,
 };
 const waitTag: React.CSSProperties = {
   fontSize: 9,
-  color: '#5AC8FA',
+  color: '#0B4F73',
   letterSpacing: '0.06em',
   textTransform: 'none',
+  fontWeight: 700,
 };
 const waitTagNeutral: React.CSSProperties = {
   fontSize: 9,
-  color: '#94A3B8',
+  color: '#475569',
   letterSpacing: '0.06em',
   textTransform: 'none',
+  fontWeight: 700,
 };
 const title: React.CSSProperties = {
   margin: '6px 0 6px',
-  fontSize: 18,
-  color: '#F8FAFC',
-  fontWeight: 700,
+  fontSize: 19,
+  color: '#0B1120',
+  fontWeight: 800,
   lineHeight: 1.2,
 };
 const body: React.CSSProperties = {
   margin: '0 0 12px',
-  color: '#F8FAFC',
+  color: '#1E293B',
   fontSize: 13,
   lineHeight: 1.5,
 };
@@ -448,15 +456,16 @@ const fieldLabel: React.CSSProperties = {
   fontSize: 11,
   letterSpacing: '0.1em',
   textTransform: 'uppercase',
-  color: '#94A3B8',
+  color: '#475569',
+  fontWeight: 700,
   marginTop: 12,
   marginBottom: 4,
 };
 const input: React.CSSProperties = {
   width: '100%',
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  color: '#F8FAFC',
+  background: 'rgba(11,17,32,0.06)',
+  border: '1px solid rgba(11,17,32,0.18)',
+  color: '#0B1120',
   padding: '10px',
   borderRadius: 8,
   fontSize: 14,

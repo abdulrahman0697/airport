@@ -550,49 +550,55 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
                       </button>
                     )}
                   </div>
-                  <div style={destScroller}>
-                    {destGroupedByCountry.length === 0 ? (
-                      <div style={empty}>No reachable destinations in range.</div>
-                    ) : destGroupedByCountry.map((group) => {
-                      const open = destExpanded.has(group.iso);
-                      return (
-                        <section key={group.iso} style={addHubCountry}>
-                          <button
-                            onClick={(): void => toggleDestCountry(group.iso)}
-                            style={addHubCountryHeaderBtn}
-                            aria-expanded={open}
-                          >
-                            <span>{group.label}</span>
-                            <span style={addHubCountryChev}>{open ? '▾' : '▸'} {group.airports.length}</span>
-                          </button>
-                          {open && (
-                            <ul style={list}>
-                              {group.airports.map((a) => {
-                                const selected = destIata === a.iata;
-                                return (
-                                  <li key={a.iata} style={destListItem}>
-                                    <button
-                                      onClick={(): void => setDestIata(a.iata)}
-                                      style={{
-                                        ...destItemBtn,
-                                        ...(selected ? destItemSelected : {}),
-                                      }}
-                                    >
-                                      <div style={destItemLeft}>
-                                        <div style={destItemIata}>{a.iata}</div>
-                                        <div style={destItemCity}>{a.city || group.label}</div>
-                                      </div>
-                                      {selected && <span style={destItemCheck}>✓</span>}
-                                    </button>
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          )}
-                        </section>
-                      );
-                    })}
-                  </div>
+                  {/* Once a destination is picked the country list
+                      collapses so the player can see the route summary
+                      and confirm button. Tap "clear" to pick again. */}
+                  {!destIata && (
+                    <div style={destScroller}>
+                      {destGroupedByCountry.length === 0 ? (
+                        <div style={empty}>No reachable destinations in range.</div>
+                      ) : destGroupedByCountry.map((group) => {
+                        const open = destExpanded.has(group.iso);
+                        return (
+                          <section key={group.iso} style={addHubCountry}>
+                            <button
+                              onClick={(): void => toggleDestCountry(group.iso)}
+                              style={addHubCountryHeaderBtn}
+                              aria-expanded={open}
+                            >
+                              <span>{group.label}</span>
+                              <span style={addHubCountryChev}>{open ? '▾' : '▸'} {group.airports.length}</span>
+                            </button>
+                            {open && (
+                              <ul style={list}>
+                                {group.airports.map((a) => {
+                                  return (
+                                    <li key={a.iata} style={destListItem}>
+                                      <button
+                                        onClick={(): void => {
+                                          setDestIata(a.iata);
+                                          // Collapse all countries — the
+                                          // selected airport now stands
+                                          // alone in the header above.
+                                          setDestExpanded(new Set());
+                                        }}
+                                        style={destItemBtn}
+                                      >
+                                        <div style={destItemLeft}>
+                                          <div style={destItemIata}>{a.iata}</div>
+                                          <div style={destItemCity}>{a.city || group.label}</div>
+                                        </div>
+                                      </button>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            )}
+                          </section>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -812,18 +818,11 @@ const destItemBtn: React.CSSProperties = {
   cursor: 'pointer', fontFamily: 'inherit',
   textAlign: 'left', color: '#F8FAFC', minHeight: 44,
 };
-const destItemSelected: React.CSSProperties = {
-  background: 'rgba(90,200,250,0.18)',
-  borderColor: 'rgba(90,200,250,0.6)',
-};
 const destItemLeft: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 2 };
 const destItemIata: React.CSSProperties = {
   fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', color: '#F8FAFC',
 };
 const destItemCity: React.CSSProperties = { fontSize: 11, color: '#94A3B8' };
-const destItemCheck: React.CSSProperties = {
-  color: '#5AC8FA', fontSize: 14, fontWeight: 700,
-};
 const addHubRight: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4,
 };
