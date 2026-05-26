@@ -1,7 +1,7 @@
 import { Application, Container, Ticker } from 'pixi.js';
 import { loadTopAirports } from '../data/airports';
 import type { Route } from '../engine/types';
-import { createAirportPins } from './AirportPins';
+import { createAirportPinsDeferred } from './AirportPins';
 import { ArcsLayer } from './Arcs';
 import { createBasemap } from './Basemap';
 import { Camera } from './Camera';
@@ -36,7 +36,11 @@ export interface WorldStage {
 
 export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
   const app = new Application();
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  // Capping DPR at 1.5 keeps the canvas backing-buffer well under
+  // memory pressure on mid-range Android WebViews while staying sharp
+  // enough for the placeholder map. Phase 10 visual polish can bump
+  // back up to 2× alongside the proper basemap textures.
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
   // eslint-disable-next-line no-console
   console.info('[skyhaven] WorldStage init', {
     hostW: host.clientWidth,
@@ -76,18 +80,23 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
   const basemap = createBasemap();
   const clouds: CloudLayer = createClouds();
   const arcsLayer = new ArcsLayer(airports);
-  const pins = createAirportPins(airports);
+  const { root: pins, ready: pinsReady } = createAirportPinsDeferred(airports);
 
   root.addChild(basemap);
   root.addChild(clouds.container);
   root.addChild(arcsLayer.container);
   root.addChild(pins);
   // eslint-disable-next-line no-console
-  console.info('[skyhaven] WorldStage layers ready', {
+  console.info('[skyhaven] WorldStage layers ready (basemap + arcs); pins deferred', {
     airports: airports.length,
-    pinChunks: pins.children.length,
     cameraScale: camera.state.scale.toFixed(3),
     cameraTxTy: [camera.state.tx.toFixed(0), camera.state.ty.toFixed(0)],
+  });
+  void pinsReady.then(() => {
+    // eslint-disable-next-line no-console
+    console.info('[skyhaven] WorldStage pins built and cached', {
+      chunks: pins.children.length,
+    });
   });
 
   function applyCamera(): void {
