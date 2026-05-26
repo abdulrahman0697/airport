@@ -1,11 +1,12 @@
 import { Application, Container, Ticker } from 'pixi.js';
 import { loadTopAirports } from '../data/airports';
-import type { Route } from '../engine/types';
+import type { Collectible, Route } from '../engine/types';
 import { createAirportPinsDeferred } from './AirportPins';
 import { ArcsLayer } from './Arcs';
 import { createBasemap } from './Basemap';
 import { Camera } from './Camera';
 import { createClouds, type CloudLayer } from './Clouds';
+import { CollectiblesLayer } from './Collectibles';
 
 /**
  * Top-level Pixi world stage.
@@ -32,6 +33,8 @@ export interface WorldStage {
   fps(): number;
   setRoutes(routes: readonly Route[]): void;
   setTailColor(hex: string): void;
+  setCollectibles(items: readonly Collectible[]): void;
+  setCollectibleTapHandler(fn: (id: string) => void): void;
 }
 
 export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
@@ -82,10 +85,17 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
   const arcsLayer = new ArcsLayer(airports);
   const { root: pins, ready: pinsReady } = createAirportPinsDeferred(airports, app.renderer);
 
+  // The world stage owns the tap dispatcher — the React layer registers
+  // its handler via `setCollectibleTapHandler`. Default is a no-op.
+  let collectibleTapHandler: (id: string) => void = () => undefined;
+  const collectiblesLayer = new CollectiblesLayer(app.renderer, (id) => collectibleTapHandler(id));
+
+  app.stage.eventMode = 'static';
   root.addChild(basemap);
   root.addChild(clouds.container);
   root.addChild(arcsLayer.container);
   root.addChild(pins);
+  root.addChild(collectiblesLayer.container);
   // eslint-disable-next-line no-console
   console.info('[skyhaven] WorldStage layers ready (basemap + arcs); pins deferred', {
     airports: airports.length,
@@ -204,6 +214,7 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
       camera.tick(dtMs);
       clouds.tick(dtMs);
     }
+    collectiblesLayer.tick(dtMs);
     applyCamera();
   };
   app.ticker.add(onTick);
@@ -215,6 +226,8 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
     fps: () => app.ticker.FPS,
     setRoutes: (routes) => arcsLayer.setRoutes(routes),
     setTailColor: (hex) => arcsLayer.setTailColor(hex),
+    setCollectibles: (items) => collectiblesLayer.setCollectibles(items),
+    setCollectibleTapHandler: (fn) => { collectibleTapHandler = fn; },
     destroy: () => {
       app.ticker.remove(onTick);
       app.canvas.removeEventListener('pointerdown', onDown);
@@ -226,6 +239,7 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
       app.canvas.removeEventListener('webglcontextrestored', onRestored);
       ro.disconnect();
       arcsLayer.destroy();
+      collectiblesLayer.destroy();
       app.destroy(true, { children: true, texture: true });
     },
   };

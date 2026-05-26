@@ -13,6 +13,7 @@ import { getAircraftDef } from '../data/aircraft';
 import { loadTopAirports } from '../data/airports';
 import { FUEL_CAPACITY_TIERS, nextCapacityTier } from '../data/fuelCapacity';
 import { FUEL_CONTRACTS, getFuelContract } from '../data/fuelContracts';
+import { getManagerDef, managerCost, type ManagerKind } from '../data/managers';
 import { getRegion, REGIONS } from '../data/regions';
 import { conditionBand, repairCost } from './condition';
 import { haversineKm } from './distance';
@@ -25,7 +26,7 @@ import {
   routesAtAirport,
 } from './hubs';
 import { upgradeCost, UPGRADE_SPECS, type UpgradeKind } from './upgrades';
-import type { Hub, OwnedAircraft, Route, RoutePricing, SaveState } from './types';
+import type { Collectible, Hub, OwnedAircraft, Route, RoutePricing, SaveState } from './types';
 
 export class ActionError extends Error {
   constructor(public readonly code: string, message: string) {
@@ -359,8 +360,45 @@ export function upgradeHub(state: SaveState, iata: string): SaveState {
   return { ...state, cash: state.cash - cost, hubs };
 }
 
+// ─── Hire manager ────────────────────────────────────────────────────
+export function hireManager(state: SaveState, iata: string, kind: ManagerKind): SaveState {
+  const def = getManagerDef(kind);
+  if (!def) throw new ActionError('UNKNOWN_MANAGER', `No manager ${kind}`);
+  const idx = state.hubs.findIndex((h) => h.iata === iata);
+  if (idx < 0) throw new ActionError('NO_HUB', `${iata} is not a hub`);
+  const hub = state.hubs[idx]!;
+  if (hub.managers[kind]) {
+    throw new ActionError('MANAGER_HIRED', `${def.name} already at ${iata}`);
+  }
+  const cost = managerCost(kind, hub.level);
+  if (state.cash < cost) {
+    throw new ActionError('INSUFFICIENT_CASH', `Need $${cost.toLocaleString()} to hire ${def.name}`);
+  }
+  const hubs = state.hubs.slice();
+  hubs[idx] = { ...hub, managers: { ...hub.managers, [kind]: true } };
+  const next = { ...state, cash: state.cash - cost, hubs };
+  // Logistics Director changes burn rate → recompute demand.
+  return kind === 'logisticsDirector' ? withRecomputedDemand(next) : next;
+}
+
+// ─── Claim collectible ───────────────────────────────────────────────
+export function claimCollectible(state: SaveState, id: string): SaveState {
+  const idx = state.collectibles.findIndex((c) => c.id === id);
+  if (idx < 0) throw new ActionError('NO_COLLECTIBLE', `No collectible ${id}`);
+  const c = state.collectibles[idx]!;
+  const collectibles = state.collectibles.slice();
+  collectibles.splice(idx, 1);
+  if (c.reward.kind === 'cash') {
+    return { ...state, cash: state.cash + c.reward.amount, collectibles };
+  }
+  // fuel reward
+  const newReserve = Math.min(state.fuel.capacity, state.fuel.reserve + c.reward.amount);
+  return { ...state, fuel: { ...state.fuel, reserve: newReserve }, collectibles };
+}
+
 // Re-export so the store / UI can render data tables without separate imports.
 export { FUEL_CAPACITY_TIERS, FUEL_CONTRACTS, REGIONS };
+export type { Collectible };
 
 /** Convenience selector for the UI's "needs attention" badge. */
 export function fleetSummary(state: SaveState): {

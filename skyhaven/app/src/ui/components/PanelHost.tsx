@@ -19,6 +19,7 @@ export const usePanelStore = create<PanelStore>((set) => ({
 const FleetPanel = lazy(() => import('../panels/FleetPanel').then((m) => ({ default: m.FleetPanel })));
 const RoutesPanel = lazy(() => import('../panels/RoutesPanel').then((m) => ({ default: m.RoutesPanel })));
 const FuelPanel = lazy(() => import('../panels/FuelPanel').then((m) => ({ default: m.FuelPanel })));
+const CrewPanel = lazy(() => import('../panels/CrewPanel').then((m) => ({ default: m.CrewPanel })));
 
 export function PanelHost() {
   const active = usePanelStore((s) => s.active);
@@ -49,8 +50,8 @@ export function PanelHost() {
             {active === 'fleet' && <FleetPanel />}
             {active === 'routes' && <RoutesPanel />}
             {active === 'fuel' && <FuelPanel />}
+            {active === 'crew' && <CrewPanel />}
             {active === 'store' && <ComingSoonPanel name="Store" />}
-            {active === 'crew' && <ComingSoonPanel name="Crew" />}
           </Suspense>
         </motion.div>
       )}

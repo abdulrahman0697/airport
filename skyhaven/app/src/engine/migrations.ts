@@ -19,8 +19,18 @@ import type { SaveState } from './types';
 type Migration = (input: Record<string, unknown>) => Record<string, unknown>;
 
 const MIGRATIONS: Record<number, Migration> = {
-  // Future migrations land here, e.g.:
-  // 1: (s) => ({ ...s, schemaVersion: 2, newField: defaultValue }),
+  // v1 → v2 (Phase 6): introduce live events + roaming collectibles.
+  // Each pre-Phase-6 save just needs the new arrays defaulted to empty
+  // and the next-spawn timers reset to 0 so the tick rolls them on its
+  // first pass after upgrade.
+  1: (s) => ({
+    ...s,
+    schemaVersion: 2,
+    activeEvents: [],
+    collectibles: [],
+    nextEventCheckMs: 0,
+    nextCollectibleSpawnMs: 0,
+  }),
 };
 
 /**

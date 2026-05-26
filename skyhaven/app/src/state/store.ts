@@ -15,8 +15,10 @@ import {
   ActionError,
   applyUpgrade as applyUpgradeAction,
   buyAircraft as buyAircraftAction,
+  claimCollectible as claimCollectibleAction,
   closeRoute as closeRouteAction,
   createHub as createHubAction,
+  hireManager as hireManagerAction,
   openRoute as openRouteAction,
   repairAircraft as repairAircraftAction,
   setRoutePricing as setRoutePricingAction,
@@ -26,6 +28,7 @@ import {
   upgradeHub as upgradeHubAction,
 } from '../engine/actions';
 import { tick, type TickContext } from '../engine/tick';
+import type { ManagerKind } from '../data/managers';
 import type { RoutePricing, SaveState } from '../engine/types';
 import type { UpgradeKind } from '../engine/upgrades';
 
@@ -47,6 +50,8 @@ interface GameStore {
   unlockRegion: (regionId: number) => ActionResult;
   createHub: (iata: string) => ActionResult;
   upgradeHub: (iata: string) => ActionResult;
+  hireManager: (iata: string, kind: ManagerKind) => ActionResult;
+  claimCollectible: (id: string) => ActionResult;
 }
 
 function runAction(
@@ -95,6 +100,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     runAction(set, get, (s) => createHubAction(s, iata)),
   upgradeHub: (iata) =>
     runAction(set, get, (s) => upgradeHubAction(s, iata)),
+  hireManager: (iata, kind) =>
+    runAction(set, get, (s) => hireManagerAction(s, iata, kind)),
+  claimCollectible: (id) =>
+    runAction(set, get, (s) => claimCollectibleAction(s, id)),
 }));
 
 export type { GameStore };
@@ -109,3 +118,5 @@ export const selectFleet = (s: GameStore) => s.state?.fleet ?? [];
 export const selectRoutes = (s: GameStore) => s.state?.routes ?? [];
 export const selectHubs = (s: GameStore) => s.state?.hubs ?? [];
 export const selectUnlockedRegions = (s: GameStore) => s.state?.unlockedRegions ?? [];
+export const selectActiveEvents = (s: GameStore) => s.state?.activeEvents ?? [];
+export const selectCollectibles = (s: GameStore) => s.state?.collectibles ?? [];

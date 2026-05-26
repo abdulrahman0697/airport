@@ -23,11 +23,15 @@ export function WorldView() {
         }
         stageRef.current = stage;
 
-        // Initial push of routes + tail color from the current store state.
+        // Initial push of routes, tail color, collectibles.
+        stage.setCollectibleTapHandler((id) => {
+          useGameStore.getState().claimCollectible(id);
+        });
         const s = useGameStore.getState().state;
         if (s) {
           stage.setTailColor(s.tailColor);
           stage.setRoutes(s.routes);
+          stage.setCollectibles(s.collectibles);
         }
 
         const loop = (): void => {
@@ -51,7 +55,7 @@ export function WorldView() {
     };
   }, []);
 
-  // Subscribe to routes + tail color and push into the stage when present.
+  // Subscribe to routes, tail color, and collectibles; push into stage.
   useEffect(() => {
     const unsub = useGameStore.subscribe((state, prev) => {
       const stage = stageRef.current;
@@ -61,6 +65,9 @@ export function WorldView() {
       }
       if (!prev.state || state.state.tailColor !== prev.state.tailColor) {
         stage.setTailColor(state.state.tailColor);
+      }
+      if (!prev.state || state.state.collectibles !== prev.state.collectibles) {
+        stage.setCollectibles(state.state.collectibles);
       }
     });
     return unsub;

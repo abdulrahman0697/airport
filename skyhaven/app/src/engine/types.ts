@@ -8,7 +8,7 @@
  * `migrations.ts` and bumps `CURRENT_SCHEMA_VERSION`.
  */
 
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 export type AircraftCategory = 'passenger' | 'cargo' | 'classic';
 export type RoutePricing = 'economy' | 'balanced' | 'premium';
@@ -81,6 +81,28 @@ export interface FuelState {
   contracts: string[];
 }
 
+export interface ActiveEvent {
+  readonly id: string;
+  readonly kind: import('../data/events').EventKind;
+  /** null for global events, region id otherwise. */
+  readonly regionId: number | null;
+  /** Epoch ms when the event started. */
+  readonly startedAt: number;
+  /** Real-time duration in ms (frozen at spawn for determinism). */
+  readonly durationMs: number;
+}
+
+export interface Collectible {
+  readonly id: string;
+  readonly lat: number;
+  readonly lon: number;
+  /** Epoch ms when this collectible was spawned. */
+  readonly spawnedAt: number;
+  /** Epoch ms after which the collectible despawns un-claimed. */
+  readonly expiresAt: number;
+  readonly reward: { kind: 'cash' | 'fuel'; amount: number };
+}
+
 export interface SaveState {
   schemaVersion: number;
   /** Epoch ms of last engine integration. Drives offline catch-up. */
@@ -103,6 +125,15 @@ export interface SaveState {
 
   unlockedRegions: number[];
   tierUnlocked: number;
+
+  /** Live events currently affecting the airline (Phase 6 §4.12). */
+  activeEvents: ActiveEvent[];
+  /** Drifting roaming collectibles awaiting a tap (Phase 6 §4.12). */
+  collectibles: Collectible[];
+  /** Epoch ms after which the next event-spawn roll should happen. */
+  nextEventCheckMs: number;
+  /** Epoch ms after which the next collectible-spawn roll should happen. */
+  nextCollectibleSpawnMs: number;
 
   vintage: string[];
   ecoRating: number;

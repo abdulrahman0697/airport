@@ -3,38 +3,140 @@
  *
  * The tick function is **pure** — no `Date.now`, no `Math.random`, no
  * `performance.now` direct reads. Everything time-related flows in
- * through `TickContext`. This is what lets the Web Worker (Phase 9)
- * deterministically catch up on offline progress.
+ * through `TickContext`. Random events use `state.seed`, advanced via
+ * `nextSeed()`, so a single big-dt catch-up tick is reproducible.
  *
- * One tick advances the world by `ctx.dtMs` milliseconds. For online
- * play the game loop calls `tick(state, { dtMs: 100, ... })` at 10 Hz;
- * for offline catch-up the worker calls it with a single larger dtMs.
- *
- * Phase 3 adds:
- *  - Condition decay per leg (BRD §4.2)
- *  - Cumulative-earnings tier-unlock gates (BRD §6.1)
- *  - Flight-hours accumulation in game-time hours
- *
- * Phase 4 adds:
- *  - Fuel reserve evolution (supply − demand × dt, clamped to capacity)
- *  - When reserve = 0 AND demand > supply, every assigned aircraft is
- *    treated as fuel-starved and earns nothing this tick. Under strict
- *    gating this only happens during fuel-price events (Phase 6).
+ * Phase 6 adds:
+ *  - Live-event scheduling (`rollEvent` + expiry) and per-tick effects
+ *    woven into `legRevenue` (revenue + load factor) and the fuel
+ *    supply rate (price-spike events).
+ *  - Maintenance Chief auto-repair: any hub aircraft below the
+ *    threshold gets a one-shot heal if cash permits.
+ *  - Roaming-collectible spawn / expiry (the world layer renders them
+ *    and the user taps to claim).
  */
 
 import { getAircraftDef } from '../data/aircraft';
+import { loadTopAirports } from '../data/airports';
+import { repairCost } from './condition';
 import { TIME_COMPRESSION, legDurationMs, legRevenue } from './economy';
+import {
+  COLLECTIBLE_INTERVAL_MS,
+  COLLECTIBLE_SPAWN_PROBABILITY,
+  EVENT_CHECK_INTERVAL_MS,
+  expireEvents,
+  fuelSupplyEventMultiplier,
+  nextSeed,
+  rollEvent,
+} from './events';
+import { MAINTENANCE_CHIEF_THRESHOLD } from './managers';
 import { maxTierUnlockedFor } from './tierUnlocks';
-import type { OwnedAircraft, Route, SaveState } from './types';
+import type { ActiveEvent, Collectible, OwnedAircraft, Route, SaveState } from './types';
 
 export const TICK_HZ = 10;
 export const TICK_MS = 1000 / TICK_HZ;
 
 export interface TickContext {
-  /** Wall-clock epoch ms at the moment this tick is being processed. */
   readonly nowMs: number;
-  /** Game-time delta this tick should advance, in real-time ms. */
   readonly dtMs: number;
+}
+
+function uniform(seed: number): number {
+  return seed / 0xFFFFFFFF;
+}
+
+function tickEvents(state: SaveState, ctx: TickContext): {
+  events: ActiveEvent[];
+  seed: number;
+  nextCheckMs: number;
+} {
+  const remaining = expireEvents(state.activeEvents, ctx.nowMs);
+  let seed = state.seed;
+  let nextCheckMs = state.nextEventCheckMs;
+  let events = remaining;
+  while (ctx.nowMs >= nextCheckMs) {
+    const { newSeed, event } = rollEvent(seed, state.unlockedRegions, nextCheckMs);
+    seed = newSeed;
+    if (event) events = [...events, event];
+    nextCheckMs += EVENT_CHECK_INTERVAL_MS;
+  }
+  return { events, seed, nextCheckMs };
+}
+
+function tickCollectibles(state: SaveState, ctx: TickContext, seed: number): {
+  collectibles: Collectible[];
+  seed: number;
+  nextSpawnMs: number;
+} {
+  const remaining = state.collectibles.filter((c) => ctx.nowMs < c.expiresAt);
+  let s = seed;
+  let nextSpawnMs = state.nextCollectibleSpawnMs;
+  let collectibles = remaining;
+  while (ctx.nowMs >= nextSpawnMs) {
+    s = nextSeed(s);
+    if (uniform(s) < COLLECTIBLE_SPAWN_PROBABILITY && collectibles.length < 3) {
+      s = nextSeed(s);
+      const airports = loadTopAirports().filter((a) => state.unlockedRegions.includes(a.region));
+      if (airports.length > 0) {
+        const idx = Math.floor(uniform(s) * airports.length) % airports.length;
+        const anchor = airports[idx]!;
+        s = nextSeed(s);
+        const isCash = uniform(s) < 0.7;
+        s = nextSeed(s);
+        const rewardAmount = isCash
+          ? Math.round(2000 * (1 + uniform(s) * 8))      // $2K–$18K
+          : Math.round(200 + uniform(s) * 500);           // 200–700 fuel
+        collectibles = [
+          ...collectibles,
+          {
+            id: `col-${nextSpawnMs}-${(s % 100_000).toString(36)}`,
+            lat: anchor.lat + (uniform(nextSeed(s)) - 0.5) * 6,
+            lon: anchor.lon + (uniform(nextSeed(s + 1)) - 0.5) * 12,
+            spawnedAt: nextSpawnMs,
+            expiresAt: nextSpawnMs + 90_000,
+            reward: { kind: isCash ? 'cash' : 'fuel', amount: rewardAmount },
+          },
+        ];
+      }
+    }
+    nextSpawnMs += COLLECTIBLE_INTERVAL_MS;
+  }
+  return { collectibles, seed: s, nextSpawnMs };
+}
+
+function tickMaintenanceChief(
+  fleet: OwnedAircraft[],
+  routes: readonly Route[],
+  hubs: readonly { iata: string; managers: { maintenanceChief: boolean } }[],
+  cashIn: number,
+): { fleet: OwnedAircraft[]; cash: number; mutated: boolean } {
+  let cash = cashIn;
+  let mutated = false;
+  let outFleet: OwnedAircraft[] = fleet;
+  // Build a fast lookup: which IATAs have a Maintenance Chief.
+  const hubsWithMC = new Set(
+    hubs.filter((h) => h.managers.maintenanceChief).map((h) => h.iata),
+  );
+  if (hubsWithMC.size === 0) return { fleet: outFleet, cash, mutated };
+
+  for (let i = 0; i < outFleet.length; i++) {
+    const a = outFleet[i]!;
+    if (a.condition >= MAINTENANCE_CHIEF_THRESHOLD) continue;
+    if (a.condition >= 100) continue;
+    if (!a.routeId) continue;
+    const route = routes.find((r) => r.id === a.routeId);
+    if (!route) continue;
+    if (!hubsWithMC.has(route.originIata) && !hubsWithMC.has(route.destIata)) continue;
+    const cost = repairCost(a);
+    if (cash < cost) continue;
+    cash -= cost;
+    if (!mutated) {
+      outFleet = outFleet.slice();
+      mutated = true;
+    }
+    outFleet[i] = { ...a, condition: 100 };
+  }
+  return { fleet: outFleet, cash, mutated };
 }
 
 export function tick(state: SaveState, ctx: TickContext): SaveState {
@@ -42,19 +144,24 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
     return { ...state, lastSeenTimestamp: ctx.nowMs };
   }
 
+  // ── Event scheduling ─────────────────────────────────────────────
+  const eventResult = tickEvents(state, ctx);
+  const collectibleResult = tickCollectibles(state, ctx, eventResult.seed);
+  const activeEvents = eventResult.events;
+
+  // ── Fuel reserve evolution with event modifier ──────────────────
+  const supplyMul = fuelSupplyEventMultiplier(activeEvents);
+  const effectiveSupply = state.fuel.supplyRate * supplyMul;
   const dtSec = ctx.dtMs / 1000;
-  const fuel = state.fuel;
-  const netRate = fuel.supplyRate - fuel.demandRate;
+  const netRate = effectiveSupply - state.fuel.demandRate;
 
-  // Evolve the reserve. Reserve fills under strict gating; the negative
-  // branch is the fuel-price-spike path covered by Phase 6 events.
-  let nextReserve = fuel.reserve + netRate * dtSec;
+  let nextReserve = state.fuel.reserve + netRate * dtSec;
   if (nextReserve < 0) nextReserve = 0;
-  if (nextReserve > fuel.capacity) nextReserve = fuel.capacity;
+  if (nextReserve > state.fuel.capacity) nextReserve = state.fuel.capacity;
 
-  // Fleet is fuel-starved when the reserve is empty AND we'd dig deeper.
   const fuelStarved = nextReserve <= 0 && netRate < 0;
 
+  // ── Fleet + route advancement ────────────────────────────────────
   const fleetById = new Map(state.fleet.map((a) => [a.uid, a]));
   let cash = state.cash;
   let lifetime = state.lifetimeEarnings;
@@ -85,7 +192,12 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
       progress -= 1;
       direction = direction === 'outbound' ? 'inbound' : 'outbound';
       const effectiveCondition = Math.max(0, aircraft.condition - conditionDelta);
-      revenueThisTick += legRevenue(r, { ...aircraft, condition: effectiveCondition }, state.hubs);
+      revenueThisTick += legRevenue(
+        r,
+        { ...aircraft, condition: effectiveCondition },
+        state.hubs,
+        activeEvents,
+      );
       hoursAccumulated += gameHoursPerLeg;
       conditionDelta += def.conditionDecayRate * gameHoursPerLeg;
     }
@@ -117,6 +229,14 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
     return { ...r, legProgress: progress, legDirection: direction };
   });
 
+  // ── Maintenance Chief auto-repair (after route advancement) ─────
+  const maintResult = tickMaintenanceChief(nextFleet, nextRoutes, state.hubs, cash);
+  if (maintResult.mutated) {
+    nextFleet = maintResult.fleet;
+    cash = maintResult.cash;
+    fleetMutated = true;
+  }
+
   const tierUnlocked = Math.max(
     state.tierUnlocked,
     maxTierUnlockedFor(lifetime, 4),
@@ -128,7 +248,12 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
     lifetimeEarnings: lifetime,
     fleet: nextFleet,
     routes: nextRoutes,
-    fuel: { ...fuel, reserve: nextReserve },
+    fuel: { ...state.fuel, reserve: nextReserve },
+    activeEvents,
+    collectibles: collectibleResult.collectibles,
+    seed: collectibleResult.seed,
+    nextEventCheckMs: eventResult.nextCheckMs,
+    nextCollectibleSpawnMs: collectibleResult.nextSpawnMs,
     tierUnlocked,
     lastSeenTimestamp: ctx.nowMs,
   };

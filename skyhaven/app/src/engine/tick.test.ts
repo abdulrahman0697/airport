@@ -57,7 +57,9 @@ describe('tick — invariants', () => {
   });
 
   it('degrades condition over flight time', () => {
-    const s0 = createInitialState(0);
+    // Hold the event scheduler off so fuel-price spikes don't drain
+    // the reserve during the catch-up window and ground the fleet.
+    const s0 = { ...createInitialState(0), nextEventCheckMs: 1e15 };
     // 30 real-minutes = 60 game-hours; T1 decay 0.25/gh → -15% condition.
     const s1 = tick(s0, { nowMs: 30 * 60 * 1000, dtMs: 30 * 60 * 1000 });
     const ac = s1.fleet[0]!;

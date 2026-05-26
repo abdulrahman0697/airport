@@ -102,6 +102,10 @@ export function createInitialState(nowMs: number): SaveState {
     },
     unlockedRegions: [3],
     tierUnlocked: 1,
+    activeEvents: [],
+    collectibles: [],
+    nextEventCheckMs: nowMs + 60_000, // first event roll 1 min after start
+    nextCollectibleSpawnMs: nowMs + 90_000,
     vintage: [],
     ecoRating: 0,
     achievements: [],
