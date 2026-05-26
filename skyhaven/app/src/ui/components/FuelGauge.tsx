@@ -53,7 +53,12 @@ export function FuelGauge() {
   const color = empty ? '#F87171' : draining ? '#F59E0B' : '#5AC8FA';
 
   return (
-    <button onClick={(): void => open('fuel')} style={shell} aria-label={`Fuel: ${pct * 100 | 0}%`}>
+    <button
+      data-tutorial="fuel-gauge"
+      onClick={(): void => open('fuel')}
+      style={shell}
+      aria-label={`Fuel: ${pct * 100 | 0}%`}
+    >
       <div style={bar}>
         <div style={{ ...fill, height: `${pct * 100}%`, background: color }} />
       </div>

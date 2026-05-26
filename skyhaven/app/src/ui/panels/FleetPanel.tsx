@@ -14,6 +14,7 @@ import {
   selectCash,
   selectFleet,
   selectTier,
+  selectTutorialCompleted,
   selectVintage,
   useGameStore,
 } from '../../state/store';
@@ -26,12 +27,21 @@ export function FleetPanel() {
   const [tab, setTab] = useState<'owned' | 'buy' | 'vintage'>('owned');
   const fleet = useGameStore(selectFleet);
   const vintage = useGameStore(selectVintage);
+  const tutorialCompleted = useGameStore(selectTutorialCompleted);
+  const resetTutorial = useGameStore((s) => s.resetTutorial);
 
   return (
     <div style={shell}>
       <div style={header}>
         <h2 style={title}>Fleet</h2>
-        <div style={subtitle}>{fleet.length} aircraft</div>
+        <div style={subtitleRow}>
+          <span style={subtitle}>{fleet.length} aircraft</span>
+          {tutorialCompleted && (
+            <button onClick={(): void => { resetTutorial(); }} style={replayLink}>
+              Replay tutorial
+            </button>
+          )}
+        </div>
         <div role="tablist" style={tabs}>
           <button role="tab" onClick={(): void => setTab('owned')}
             style={{ ...tabBtn, ...(tab === 'owned' ? tabActive : {}) }}>
@@ -256,7 +266,24 @@ function BuyRow({ def, unlocked }: { def: AircraftDef; unlocked: boolean }) {
 const shell: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100%' };
 const header: React.CSSProperties = { padding: '20px 16px 8px', borderBottom: '1px solid rgba(255,255,255,0.06)' };
 const title: React.CSSProperties = { margin: 0, fontSize: 22, color: '#F8FAFC' };
-const subtitle: React.CSSProperties = { color: '#94A3B8', fontSize: 12, marginTop: 2 };
+const subtitle: React.CSSProperties = { color: '#94A3B8', fontSize: 12 };
+const subtitleRow: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginTop: 2,
+  gap: 12,
+};
+const replayLink: React.CSSProperties = {
+  background: 'transparent',
+  border: 0,
+  color: '#5AC8FA',
+  fontSize: 11,
+  textDecoration: 'underline',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  padding: 0,
+};
 const tabs: React.CSSProperties = { display: 'flex', gap: 6, marginTop: 12 };
 const tabBtn: React.CSSProperties = {
   background: 'transparent', color: '#94A3B8', border: 0, padding: '8px 14px', borderRadius: 8,

@@ -26,6 +26,7 @@ import {
   hireManager as hireManagerAction,
   openRoute as openRouteAction,
   repairAircraft as repairAircraftAction,
+  resetTutorial as resetTutorialAction,
   setAirlineIdentity as setAirlineIdentityAction,
   setOfflineSummary as setOfflineSummaryAction,
   setRoutePricing as setRoutePricingAction,
@@ -65,6 +66,7 @@ interface GameStore {
   setAirlineIdentity: (name: string, tailColor: string) => ActionResult;
   advanceTutorial: () => ActionResult;
   completeTutorial: () => ActionResult;
+  resetTutorial: () => ActionResult;
   acknowledgeOfflineSummary: () => ActionResult;
   claimDailyReward: () => ActionResult;
   setOfflineSummary: (s: { elapsedMs: number; earnings: number } | null) => void;
@@ -138,6 +140,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     runAction(set, get, (s) => setAirlineIdentityAction(s, name, tailColor)),
   advanceTutorial: () => runAction(set, get, (s) => advanceTutorialAction(s)),
   completeTutorial: () => runAction(set, get, (s) => completeTutorialAction(s)),
+  resetTutorial: () => runAction(set, get, (s) => resetTutorialAction(s)),
   acknowledgeOfflineSummary: () =>
     runAction(set, get, (s) => acknowledgeOfflineSummaryAction(s)),
   claimDailyReward: () => runAction(set, get, (s) => claimDailyRewardAction(s)),

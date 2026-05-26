@@ -34,6 +34,7 @@ export function BottomTabs() {
         return (
           <button
             key={t.id}
+            data-tutorial={`${t.id}-tab`}
             onClick={(): void => {
               if (t.id === 'map') close();
               else open(t.id);

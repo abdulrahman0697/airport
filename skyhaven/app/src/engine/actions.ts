@@ -430,6 +430,11 @@ export function completeTutorial(state: SaveState): SaveState {
   return { ...state, tutorialCompleted: true, tutorialStep: 0 };
 }
 
+/** Replay the playable walkthrough — kicks the tutorial back to step 0. */
+export function resetTutorial(state: SaveState): SaveState {
+  return { ...state, tutorialCompleted: false, tutorialStep: 0 };
+}
+
 // ─── Acknowledge offline summary ─────────────────────────────────────
 export function acknowledgeOfflineSummary(state: SaveState): SaveState {
   if (state.pendingOfflineSummary === null) return state;
