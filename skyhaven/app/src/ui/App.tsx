@@ -22,7 +22,20 @@ export function App() {
   useEffect(() => {
     const loop = createGameLoop();
     void loop.start();
-    return () => { void loop.stop(); };
+    // Cloud sync runs alongside the local game loop. Firebase is a
+    // ~140 KB chunk, so we lazy-import it to keep the cold-start path
+    // light — anonymous sign-in still fires within a second or two of
+    // launch, which is plenty fast for cross-device sync.
+    let stopCloud: (() => void) | null = null;
+    void (async () => {
+      const mod = await import('../backend/cloudSync');
+      const cloud = mod.startCloudSync();
+      stopCloud = (): void => cloud.stop();
+    })();
+    return () => {
+      void loop.stop();
+      stopCloud?.();
+    };
   }, []);
 
   // Deferred daily-login: the modal only fires once the tutorial has

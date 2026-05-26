@@ -1,4 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { signInWithGoogle, signOut } from '../../backend/auth';
+import { useAuth } from '../../backend/useAuth';
 import { AIRCRAFT_DEFS, getAircraftDef } from '../../data/aircraft';
 import { CLASSIC_DEFS } from '../../data/classics';
 import { getRegion, REGIONS } from '../../data/regions';
@@ -97,6 +99,8 @@ export function OfficePanel() {
             </div>
           </div>
         </section>
+
+        <CloudAccountCard />
 
         {/* Tier progress */}
         <section style={card}>
@@ -215,6 +219,92 @@ export function OfficePanel() {
     </div>
   );
 }
+
+/**
+ * Cloud-save account card (BRD §11). Surfaces the current auth state
+ * and offers a Google sign-in upgrade. The card is intentionally low
+ * key — the local game works fine without it; this is for players
+ * who want cross-device sync.
+ */
+function CloudAccountCard() {
+  const user = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const onSignIn = async (): Promise<void> => {
+    setBusy(true); setError(null);
+    const next = await signInWithGoogle();
+    setBusy(false);
+    if (!next) setError("Couldn't sign in. Check connection or try again.");
+  };
+  const onSignOut = async (): Promise<void> => {
+    setBusy(true); setError(null);
+    await signOut();
+    setBusy(false);
+  };
+
+  const status =
+    !user ? 'Offline' :
+    user.providerId === 'google.com' ? 'Cloud sync enabled' :
+    'Anonymous device sync';
+  const statusColor =
+    !user ? '#94A3B8' :
+    user.providerId === 'google.com' ? '#34D399' :
+    '#5AC8FA';
+
+  return (
+    <section style={card}>
+      <div style={sectionHead}>Cloud Save</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: statusColor }}>{status}</div>
+          <div style={subStat}>
+            {!user
+              ? 'Trying to connect — local progress is always safe.'
+              : user.providerId === 'google.com'
+                ? `Signed in as ${user.displayName ?? user.email ?? user.uid.slice(0, 8)}`
+                : 'Sign in to keep your progress across devices.'}
+          </div>
+        </div>
+        {user?.providerId === 'google.com' ? (
+          <button
+            onClick={(): void => { void onSignOut(); }}
+            disabled={busy}
+            style={cloudBtnSecondary}
+          >
+            Sign out
+          </button>
+        ) : (
+          <button
+            onClick={(): void => { void onSignIn(); }}
+            disabled={busy}
+            style={cloudBtnPrimary}
+          >
+            {busy ? '…' : 'Sign in with Google'}
+          </button>
+        )}
+      </div>
+      {error && <div style={cloudError}>{error}</div>}
+    </section>
+  );
+}
+
+const cloudBtnPrimary: React.CSSProperties = {
+  background: '#5AC8FA', color: '#0B1120', border: 0,
+  borderRadius: 8, padding: '10px 14px', fontWeight: 700,
+  cursor: 'pointer', minHeight: 40, fontFamily: 'inherit',
+  fontSize: 12, whiteSpace: 'nowrap',
+};
+const cloudBtnSecondary: React.CSSProperties = {
+  background: 'transparent', color: '#94A3B8',
+  border: '1px solid rgba(255,255,255,0.15)',
+  borderRadius: 8, padding: '8px 14px', minHeight: 36,
+  cursor: 'pointer', fontFamily: 'inherit', fontSize: 12,
+};
+const cloudError: React.CSSProperties = {
+  marginTop: 8, padding: '6px 10px', fontSize: 11, color: '#F87171',
+  background: 'rgba(248,113,113,0.08)', borderRadius: 6,
+};
 
 function Stat({ label, value, sub, accent }: {
   label: string;
