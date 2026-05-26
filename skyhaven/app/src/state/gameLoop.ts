@@ -12,10 +12,13 @@
  * The clock is injected so tests can drive it deterministically.
  */
 
+import { applyDailyLogin } from '../engine/dailyLogin';
 import { createInitialState } from '../engine/initialState';
 import { TICK_MS } from '../engine/tick';
 import { createSaveScheduler, loadSave } from './persistence';
 import { useGameStore } from './store';
+
+const OFFLINE_SUMMARY_THRESHOLD_MS = 60_000;
 
 export interface GameLoopDeps {
   now: () => number;
@@ -48,7 +51,17 @@ export function createGameLoop(deps: GameLoopDeps = { now: () => Date.now() }): 
     const now = deps.now();
     const elapsedMs = Math.min(OFFLINE_CAP_MS, Math.max(0, now - cur.lastSeenTimestamp));
     if (elapsedMs <= 0) return;
+    const cashBefore = cur.cash;
     useGameStore.getState().applyTick({ nowMs: now, dtMs: elapsedMs });
+    if (elapsedMs >= OFFLINE_SUMMARY_THRESHOLD_MS) {
+      const after = useGameStore.getState().state;
+      if (after) {
+        const earnings = Math.max(0, after.cash - cashBefore);
+        if (earnings > 0) {
+          useGameStore.getState().setOfflineSummary({ elapsedMs, earnings });
+        }
+      }
+    }
     scheduler?.schedule();
   };
 
@@ -57,7 +70,10 @@ export function createGameLoop(deps: GameLoopDeps = { now: () => Date.now() }): 
       if (intervalId) return;
 
       const restored = await loadSave(deps.now());
-      const initial = restored ?? createInitialState(deps.now());
+      const baseInitial = restored ?? createInitialState(deps.now());
+      // First-of-day login: streak bookkeeping happens here so the
+      // pendingDailyReward modal fires as part of the resume flow.
+      const initial = applyDailyLogin(baseInitial, deps.now());
       useGameStore.getState().setState(initial);
 
       scheduler = createSaveScheduler(() => {

@@ -66,6 +66,21 @@ const MIGRATIONS: Record<number, Migration> = {
       pendingVintageDrop: null,
     };
   },
+  // v4 → v5 (Phase 9): adds tutorial / goal-chain / offline-summary /
+  // daily-login fields. Pre-Phase-9 players have already been past the
+  // intro experience by definition, so we mark the tutorial and goal
+  // chain as completed for them. Daily-login starts fresh.
+  4: (s) => ({
+    ...s,
+    schemaVersion: 5,
+    tutorialCompleted: true,
+    tutorialStep: 0,
+    goalChainStep: 8,
+    pendingOfflineSummary: null,
+    lastLoginDate: null,
+    loginStreak: 0,
+    pendingDailyReward: null,
+  }),
 };
 
 /**

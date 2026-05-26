@@ -8,7 +8,7 @@
  * `migrations.ts` and bumps `CURRENT_SCHEMA_VERSION`.
  */
 
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 5;
 
 export type AircraftCategory = 'passenger' | 'cargo' | 'classic';
 export type RoutePricing = 'economy' | 'balanced' | 'premium';
@@ -151,4 +151,22 @@ export interface SaveState {
   /** Eco Rating score 0..100 (BRD §4.10). */
   ecoRating: number;
   achievements: string[];
+
+  // ── Player journey (Phase 9 / BRD §5) ────────────────────────────
+  /** Has the player completed the playable tutorial? */
+  tutorialCompleted: boolean;
+  /** Current step within the tutorial (0..N). */
+  tutorialStep: number;
+  /**
+   * Current step within the early-goal chain (0..8). 8 == graduated.
+   * Each goal awards cash on completion; the tick auto-detects them.
+   */
+  goalChainStep: number;
+  /** Cash earned during the most recent catch-up window, awaiting modal ack. */
+  pendingOfflineSummary: { elapsedMs: number; earnings: number } | null;
+  /** Daily-login bookkeeping. */
+  lastLoginDate: string | null; // ISO yyyy-mm-dd
+  loginStreak: number;
+  /** A daily-login reward awaiting modal ack. */
+  pendingDailyReward: { day: number; amount: number } | null;
 }

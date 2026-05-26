@@ -411,6 +411,46 @@ export function acknowledgeVintageDrop(state: SaveState): SaveState {
   return { ...state, pendingVintageDrop: null };
 }
 
+// ─── Tutorial (Phase 9) ──────────────────────────────────────────────
+export function setAirlineIdentity(
+  state: SaveState,
+  name: string,
+  tailColor: string,
+): SaveState {
+  const clean = (name || '').trim().slice(0, 20) || state.airlineName;
+  const code = (clean.replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase()) || state.code;
+  return { ...state, airlineName: clean, tailColor, code };
+}
+
+export function advanceTutorial(state: SaveState): SaveState {
+  return { ...state, tutorialStep: state.tutorialStep + 1 };
+}
+
+export function completeTutorial(state: SaveState): SaveState {
+  return { ...state, tutorialCompleted: true, tutorialStep: 0 };
+}
+
+// ─── Acknowledge offline summary ─────────────────────────────────────
+export function acknowledgeOfflineSummary(state: SaveState): SaveState {
+  if (state.pendingOfflineSummary === null) return state;
+  return { ...state, pendingOfflineSummary: null };
+}
+
+// ─── Claim daily reward ──────────────────────────────────────────────
+export function claimDailyReward(state: SaveState): SaveState {
+  if (state.pendingDailyReward === null) return state;
+  const { amount } = state.pendingDailyReward;
+  return { ...state, cash: state.cash + amount, pendingDailyReward: null };
+}
+
+// ─── Set pending offline summary (used by gameLoop) ──────────────────
+export function setOfflineSummary(
+  state: SaveState,
+  summary: { elapsedMs: number; earnings: number } | null,
+): SaveState {
+  return { ...state, pendingOfflineSummary: summary };
+}
+
 // ─── Claim collectible ───────────────────────────────────────────────
 export function claimCollectible(state: SaveState, id: string): SaveState {
   const idx = state.collectibles.findIndex((c) => c.id === id);

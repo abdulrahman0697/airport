@@ -12,16 +12,22 @@
 
 import { create } from 'zustand';
 import {
+  acknowledgeOfflineSummary as acknowledgeOfflineSummaryAction,
   acknowledgeVintageDrop as acknowledgeVintageDropAction,
   ActionError,
+  advanceTutorial as advanceTutorialAction,
   applyUpgrade as applyUpgradeAction,
   buyAircraft as buyAircraftAction,
   claimCollectible as claimCollectibleAction,
+  claimDailyReward as claimDailyRewardAction,
   closeRoute as closeRouteAction,
+  completeTutorial as completeTutorialAction,
   createHub as createHubAction,
   hireManager as hireManagerAction,
   openRoute as openRouteAction,
   repairAircraft as repairAircraftAction,
+  setAirlineIdentity as setAirlineIdentityAction,
+  setOfflineSummary as setOfflineSummaryAction,
   setRoutePricing as setRoutePricingAction,
   signFuelContract as signFuelContractAction,
   unlockRegion as unlockRegionAction,
@@ -54,6 +60,14 @@ interface GameStore {
   hireManager: (iata: string, kind: ManagerKind) => ActionResult;
   claimCollectible: (id: string) => ActionResult;
   acknowledgeVintageDrop: () => ActionResult;
+
+  // Player journey (Phase 9)
+  setAirlineIdentity: (name: string, tailColor: string) => ActionResult;
+  advanceTutorial: () => ActionResult;
+  completeTutorial: () => ActionResult;
+  acknowledgeOfflineSummary: () => ActionResult;
+  claimDailyReward: () => ActionResult;
+  setOfflineSummary: (s: { elapsedMs: number; earnings: number } | null) => void;
 }
 
 function runAction(
@@ -120,6 +134,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
     runAction(set, get, (s) => claimCollectibleAction(s, id)),
   acknowledgeVintageDrop: () =>
     runAction(set, get, (s) => acknowledgeVintageDropAction(s)),
+  setAirlineIdentity: (name, tailColor) =>
+    runAction(set, get, (s) => setAirlineIdentityAction(s, name, tailColor)),
+  advanceTutorial: () => runAction(set, get, (s) => advanceTutorialAction(s)),
+  completeTutorial: () => runAction(set, get, (s) => completeTutorialAction(s)),
+  acknowledgeOfflineSummary: () =>
+    runAction(set, get, (s) => acknowledgeOfflineSummaryAction(s)),
+  claimDailyReward: () => runAction(set, get, (s) => claimDailyRewardAction(s)),
+  setOfflineSummary: (summary): void => {
+    const cur = get().state;
+    if (!cur) return;
+    set({ state: setOfflineSummaryAction(cur, summary) });
+  },
 }));
 
 export type { GameStore };
@@ -151,3 +177,10 @@ export const selectCollectibles = (s: GameStore) => s.state?.collectibles ?? EMP
 export const selectVintage = (s: GameStore) => s.state?.vintage ?? EMPTY_STRINGS;
 export const selectEcoRating = (s: GameStore) => s.state?.ecoRating ?? 0;
 export const selectPendingVintageDrop = (s: GameStore) => s.state?.pendingVintageDrop ?? null;
+export const selectTutorial = (s: GameStore) => ({
+  completed: s.state?.tutorialCompleted ?? true,
+  step: s.state?.tutorialStep ?? 0,
+});
+export const selectGoalChainStep = (s: GameStore) => s.state?.goalChainStep ?? 0;
+export const selectPendingOfflineSummary = (s: GameStore) => s.state?.pendingOfflineSummary ?? null;
+export const selectPendingDailyReward = (s: GameStore) => s.state?.pendingDailyReward ?? null;

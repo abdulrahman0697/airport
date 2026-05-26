@@ -21,6 +21,7 @@ import { loadTopAirports } from '../data/airports';
 import { repairCost } from './condition';
 import { computeEcoScore, ecoRevenueBonus } from './eco';
 import { TIME_COMPRESSION, legDurationMs, legRevenue } from './economy';
+import { processGoalChain } from './goalChain';
 import { processVintageMilestones, vintageGlobalYieldBonus } from './vintage';
 import {
   COLLECTIBLE_INTERVAL_MS,
@@ -321,5 +322,8 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
   // Vintage milestone processing happens after the cash credit lands.
   // The helper queues a `pendingVintageDrop` for the UI popup; ack via
   // the `acknowledgeVintageDrop` action clears it.
-  return processVintageMilestones(next);
+  const withVintage = processVintageMilestones(next);
+  // Goal-chain auto-detection runs last so it sees the freshly-credited
+  // cash + any vintage drops in the same tick.
+  return processGoalChain(withVintage);
 }

@@ -111,5 +111,12 @@ export function createInitialState(nowMs: number): SaveState {
     pendingVintageDrop: null,
     ecoRating: 0,
     achievements: [],
+    tutorialCompleted: false,
+    tutorialStep: 0,
+    goalChainStep: 0,
+    pendingOfflineSummary: null,
+    lastLoginDate: null,
+    loginStreak: 0,
+    pendingDailyReward: null,
   };
 }
