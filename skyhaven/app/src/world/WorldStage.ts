@@ -80,7 +80,7 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
   const basemap = createBasemap();
   const clouds: CloudLayer = createClouds();
   const arcsLayer = new ArcsLayer(airports);
-  const { root: pins, ready: pinsReady } = createAirportPinsDeferred(airports);
+  const { root: pins, ready: pinsReady } = createAirportPinsDeferred(airports, app.renderer);
 
   root.addChild(basemap);
   root.addChild(clouds.container);

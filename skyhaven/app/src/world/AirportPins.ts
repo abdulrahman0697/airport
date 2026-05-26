@@ -1,19 +1,19 @@
-import { Container, Graphics } from 'pixi.js';
+import { Container, Graphics, Sprite, type Renderer, type Texture } from 'pixi.js';
 import type { Airport } from '../data/airports';
 import { lonLatToWorld } from './projection';
 
 /**
- * Render airport pins (BRD §9.1).
+ * Render airport pins as sprites against a per-tier baked texture.
  *
- * Pins are built into chunked `Graphics` objects (256 pins per chunk
- * — Pixi 8 silently drops draw calls past per-batch limits at the
- * ~1,100-pin scale otherwise). The completed pin container is then
- * cached to a texture (`cacheAsTexture`) so per-frame cost drops to a
- * single textured quad rather than 70k tessellated triangles.
+ * Why sprites and not Graphics: the Graphics path tessellated ~70k
+ * triangles for 1,100 pin pairs on first draw — slow first-paint on
+ * mid-range Android, and caching the whole layer to a single texture
+ * (the previous defensive fix) made pins blurry on zoom-in.
  *
- * Build is split into a deferred-build path so the basemap can paint
- * before pin tessellation runs — first map paint goes from seconds to
- * milliseconds on slower devices.
+ * Sprites with a shared texture batch into one draw call per texture
+ * and stay sharp at any zoom because the GPU samples the high-res
+ * source texture with bilinear filtering rather than magnifying a
+ * pre-rasterised quad.
  */
 const PIN_PALETTE: Record<number, { fill: number; glow: number; radius: number; alpha: number }> = {
   4: { fill: 0x5ac8fa, glow: 0x5ac8fa, radius: 3.0, alpha: 1.0 },
@@ -22,39 +22,91 @@ const PIN_PALETTE: Record<number, { fill: number; glow: number; radius: number; 
   1: { fill: 0xb6d4ff, glow: 0x5ac8fa, radius: 1.2, alpha: 0.7 },
 };
 
-const CHUNK_SIZE = 256;
+/** Pad the texture canvas so the halo's edge isn't clipped by sampling. */
+const TEX_PADDING = 1;
 
-/** Build the pin Graphics chunks synchronously. */
-export function createAirportPins(airports: readonly Airport[]): Container {
+/** Generate a small texture for one size-tier (halo + core).  */
+function makeTierTexture(renderer: Renderer, tier: number): { texture: Texture; worldSize: number } {
+  const style = PIN_PALETTE[tier] ?? PIN_PALETTE[1]!;
+  const haloR = style.radius * 2.5;
+  const worldSize = (haloR + TEX_PADDING) * 2;
+  const center = worldSize / 2;
+  const g = new Graphics();
+  g.circle(center, center, haloR).fill({ color: style.glow, alpha: style.alpha * 0.18 });
+  g.circle(center, center, style.radius).fill({ color: style.fill, alpha: style.alpha });
+  // resolution 4× the world-space size keeps the source texture sharp
+  // at the highest reachable camera zoom (camera caps maxScale at 6×).
+  const texture = renderer.generateTexture({
+    target: g,
+    resolution: 4,
+    antialias: true,
+  });
+  g.destroy();
+  return { texture, worldSize };
+}
+
+export function createAirportPins(
+  airports: readonly Airport[],
+  renderer: Renderer,
+): Container {
   const root = new Container();
   root.label = 'airport-pins';
-  buildPinsInto(root, airports);
+
+  const tiers = new Map<number, { texture: Texture; worldSize: number }>();
+  for (const tier of [1, 2, 3, 4]) {
+    tiers.set(tier, makeTierTexture(renderer, tier));
+  }
+
+  for (const a of airports) {
+    const t = tiers.get(a.sizeTier) ?? tiers.get(1)!;
+    const sprite = new Sprite(t.texture);
+    sprite.anchor.set(0.5);
+    sprite.width = t.worldSize;
+    sprite.height = t.worldSize;
+    const { x, y } = lonLatToWorld(a.lon, a.lat);
+    sprite.position.set(x, y);
+    root.addChild(sprite);
+  }
+
   return root;
 }
 
 /**
- * Build the pin chunks across multiple `requestAnimationFrame` callbacks
- * so the rest of the world layer (basemap, clouds) can paint immediately.
- * Resolves once every pin chunk has been attached and the container has
- * been baked to a cached texture.
+ * Build pins across multiple animation frames so the basemap + arcs
+ * can paint immediately. Resolves once every pin is attached.
  */
-export function createAirportPinsDeferred(airports: readonly Airport[]): {
-  root: Container;
-  ready: Promise<void>;
-} {
+export function createAirportPinsDeferred(
+  airports: readonly Airport[],
+  renderer: Renderer,
+): { root: Container; ready: Promise<void> } {
   const root = new Container();
   root.label = 'airport-pins';
 
+  const tiers = new Map<number, { texture: Texture; worldSize: number }>();
+  for (const tier of [1, 2, 3, 4]) {
+    tiers.set(tier, makeTierTexture(renderer, tier));
+  }
+
+  const CHUNK = 256;
   const ready = new Promise<void>((resolve) => {
     let idx = 0;
     const step = (): void => {
       if (idx >= airports.length) {
-        bakeAndCache(root);
         resolve();
         return;
       }
-      const end = Math.min(airports.length, idx + CHUNK_SIZE);
-      buildOneChunk(root, airports, idx, end);
+      const end = Math.min(airports.length, idx + CHUNK);
+      for (let i = idx; i < end; i++) {
+        const a = airports[i]!;
+        const t = tiers.get(a.sizeTier) ?? tiers.get(1)!;
+        const sprite = new Sprite(t.texture);
+        sprite.anchor.set(0.5);
+        sprite.width = t.worldSize;
+        sprite.height = t.worldSize;
+        const { x, y } = lonLatToWorld(a.lon, a.lat);
+        sprite.position.set(x, y);
+        root.addChild(sprite);
+      }
       idx = end;
       requestAnimationFrame(step);
     };
@@ -62,41 +114,4 @@ export function createAirportPinsDeferred(airports: readonly Airport[]): {
   });
 
   return { root, ready };
-}
-
-function buildPinsInto(root: Container, airports: readonly Airport[]): void {
-  for (let start = 0; start < airports.length; start += CHUNK_SIZE) {
-    const end = Math.min(airports.length, start + CHUNK_SIZE);
-    buildOneChunk(root, airports, start, end);
-  }
-  bakeAndCache(root);
-}
-
-function buildOneChunk(root: Container, airports: readonly Airport[], start: number, end: number): void {
-  const halos = new Graphics();
-  const cores = new Graphics();
-  for (let i = start; i < end; i++) {
-    const a = airports[i]!;
-    const { x, y } = lonLatToWorld(a.lon, a.lat);
-    const style = PIN_PALETTE[a.sizeTier] ?? PIN_PALETTE[1]!;
-    halos.circle(x, y, style.radius * 2.5).fill({ color: style.glow, alpha: style.alpha * 0.18 });
-    cores.circle(x, y, style.radius).fill({ color: style.fill, alpha: style.alpha });
-  }
-  root.addChild(halos);
-  root.addChild(cores);
-}
-
-function bakeAndCache(root: Container): void {
-  // Cache the assembled pin container to a render texture. Per-frame
-  // cost drops from "tessellate 70k triangles" to "draw one textured
-  // quad". The texture is sized to the container's local bounds at
-  // half resolution — pins are small enough that subpixel blur is
-  // imperceptible at fitting zoom.
-  try {
-    root.cacheAsTexture({ resolution: 0.5, antialias: true });
-  } catch {
-    // Older Pixi versions or unusual renderer states may not support
-    // cacheAsTexture; falling through to direct render is a perf hit
-    // but visually identical.
-  }
 }
