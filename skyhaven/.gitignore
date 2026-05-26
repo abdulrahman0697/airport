@@ -16,6 +16,7 @@ android/.idea/
 android/app/release/
 *.keystore
 !debug.keystore
+!skyhaven-debug.keystore
 google-services.json
 GoogleService-Info.plist
 

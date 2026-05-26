@@ -125,16 +125,20 @@ environment.
 
 1. **Firebase Console → Authentication → Sign-in method** — enable
    **Google** and **Anonymous** providers.
-2. **Android OAuth** — add the Android app's SHA-1 fingerprint
-   under Project settings → General → Your apps → Android. Use:
+2. **Add the committed debug keystore's SHA-1** under Project settings
+   → General → Your apps → Android → SHA certificate fingerprints.
 
-   ```
-   keytool -list -v -alias androiddebugkey \
-     -keystore ~/.android/debug.keystore -storepass android -keypass android
-   ```
+   The repo now ships a stable debug keystore
+   (`skyhaven/android/app/skyhaven-debug.keystore`) so the SHA-1 is
+   the same on every CI run and every developer's machine. Its
+   fingerprints:
 
-   …for the debug build, and your release keystore's SHA-1 before
-   shipping to Play.
+   - **SHA-1**: `06:9E:FD:1E:9C:82:DD:EA:1E:38:6C:EA:C1:10:51:BF:36:E2:BD:E9`
+   - **SHA-256**: `53:C8:22:CC:41:64:45:16:BB:E5:90:75:6F:C9:08:A6:A0:5E:49:89:43:B6:5A:2C:CC:51:48:C3:B3:5C:E4:40`
+
+   Pick **SHA-1** in the form (Google Sign-in requires it; add
+   SHA-256 too if you like). For the production release build, add the
+   release keystore's SHA-1 separately when it lands.
 3. **Download the updated `google-services.json`** — Firebase regenerates
    it with the OAuth client info; drop it into
    `skyhaven/android/app/google-services.json` (replacing the existing
