@@ -14,15 +14,18 @@ import {
   selectCash,
   selectFleet,
   selectTier,
+  selectVintage,
   useGameStore,
 } from '../../state/store';
 import { formatCash } from '../format';
+import { VintageHangar } from './VintageHangar';
 
 type BuyCategoryFilter = 'passenger' | 'cargo';
 
 export function FleetPanel() {
-  const [tab, setTab] = useState<'owned' | 'buy'>('owned');
+  const [tab, setTab] = useState<'owned' | 'buy' | 'vintage'>('owned');
   const fleet = useGameStore(selectFleet);
+  const vintage = useGameStore(selectVintage);
 
   return (
     <div style={shell}>
@@ -38,10 +41,16 @@ export function FleetPanel() {
             style={{ ...tabBtn, ...(tab === 'buy' ? tabActive : {}) }}>
             Buy aircraft
           </button>
+          <button role="tab" onClick={(): void => setTab('vintage')}
+            style={{ ...tabBtn, ...(tab === 'vintage' ? tabActive : {}) }}>
+            Vintage ({vintage.length})
+          </button>
         </div>
       </div>
       <div style={body}>
-        {tab === 'owned' ? <OwnedList /> : <BuyList />}
+        {tab === 'owned' && <OwnedList />}
+        {tab === 'buy' && <BuyList />}
+        {tab === 'vintage' && <VintageHangar />}
       </div>
     </div>
   );

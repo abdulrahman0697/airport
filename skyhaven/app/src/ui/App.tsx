@@ -5,6 +5,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { EventBanner } from './components/EventBanner';
 import { EventPopup } from './components/EventPopup';
 import { FuelGauge } from './components/FuelGauge';
+import { VintageDropPopup } from './components/VintageDropPopup';
 import { PanelHost } from './components/PanelHost';
 import { TopBar } from './components/TopBar';
 import { WorldView } from './components/WorldView';
@@ -25,6 +26,7 @@ export function App() {
       <PanelHost />
       <BottomTabs />
       <EventPopup />
+      <VintageDropPopup />
     </ErrorBoundary>
   );
 }

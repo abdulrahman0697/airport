@@ -9,6 +9,7 @@ import {
   useGameStore,
 } from '../../state/store';
 import { formatRate } from '../format';
+import { EcoBadge } from './EcoBadge';
 import { RollingCash } from './RollingCash';
 
 export function TopBar() {
@@ -40,6 +41,7 @@ export function TopBar() {
         <div>
           <div style={brandText}>{airlineName.toUpperCase()}</div>
           <div style={tierPill}>T{tier} unlocked</div>
+          <EcoBadge />
         </div>
       </div>
       <div style={cashCol}>

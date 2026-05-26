@@ -107,6 +107,8 @@ export function createInitialState(nowMs: number): SaveState {
     nextEventCheckMs: nowMs + 60_000, // first event roll 1 min after start
     nextCollectibleSpawnMs: nowMs + 90_000,
     vintage: [],
+    vintageMilestonesConsumed: 0,
+    pendingVintageDrop: null,
     ecoRating: 0,
     achievements: [],
   };

@@ -12,6 +12,7 @@
 
 import { create } from 'zustand';
 import {
+  acknowledgeVintageDrop as acknowledgeVintageDropAction,
   ActionError,
   applyUpgrade as applyUpgradeAction,
   buyAircraft as buyAircraftAction,
@@ -52,6 +53,7 @@ interface GameStore {
   upgradeHub: (iata: string) => ActionResult;
   hireManager: (iata: string, kind: ManagerKind) => ActionResult;
   claimCollectible: (id: string) => ActionResult;
+  acknowledgeVintageDrop: () => ActionResult;
 }
 
 function runAction(
@@ -116,6 +118,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     runAction(set, get, (s) => hireManagerAction(s, iata, kind)),
   claimCollectible: (id) =>
     runAction(set, get, (s) => claimCollectibleAction(s, id)),
+  acknowledgeVintageDrop: () =>
+    runAction(set, get, (s) => acknowledgeVintageDropAction(s)),
 }));
 
 export type { GameStore };
@@ -136,6 +140,7 @@ const EMPTY_HUBS = Object.freeze([]) as readonly SaveState['hubs'][number][];
 const EMPTY_NUMBERS = Object.freeze([]) as readonly number[];
 const EMPTY_EVENTS = Object.freeze([]) as readonly SaveState['activeEvents'][number][];
 const EMPTY_COLLECTIBLES = Object.freeze([]) as readonly SaveState['collectibles'][number][];
+const EMPTY_STRINGS = Object.freeze([]) as readonly string[];
 
 export const selectFleet = (s: GameStore) => s.state?.fleet ?? EMPTY_OWNED_AIRCRAFT;
 export const selectRoutes = (s: GameStore) => s.state?.routes ?? EMPTY_ROUTES;
@@ -143,3 +148,6 @@ export const selectHubs = (s: GameStore) => s.state?.hubs ?? EMPTY_HUBS;
 export const selectUnlockedRegions = (s: GameStore) => s.state?.unlockedRegions ?? EMPTY_NUMBERS;
 export const selectActiveEvents = (s: GameStore) => s.state?.activeEvents ?? EMPTY_EVENTS;
 export const selectCollectibles = (s: GameStore) => s.state?.collectibles ?? EMPTY_COLLECTIBLES;
+export const selectVintage = (s: GameStore) => s.state?.vintage ?? EMPTY_STRINGS;
+export const selectEcoRating = (s: GameStore) => s.state?.ecoRating ?? 0;
+export const selectPendingVintageDrop = (s: GameStore) => s.state?.pendingVintageDrop ?? null;

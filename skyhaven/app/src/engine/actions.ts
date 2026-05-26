@@ -405,6 +405,12 @@ export function hireManager(state: SaveState, iata: string, kind: ManagerKind): 
   return kind === 'logisticsDirector' ? withRecomputedDemand(next) : next;
 }
 
+// ─── Acknowledge vintage drop ────────────────────────────────────────
+export function acknowledgeVintageDrop(state: SaveState): SaveState {
+  if (state.pendingVintageDrop === null) return state;
+  return { ...state, pendingVintageDrop: null };
+}
+
 // ─── Claim collectible ───────────────────────────────────────────────
 export function claimCollectible(state: SaveState, id: string): SaveState {
   const idx = state.collectibles.findIndex((c) => c.id === id);

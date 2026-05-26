@@ -19,7 +19,9 @@
 import { getAircraftDef } from '../data/aircraft';
 import { loadTopAirports } from '../data/airports';
 import { repairCost } from './condition';
+import { computeEcoScore, ecoRevenueBonus } from './eco';
 import { TIME_COMPRESSION, legDurationMs, legRevenue } from './economy';
+import { processVintageMilestones, vintageGlobalYieldBonus } from './vintage';
 import {
   COLLECTIBLE_INTERVAL_MS,
   COLLECTIBLE_SPAWN_PROBABILITY,
@@ -193,6 +195,14 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
   // announce phase shows a popup but doesn't modify revenue or fuel.
   const running = runningEventsOf(activeEvents, ctx.nowMs);
 
+  // ── Vintage + Eco global multipliers ────────────────────────────
+  // Computed once per tick from state at tick-start; classics added
+  // mid-tick via processVintageMilestones don't retroactively boost
+  // earnings within the same tick.
+  const ecoScoreAtStart = computeEcoScore(state.fleet);
+  const globalYieldMult =
+    1 + vintageGlobalYieldBonus(state.vintage) + ecoRevenueBonus(ecoScoreAtStart);
+
   // ── Fuel reserve evolution with event modifier ──────────────────
   const supplyMul = fuelSupplyEventMultiplier(running);
   const effectiveSupply = state.fuel.supplyRate * supplyMul;
@@ -241,6 +251,7 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
         { ...aircraft, condition: effectiveCondition },
         state.hubs,
         running,
+        globalYieldMult,
       );
       hoursAccumulated += gameHoursPerLeg;
       conditionDelta += def.conditionDecayRate * gameHoursPerLeg;
@@ -286,7 +297,11 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
     maxTierUnlockedFor(lifetime),
   );
 
-  return {
+  // Eco score reflects the fleet *after* tick mutations; tiering shifts
+  // smoothly as fuel-eff upgrades land or modern aircraft join.
+  const ecoRating = Math.round(computeEcoScore(nextFleet));
+
+  const next: SaveState = {
     ...state,
     cash,
     lifetimeEarnings: lifetime,
@@ -299,6 +314,12 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
     nextEventCheckMs: eventResult.nextCheckMs,
     nextCollectibleSpawnMs: collectibleResult.nextSpawnMs,
     tierUnlocked,
+    ecoRating,
     lastSeenTimestamp: ctx.nowMs,
   };
+
+  // Vintage milestone processing happens after the cash credit lands.
+  // The helper queues a `pendingVintageDrop` for the UI popup; ack via
+  // the `acknowledgeVintageDrop` action clears it.
+  return processVintageMilestones(next);
 }

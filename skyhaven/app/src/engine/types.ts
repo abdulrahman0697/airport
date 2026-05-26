@@ -8,7 +8,7 @@
  * `migrations.ts` and bumps `CURRENT_SCHEMA_VERSION`.
  */
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 export type AircraftCategory = 'passenger' | 'cargo' | 'classic';
 export type RoutePricing = 'economy' | 'balanced' | 'premium';
@@ -137,7 +137,18 @@ export interface SaveState {
   /** Epoch ms after which the next collectible-spawn roll should happen. */
   nextCollectibleSpawnMs: number;
 
+  /** IDs of collected classic aircraft (BRD §4.9). */
   vintage: string[];
+  /**
+   * Total lifetime-earning vintage milestones the player has been awarded.
+   * Each milestone yields either a new classic or, once the set is full,
+   * a cash bonus. Tracked separately from `vintage.length` because the
+   * post-completion milestones also count.
+   */
+  vintageMilestonesConsumed: number;
+  /** Most recent un-acknowledged classic drop (UI shows a popup). */
+  pendingVintageDrop: string | null;
+  /** Eco Rating score 0..100 (BRD §4.10). */
   ecoRating: number;
   achievements: string[];
 }

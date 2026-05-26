@@ -53,6 +53,19 @@ const MIGRATIONS: Record<number, Migration> = {
       };
     }),
   }),
+  // v3 → v4 (Phase 8): vintage milestones tracked separately so post-
+  // completion cash awards don't double-fire. Existing classics count
+  // as already-consumed milestones so the tick doesn't reroll them.
+  3: (s) => {
+    const existing = (s as Record<string, unknown>).vintageMilestonesConsumed;
+    const vintageLen = Array.isArray(s.vintage) ? (s.vintage as unknown[]).length : 0;
+    return {
+      ...s,
+      schemaVersion: 4,
+      vintageMilestonesConsumed: typeof existing === 'number' ? existing : vintageLen,
+      pendingVintageDrop: null,
+    };
+  },
 };
 
 /**
