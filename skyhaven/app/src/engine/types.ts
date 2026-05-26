@@ -8,7 +8,7 @@
  * `migrations.ts` and bumps `CURRENT_SCHEMA_VERSION`.
  */
 
-export const CURRENT_SCHEMA_VERSION = 5;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 export type AircraftCategory = 'passenger' | 'cargo' | 'classic';
 export type RoutePricing = 'economy' | 'balanced' | 'premium';
@@ -169,4 +169,9 @@ export interface SaveState {
   loginStreak: number;
   /** A daily-login reward awaiting modal ack. */
   pendingDailyReward: { day: number; amount: number } | null;
+  /**
+   * After unlocking a region the UI prompts for a free hub pick in it.
+   * Null when no pick is outstanding.
+   */
+  pendingHubPickRegion: number | null;
 }

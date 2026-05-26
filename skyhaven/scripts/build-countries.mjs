@@ -4,10 +4,13 @@
  *
  * Input:  scripts/data/countries.geojson (Natural Earth ne_110m, CC0)
  * Output: app/src/data/countries.json
- *         — a compact array of polygons, each as a flat Float32-ish
- *           array of [lon0, lat0, lon1, lat1, …]. We pre-simplify each
- *           ring with Ramer-Douglas-Peucker so the runtime can render
- *           every country in a single Graphics object without choking.
+ *         — { polygons: [{ iso, region, ring }] }
+ *           where `region` is the SkyHaven region 1..9 (same mapping as
+ *           the airport build script) and `ring` is a flat coordinate
+ *           array [lon0, lat0, lon1, lat1, …].
+ *
+ * Pre-simplifies each ring with Ramer-Douglas-Peucker so the runtime
+ * can render every country in a single Graphics object without choking.
  *
  * Run from skyhaven/: node scripts/build-countries.mjs
  */
@@ -25,9 +28,41 @@ if (!existsSync(SRC)) {
   process.exit(1);
 }
 
+// Region mapping by ISO country code — duplicated from
+// build-airports.mjs (same source of truth).
+const NA = new Set(['US', 'CA', 'MX', 'BM']);
+const LATAM = new Set([
+  'AR','BO','BR','CL','CO','CR','CU','DO','EC','SV','GT','GY','HN','HT','JM','NI','PA','PE','PR','PY','SR','TT','UY','VE','BS','BB','BZ','GD','LC','VC','AG','DM','KN','TC','KY','VG','AI','MS',
+]);
+const EUROPE = new Set([
+  'AD','AL','AT','BA','BE','BG','BY','CH','CY','CZ','DE','DK','EE','ES','FI','FO','FR','GB','GR','HR','HU','IE','IS','IT','LI','LT','LU','LV','MC','MD','ME','MK','MT','NL','NO','PL','PT','RO','RS','RU','SE','SI','SK','SM','TR','UA','VA','XK','GI','GG','JE','IM','AX',
+]);
+const MIDDLE_EAST = new Set(['AE','BH','IL','IQ','IR','JO','KW','LB','OM','PS','QA','SA','SY','YE']);
+const AFRICA = new Set([
+  'AO','BF','BI','BJ','BW','CD','CF','CG','CI','CM','CV','DJ','DZ','EG','EH','ER','ET','GA','GH','GM','GN','GQ','GW','KE','KM','LR','LS','LY','MA','MG','ML','MR','MU','MW','MZ','NA','NE','NG','RE','RW','SC','SD','SH','SL','SN','SO','SS','ST','SZ','TD','TG','TN','TZ','UG','YT','ZA','ZM','ZW',
+]);
+const SOUTH_ASIA = new Set(['AF','BD','BT','IN','LK','MV','NP','PK']);
+const EAST_ASIA = new Set(['CN','HK','JP','KP','KR','MN','MO','TW']);
+const SOUTHEAST_ASIA = new Set(['BN','ID','KH','LA','MM','MY','PH','SG','TH','TL','VN']);
+const OCEANIA = new Set(['AS','AU','CK','FJ','FM','GU','KI','MH','MP','NC','NR','NU','NZ','PF','PG','PN','PW','SB','TK','TO','TV','VU','WS','WF']);
+
+function regionOf(iso) {
+  if (!iso) return 0;
+  if (NA.has(iso)) return 1;
+  if (LATAM.has(iso)) return 2;
+  if (EUROPE.has(iso)) return 3;
+  if (MIDDLE_EAST.has(iso)) return 4;
+  if (AFRICA.has(iso)) return 5;
+  if (SOUTH_ASIA.has(iso)) return 6;
+  if (EAST_ASIA.has(iso)) return 7;
+  if (SOUTHEAST_ASIA.has(iso)) return 8;
+  if (OCEANIA.has(iso)) return 9;
+  return 0;
+}
+
 /** Ramer-Douglas-Peucker on a flat ring of [lon, lat] pairs. */
 function simplifyRing(ring, epsilon) {
-  if (ring.length <= 4) return ring; // [lon0,lat0,lon1,lat1]
+  if (ring.length <= 4) return ring;
   function dist2(ax, ay, bx, by, px, py) {
     const dx = bx - ax, dy = by - ay;
     const t = dx === 0 && dy === 0 ? 0 : ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy);
@@ -61,28 +96,30 @@ function simplifyRing(ring, epsilon) {
 }
 
 const raw = JSON.parse(readFileSync(SRC, 'utf8'));
-const out = [];
-const EPSILON_DEG = 0.4; // ~44km — coarse enough for the placeholder basemap
+const polygons = [];
+const EPSILON_DEG = 0.4;
 
 for (const feat of raw.features) {
   const geom = feat.geometry;
   if (!geom) continue;
-  const polygons = geom.type === 'Polygon' ? [geom.coordinates]
-                : geom.type === 'MultiPolygon' ? geom.coordinates
-                : [];
-  for (const poly of polygons) {
-    // First ring is outer, others are holes — for our flat-fill basemap
-    // we just take the outer (Natural Earth's 110m has very few holes
-    // and they're invisible at this resolution anyway).
+  const props = feat.properties ?? {};
+  const iso = (props.ISO_A2_EH || props.ISO_A2 || props.iso_a2 || '').toUpperCase();
+  const region = regionOf(iso);
+  const ringsList = geom.type === 'Polygon' ? [geom.coordinates]
+                  : geom.type === 'MultiPolygon' ? geom.coordinates
+                  : [];
+  for (const poly of ringsList) {
     const ring = poly[0];
     if (!ring || ring.length < 4) continue;
     const flat = [];
     for (const [lon, lat] of ring) flat.push(lon, lat);
     const simplified = simplifyRing(flat, EPSILON_DEG);
-    if (simplified.length >= 6) out.push(simplified);
+    if (simplified.length >= 6) polygons.push({ iso, region, ring: simplified });
   }
 }
 
-writeFileSync(OUT, JSON.stringify(out));
+writeFileSync(OUT, JSON.stringify({ polygons }));
 const bytes = readFileSync(OUT).length;
-console.log(`Wrote ${out.length} polygons → app/src/data/countries.json (${(bytes / 1024).toFixed(1)} KB)`);
+console.log(`Wrote ${polygons.length} polygons → app/src/data/countries.json (${(bytes / 1024).toFixed(1)} KB)`);
+const regionDist = polygons.reduce((m, p) => { m[p.region] = (m[p.region] || 0) + 1; return m; }, {});
+console.log('Polygons by region:', regionDist);

@@ -7,6 +7,7 @@ import {
   useGameStore,
 } from '../../state/store';
 import { usePanelStore, type PanelId } from './PanelHost';
+import { useUiStore } from '../../state/uiStore';
 import type { SaveState } from '../../engine/types';
 
 /**
@@ -121,6 +122,8 @@ export function Tutorial() {
     if (!completed && step >= STEPS.length) complete();
   }, [completed, step, complete]);
 
+  const introDismissed = useUiStore((s) => s.introDismissed);
+  if (!introDismissed) return null;
   if (completed) return null;
   if (!current) return null;
 

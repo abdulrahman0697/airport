@@ -1,19 +1,18 @@
 /**
  * Bootstrap a fresh airline.
  *
- * Phase 2 starter state: one Tier-1 turboprop on one short regional route.
- * Phase 4: also grants the free starter fuel contract and Level-0 capacity.
- * Phase 9's playable tutorial replaces the canned name / route with the
- * player's choices.
+ * Phase 10+ starter state: the player has a single idle Tier-1 turbo-
+ * prop and ZERO routes / hubs. The tutorial walks them through naming
+ * the airline, picking a home airport (their first hub), securing
+ * fuel, and opening their first route. Without that the new-route
+ * action can't even succeed — origin must be a hub (BRD §4.3 + locked
+ * decision after Phase 10 owner feedback).
  */
 
 import { AIRCRAFT_DEFS, getAircraftDef } from '../data/aircraft';
-import { loadTopAirports, type Airport } from '../data/airports';
 import { FUEL_CAPACITY_TIERS } from '../data/fuelCapacity';
 import { FUEL_CONTRACTS } from '../data/fuelContracts';
-import { haversineKm } from './distance';
-import { aircraftBurnRate } from './fuel';
-import type { OwnedAircraft, Route, SaveState } from './types';
+import type { OwnedAircraft, SaveState } from './types';
 import { CURRENT_SCHEMA_VERSION } from './types';
 
 const STARTER_AIRLINE_NAME = 'SkyHaven Airlines';
@@ -27,35 +26,8 @@ const STARTER_CASH = 2_000_000;
 const STARTER_AIRCRAFT_DEF = 't1.atr42';
 const STARTER_CONTRACT = 'fc.starter';
 
-function pickStarterRoute(
-  airports: readonly Airport[],
-  homeRegion: number,
-  maxKm: number,
-): { origin: Airport; dest: Airport; distanceKm: number } | null {
-  const inRegion = airports.filter((a) => a.region === homeRegion && a.sizeTier === 4);
-  const candidates = inRegion.length >= 2 ? inRegion : airports.filter((a) => a.sizeTier === 4);
-  if (candidates.length < 2) return null;
-  let best: { origin: Airport; dest: Airport; distanceKm: number } | null = null;
-  for (let i = 0; i < candidates.length; i++) {
-    for (let j = i + 1; j < candidates.length; j++) {
-      const a = candidates[i]!;
-      const b = candidates[j]!;
-      const d = haversineKm(a.lat, a.lon, b.lat, b.lon);
-      if (d >= 200 && d <= maxKm) {
-        if (!best || d < best.distanceKm) {
-          best = { origin: a, dest: b, distanceKm: d };
-        }
-      }
-    }
-    if (best && best.distanceKm < 400) break;
-  }
-  return best;
-}
-
 export function createInitialState(nowMs: number, homeRegion = 3): SaveState {
-  const airports = loadTopAirports();
   const def = getAircraftDef(STARTER_AIRCRAFT_DEF) ?? AIRCRAFT_DEFS[0]!;
-  const route = pickStarterRoute(airports, homeRegion, def.rangeKm);
 
   const aircraft: OwnedAircraft = {
     uid: 'ac-0001',
@@ -63,26 +35,11 @@ export function createInitialState(nowMs: number, homeRegion = 3): SaveState {
     condition: 100,
     flightHoursAccumulated: 0,
     upgrades: { engine: 0, cabin: 0, fuelEff: 0, marketing: 0 },
-    routeId: route ? 'rt-0001' : null,
+    routeId: null,
   };
-
-  const routes: Route[] = route
-    ? [{
-        id: 'rt-0001',
-        originIata: route.origin.iata,
-        destIata: route.dest.iata,
-        distanceKm: route.distanceKm,
-        aircraftUid: aircraft.uid,
-        pricing: 'balanced',
-        loadFactor: 0.6,
-        legProgress: 0,
-        legDirection: 'outbound',
-      }]
-    : [];
 
   const starterContract = FUEL_CONTRACTS.find((c) => c.id === STARTER_CONTRACT)!;
   const starterCapacity = FUEL_CAPACITY_TIERS[0]!.capacity;
-  const starterDemand = routes.length > 0 ? aircraftBurnRate(aircraft) : 0;
 
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -94,20 +51,20 @@ export function createInitialState(nowMs: number, homeRegion = 3): SaveState {
     cash: STARTER_CASH,
     lifetimeEarnings: 0,
     fleet: [aircraft],
-    routes,
+    routes: [],
     hubs: [],
     fuel: {
-      reserve: starterCapacity, // start topped off
+      reserve: starterCapacity,
       capacity: starterCapacity,
       supplyRate: starterContract.supplyRatePerSec,
-      demandRate: starterDemand,
+      demandRate: 0,
       contracts: [STARTER_CONTRACT],
     },
     unlockedRegions: [homeRegion],
     tierUnlocked: 1,
     activeEvents: [],
     collectibles: [],
-    nextEventCheckMs: nowMs + 60_000, // first event roll 1 min after start
+    nextEventCheckMs: nowMs + 60_000,
     nextCollectibleSpawnMs: nowMs + 90_000,
     vintage: [],
     vintageMilestonesConsumed: 0,
@@ -121,5 +78,8 @@ export function createInitialState(nowMs: number, homeRegion = 3): SaveState {
     lastLoginDate: null,
     loginStreak: 0,
     pendingDailyReward: null,
+    // Home airport pick is the very first interactive tutorial step —
+    // pre-set the home region so the picker knows what to offer.
+    pendingHubPickRegion: homeRegion,
   };
 }

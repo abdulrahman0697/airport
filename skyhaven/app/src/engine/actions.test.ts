@@ -9,20 +9,10 @@ import {
   repairAircraft,
   setRoutePricing,
 } from './actions';
-import { createInitialState } from './initialState';
+import { loadedTestState } from './test-fixtures';
 
 function freshState() {
-  const s = createInitialState(0);
-  // Generous everything so we exercise the action logic without bumping
-  // into cash / tier / fuel / region gates. Each gate has its own suite.
-  return {
-    ...s,
-    cash: 10_000_000_000,
-    tierUnlocked: 4,
-    lifetimeEarnings: 10_000_000_000,
-    unlockedRegions: [1, 2, 3, 4, 5, 6, 7, 8, 9],
-    fuel: { ...s.fuel, supplyRate: 1_000_000, capacity: 10_000_000, reserve: 10_000_000 },
-  };
+  return loadedTestState();
 }
 
 describe('buyAircraft', () => {
@@ -61,6 +51,11 @@ describe('openRoute / closeRoute / setRoutePricing', () => {
 
   it('refuses an out-of-range route', () => {
     let s = freshState();
+    // Add LAX as a hub so the range gate fires first (not the hub gate).
+    s = { ...s, hubs: [...s.hubs, { iata: 'LAX', level: 1, managers: {
+      hubDirector: false, maintenanceChief: false, logisticsDirector: false,
+      fleetEngineer: false, marketingLead: false, crisisManager: false,
+    } }] };
     s = buyAircraft(s, 't1.atr42'); // 1450 km
     const ac = s.fleet[s.fleet.length - 1]!;
     try {

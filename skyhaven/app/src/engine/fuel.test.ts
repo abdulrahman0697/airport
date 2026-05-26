@@ -9,11 +9,11 @@ import {
 } from './actions';
 import { createInitialState } from './initialState';
 import { aircraftBurnRate, hasFuelHeadroom, totalDemand, withRecomputedDemand } from './fuel';
+import { loadedTestState } from './test-fixtures';
 import { tick } from './tick';
 
 function loaded() {
-  const s = createInitialState(0);
-  return { ...s, cash: 10_000_000_000, tierUnlocked: 4, lifetimeEarnings: 10_000_000_000 };
+  return loadedTestState();
 }
 
 describe('aircraftBurnRate / totalDemand', () => {
@@ -24,7 +24,7 @@ describe('aircraftBurnRate / totalDemand', () => {
   });
 
   it('matches a single assigned aircraft', () => {
-    const s = createInitialState(0);
+    const s = loaded();
     const a = s.fleet[0]!;
     expect(totalDemand(s)).toBeCloseTo(aircraftBurnRate(a), 5);
   });
@@ -92,7 +92,9 @@ describe('signFuelContract / upgradeFuelCapacity', () => {
   });
 
   it('upgradeFuelCapacity bumps capacity to the next tier', () => {
-    const s0 = loaded();
+    // Reset capacity to a tier the upgrade can step past.
+    const base = loaded();
+    const s0 = { ...base, fuel: { ...base.fuel, capacity: 1_500 } };
     const s1 = upgradeFuelCapacity(s0);
     expect(s1.fuel.capacity).toBeGreaterThan(s0.fuel.capacity);
   });
@@ -138,7 +140,7 @@ describe('reserve evolution in tick', () => {
 
 describe('closeRoute / sellAircraft recompute demand', () => {
   it('closeRoute brings demand back down', () => {
-    const s0 = createInitialState(0);
+    const s0 = loaded();
     const initialDemand = s0.fuel.demandRate;
     expect(initialDemand).toBeGreaterThan(0);
     const s1 = closeRoute(s0, s0.routes[0]!.id);

@@ -1,20 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { ActionError, buyAircraft, createHub, hireManager, openRoute } from './actions';
+import { ActionError, buyAircraft, hireManager, openRoute } from './actions';
 import { aircraftBurnRate, aircraftEffectiveBurn, totalDemand, withRecomputedDemand } from './fuel';
-import { createInitialState } from './initialState';
 import { LOGISTICS_DIRECTOR_FUEL_MULT } from './managers';
+import { loadedTestState } from './test-fixtures';
 import type { Hub } from './types';
 
 function loaded() {
-  const s = createInitialState(0);
-  return {
-    ...s,
-    cash: 10_000_000_000,
-    tierUnlocked: 4,
-    lifetimeEarnings: 10_000_000_000,
-    unlockedRegions: [1, 2, 3, 4, 5, 6, 7, 8, 9],
-    fuel: { ...s.fuel, supplyRate: 1_000_000, capacity: 10_000_000, reserve: 10_000_000 },
-  };
+  // Start from the shared fixture, then strip the auto-added LHR hub
+  // so the per-test "no hub" scenarios match what they assert. Tests
+  // that need a hub add one explicitly.
+  const s = loadedTestState();
+  return { ...s, hubs: [], fleet: s.fleet.map((a) => ({ ...a, routeId: null })), routes: [] };
 }
 
 const HUB_BLANK_MANAGERS: Hub['managers'] = {
@@ -49,16 +45,17 @@ describe('hireManager', () => {
 
 describe('Logistics Director (BRD §4.11 acceptance)', () => {
   it('cuts the burn rate of hub aircraft by 25%', () => {
-    let s = loaded();
-    const origin = s.routes[0]!.originIata;
-    // Bring the starter origin up to 2 routes so it can become a hub.
+    // Start from the shared fixture which already has LHR as a hub
+    // and an LHR-CDG starter route.
+    let s = loadedTestState();
+    const origin = s.routes[0]!.originIata; // LHR
+    // Add a second aircraft on a second LHR route so the hub aircraft
+    // count is two — the LD effect is per-aircraft.
     s = buyAircraft(s, 't2.e190');
     const newAc = s.fleet[s.fleet.length - 1]!;
-    // Pick any other large EU airport in range.
     const r0 = s.routes[0]!;
     const otherIata = r0.destIata === 'CDG' ? 'AMS' : 'CDG';
     s = openRoute(s, origin, otherIata, newAc.uid);
-    s = createHub(s, origin);
 
     const baseDemand = s.fuel.demandRate;
     const baseTwo = totalDemand(s);
@@ -73,11 +70,11 @@ describe('Logistics Director (BRD §4.11 acceptance)', () => {
   });
 
   it('does not affect aircraft on routes that miss the hub', () => {
-    let s = loaded();
-    // Hub at AAA with Logistics Director.
+    let s = loadedTestState();
+    // Swap in a single hub at AAA (no route touches it) with LD on,
+    // and ensure the LHR-CDG starter aircraft burns at the base rate.
     s = { ...s, hubs: [{ iata: 'AAA', level: 1, managers: { ...HUB_BLANK_MANAGERS, logisticsDirector: true } }] };
     s = withRecomputedDemand(s);
-    // Starter aircraft is on a route that doesn't touch AAA.
     const starter = s.fleet[0]!;
     const burn = aircraftEffectiveBurn(starter, s.routes, s.hubs);
     expect(burn).toBeCloseTo(aircraftBurnRate(starter), 6);
@@ -87,7 +84,7 @@ describe('Logistics Director (BRD §4.11 acceptance)', () => {
 describe('Marketing Lead', () => {
   it('adds 5% to the effective load factor of touching routes', async () => {
     const { effectiveLoadFactor } = await import('./economy');
-    let s = loaded();
+    const s = loadedTestState();
     const route = s.routes[0]!;
     const baseLoad = effectiveLoadFactor(route, [], []);
     const withMktg = effectiveLoadFactor(

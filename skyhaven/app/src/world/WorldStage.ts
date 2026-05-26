@@ -7,7 +7,7 @@ import { createBasemap } from './Basemap';
 import { Camera } from './Camera';
 import { createClouds, type CloudLayer } from './Clouds';
 import { CollectiblesLayer } from './Collectibles';
-import { createCountries } from './Countries';
+import { createCountries, type CountriesLayer } from './Countries';
 
 /**
  * Top-level Pixi world stage.
@@ -84,7 +84,7 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
 
   const airports = loadTopAirports();
   const basemap = createBasemap();
-  const countries = createCountries();
+  const countries: CountriesLayer = createCountries();
   const clouds: CloudLayer = createClouds();
   const arcsLayer = new ArcsLayer(airports);
 
@@ -103,7 +103,7 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
 
   app.stage.eventMode = 'static';
   root.addChild(basemap);
-  root.addChild(countries);
+  root.addChild(countries.container);
   root.addChild(clouds.container);
   root.addChild(arcsLayer.container);
   root.addChild(pinsLayer.container);
@@ -249,7 +249,11 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
     },
     setCollectibles: (items) => collectiblesLayer.setCollectibles(items),
     setCollectibleTapHandler: (fn) => { collectibleTapHandler = fn; },
-    setUnlockedRegions: (regions) => { unlockedRegions = regions; refreshPinRegions(); },
+    setUnlockedRegions: (regions) => {
+      unlockedRegions = regions;
+      refreshPinRegions();
+      countries.setUnlockedRegions(regions);
+    },
     setAirportTapHandler: (fn) => { airportTapHandler = fn; },
     destroy: () => {
       app.ticker.remove(onTick);
@@ -264,6 +268,7 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
       arcsLayer.destroy();
       collectiblesLayer.destroy();
       pinsLayer.destroy();
+      countries.destroy();
       app.destroy(true, { children: true, texture: true });
     },
   };

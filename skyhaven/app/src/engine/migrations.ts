@@ -81,6 +81,30 @@ const MIGRATIONS: Record<number, Migration> = {
     loginStreak: 0,
     pendingDailyReward: null,
   }),
+  // v5 → v6 (Phase 10 polish): hub system rework. Routes must now
+  // originate from a hub. To keep existing routes valid we promote
+  // each route's origin into a hub (free, level 1) if it isn't one
+  // already. New pendingHubPickRegion field defaults to null.
+  5: (s) => {
+    const routes = (Array.isArray(s.routes) ? s.routes : []) as Array<{ originIata?: string }>;
+    const hubs = (Array.isArray(s.hubs) ? s.hubs.slice() : []) as Array<{
+      iata: string;
+      level: number;
+      managers: Record<string, boolean>;
+    }>;
+    const known = new Set(hubs.map((h) => h.iata));
+    const emptyManagers = {
+      hubDirector: false, maintenanceChief: false, logisticsDirector: false,
+      fleetEngineer: false, marketingLead: false, crisisManager: false,
+    };
+    for (const r of routes) {
+      const iata = r.originIata;
+      if (!iata || known.has(iata)) continue;
+      hubs.push({ iata, level: 1, managers: { ...emptyManagers } });
+      known.add(iata);
+    }
+    return { ...s, schemaVersion: 6, hubs, pendingHubPickRegion: null };
+  },
 };
 
 /**

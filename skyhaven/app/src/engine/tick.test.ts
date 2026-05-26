@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from './initialState';
+import { loadedTestState } from './test-fixtures';
 import { TICK_HZ, TICK_MS, tick } from './tick';
 
 describe('tick constants', () => {
@@ -25,7 +26,7 @@ describe('tick — invariants', () => {
   });
 
   it('never makes cash decrease', () => {
-    let s = createInitialState(0);
+    let s = loadedTestState();
     for (let i = 0; i < 200; i++) {
       const before = s.cash;
       s = tick(s, { nowMs: (i + 1) * 100, dtMs: 100 });
@@ -36,7 +37,7 @@ describe('tick — invariants', () => {
   it('200 small ticks ≈ one big tick over a short window (pre-threshold)', () => {
     // Keep the window short enough that condition stays above the 70%
     // threshold for both paths — the linear regime where small ≈ big.
-    const s0 = createInitialState(0);
+    const s0 = loadedTestState();
     let small = s0;
     for (let i = 0; i < 200; i++) {
       small = tick(small, { nowMs: (i + 1) * 100, dtMs: 100 });
@@ -48,7 +49,7 @@ describe('tick — invariants', () => {
   });
 
   it('credits revenue and accumulates flight hours over a long window', () => {
-    const s0 = createInitialState(0);
+    const s0 = loadedTestState();
     const s1 = tick(s0, { nowMs: 600_000, dtMs: 600_000 });
     expect(s1.cash).toBeGreaterThan(s0.cash);
     expect(s1.lifetimeEarnings).toBeGreaterThan(0);
@@ -59,8 +60,7 @@ describe('tick — invariants', () => {
   it('degrades condition over flight time', () => {
     // Hold the event scheduler off so fuel-price spikes don't drain
     // the reserve during the catch-up window and ground the fleet.
-    const s0 = { ...createInitialState(0), nextEventCheckMs: 1e15 };
-    // 30 real-minutes = 60 game-hours; T1 decay 0.25/gh → -15% condition.
+    const s0 = { ...loadedTestState(), nextEventCheckMs: 1e15 };
     const s1 = tick(s0, { nowMs: 30 * 60 * 1000, dtMs: 30 * 60 * 1000 });
     const ac = s1.fleet[0]!;
     expect(ac.condition).toBeLessThan(100);
@@ -68,20 +68,17 @@ describe('tick — invariants', () => {
   });
 
   it('unlocks tier 2 once lifetime earnings cross $50K', () => {
-    const s0 = createInitialState(0);
-    // Bypass the starter income curve by handing the player enough
-    // lifetime earnings to be just under the gate, then verifying that
-    // a single tick of revenue pushes them past it.
-    const seeded = { ...s0, lifetimeEarnings: 49_000 };
+    const s0 = loadedTestState();
+    const seeded = { ...s0, lifetimeEarnings: 49_000, tierUnlocked: 1 };
     const s1 = tick(seeded, { nowMs: 60_000, dtMs: 60_000 });
     expect(s1.lifetimeEarnings).toBeGreaterThan(50_000);
     expect(s1.tierUnlocked).toBeGreaterThanOrEqual(2);
   });
 
   it('refuses to fly an aircraft at 0% condition', () => {
-    let s = createInitialState(0);
+    let s = loadedTestState();
     s = { ...s, fleet: [{ ...s.fleet[0]!, condition: 0 }] };
     const s1 = tick(s, { nowMs: 60_000, dtMs: 60_000 });
-    expect(s1.cash).toBe(s.cash); // no revenue when grounded
+    expect(s1.cash).toBe(s.cash);
   });
 });

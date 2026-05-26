@@ -23,7 +23,6 @@ import {
   hubCreationCost,
   hubUpgradeCost,
   MAX_HUB_LEVEL,
-  routesAtAirport,
 } from './hubs';
 import { airportSupportsAircraft, minRunwayForAircraft } from './runway';
 import { upgradeCost, UPGRADE_SPECS, type UpgradeKind } from './upgrades';
@@ -131,6 +130,13 @@ export function openRoute(
         `${region?.name ?? `Region ${ap.region}`} not yet unlocked`,
       );
     }
+  }
+
+  // Hub gate (Phase 10 rework) — every route must originate from one
+  // of the player's hubs.
+  if (!state.hubs.some((h) => h.iata === originIata)) {
+    throw new ActionError('NOT_A_HUB',
+      `${originIata} isn't a hub yet — add it from the Hubs tab first.`);
   }
 
   const aIdx = state.fleet.findIndex((a) => a.uid === aircraftUid);
@@ -348,23 +354,80 @@ export function unlockRegion(state: SaveState, regionId: number): SaveState {
     ...state,
     cash: state.cash - def.unlockCost,
     unlockedRegions: [...state.unlockedRegions, regionId].sort((a, b) => a - b),
+    // Each newly-unlocked region triggers a free hub pick — the UI
+    // prompts the player to choose their foothold there.
+    pendingHubPickRegion: regionId,
   };
 }
 
-// ─── Create hub ──────────────────────────────────────────────────────
-export function createHub(state: SaveState, iata: string): SaveState {
+// ─── Pick / create hub ───────────────────────────────────────────────
+/**
+ * Promote an airport to a hub. Phase 10 rework:
+ *  - The first hub in any region is **free** (it's the player's
+ *    foothold in that region — comes with the region unlock).
+ *  - Subsequent hubs in an unlocked region cost the standard fee.
+ *  - Routes originate from hubs only (validated in `openRoute`).
+ *
+ * When the picked airport's region matches `pendingHubPickRegion`,
+ * the pending flag is cleared.
+ */
+export function pickHub(state: SaveState, iata: string): SaveState {
+  const airports = loadTopAirports();
+  const ap = airports.find((a) => a.iata === iata);
+  if (!ap) throw new ActionError('UNKNOWN_AIRPORT', `No airport ${iata}`);
+  if (!state.unlockedRegions.includes(ap.region)) {
+    const region = getRegion(ap.region);
+    throw new ActionError(
+      'REGION_LOCKED',
+      `${region?.name ?? `Region ${ap.region}`} not yet unlocked`,
+    );
+  }
   if (state.hubs.some((h) => h.iata === iata)) {
     throw new ActionError('HUB_EXISTS', `${iata} is already a hub`);
   }
-  if (routesAtAirport(state, iata) < 2) {
-    throw new ActionError('HUB_NEEDS_ROUTES', `${iata} needs ≥ 2 connected routes`);
+
+  // Count existing hubs already in this region — first one's free.
+  let inRegion = 0;
+  for (const h of state.hubs) {
+    const hap = airports.find((a) => a.iata === h.iata);
+    if (hap && hap.region === ap.region) inRegion++;
   }
-  const cost = hubCreationCost(iata);
+  const cost = inRegion === 0 ? 0 : hubCreationCost(iata);
   if (state.cash < cost) {
-    throw new ActionError('INSUFFICIENT_CASH', `Need $${cost.toLocaleString()} to create hub`);
+    throw new ActionError('INSUFFICIENT_CASH', `Need $${cost.toLocaleString()} to add hub`);
   }
+
   const hub: Hub = { iata, level: 1, managers: emptyHubManagers() };
-  return { ...state, cash: state.cash - cost, hubs: [...state.hubs, hub] };
+  return {
+    ...state,
+    cash: state.cash - cost,
+    hubs: [...state.hubs, hub],
+    pendingHubPickRegion:
+      state.pendingHubPickRegion === ap.region ? null : state.pendingHubPickRegion,
+  };
+}
+
+/** Backwards-compatible alias. The Phase 5 createHub gate (≥ 2 routes)
+ *  is gone; the store action still exists for any caller that wires it. */
+export const createHub = pickHub;
+
+/** Compute the cost to pick a hub at this airport given current state. */
+export function hubPickCost(state: SaveState, iata: string): number {
+  const airports = loadTopAirports();
+  const ap = airports.find((a) => a.iata === iata);
+  if (!ap) return 0;
+  let inRegion = 0;
+  for (const h of state.hubs) {
+    const hap = airports.find((a) => a.iata === h.iata);
+    if (hap && hap.region === ap.region) inRegion++;
+  }
+  return inRegion === 0 ? 0 : hubCreationCost(iata);
+}
+
+/** Dismiss the pending hub-pick prompt without picking (UI Skip button). */
+export function dismissHubPick(state: SaveState): SaveState {
+  if (state.pendingHubPickRegion === null) return state;
+  return { ...state, pendingHubPickRegion: null };
 }
 
 // ─── Upgrade hub ─────────────────────────────────────────────────────

@@ -7,7 +7,6 @@ import { haversineKm } from '../../engine/distance';
 import { cashPerSecond, legDurationMs } from '../../engine/economy';
 import { routeOpenCost } from '../../engine/actions';
 import {
-  hubCreationCost,
   hubUpgradeCost,
   MAX_HUB_LEVEL,
   routesAtAirport,
@@ -152,36 +151,28 @@ function RouteRow({ route }: { route: Route }) {
 function HubsList() {
   const cash = useGameStore(selectCash);
   const hubs = useGameStore(selectHubs);
-  const routes = useGameStore(selectRoutes);
-  const create = useGameStore((s) => s.createHub);
+  const unlocked = useGameStore(selectUnlockedRegions);
+  const pickHub = useGameStore((s) => s.pickHub);
   const upgrade = useGameStore((s) => s.upgradeHub);
-  const [error, setError] = useState<string | null>(null);
   const state = useGameStore((s) => s.state);
+  const [error, setError] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
 
-  // Candidate airports: ≥ 2 routes touching, not yet a hub.
-  const candidates = useMemo(() => {
-    if (!state) return [] as { iata: string; count: number }[];
-    const counts = new Map<string, number>();
-    for (const r of routes) {
-      counts.set(r.originIata, (counts.get(r.originIata) ?? 0) + 1);
-      counts.set(r.destIata, (counts.get(r.destIata) ?? 0) + 1);
-    }
-    return [...counts.entries()]
-      .filter(([iata, n]) => n >= 2 && !hubs.some((h) => h.iata === iata))
-      .map(([iata, count]) => ({ iata, count }))
-      .sort((a, b) => b.count - a.count);
-  }, [routes, hubs, state]);
+  const airports = useMemo(() => loadTopAirports(), []);
 
   return (
     <div>
-      {hubs.length === 0 && candidates.length === 0 && (
+      {hubs.length === 0 ? (
         <div style={empty}>
-          Build at least 2 routes touching the same airport, then promote it to a hub.
+          You don't have any hubs yet. Pick your home airport from the prompt above,
+          or unlock a region and choose a hub there.
         </div>
-      )}
-      {hubs.length > 0 && (
+      ) : (
         <>
-          <h3 style={sectionTitle}>Active hubs</h3>
+          <div style={hubsHeader}>
+            <h3 style={sectionTitle}>Active hubs ({hubs.length})</h3>
+            <button onClick={(): void => setShowAdd(true)} style={addHubBtn}>+ Add hub</button>
+          </div>
           <ul style={list}>
             {hubs.map((h) => {
               const upCost = hubUpgradeCost(h.iata, h.level);
@@ -213,38 +204,67 @@ function HubsList() {
           </ul>
         </>
       )}
-      {candidates.length > 0 && (
-        <>
-          <h3 style={sectionTitle}>Eligible airports</h3>
-          <ul style={list}>
-            {candidates.map((c) => {
-              const cost = hubCreationCost(c.iata);
-              return (
-                <li key={c.iata} style={card}>
-                  <div style={cardHeader}>
-                    <div>
-                      <div style={cardTitle}>{c.iata}</div>
-                      <div style={cardSubtitle}>{c.count} routes connected</div>
-                    </div>
-                    <div style={costText}>${formatCash(cost, 1)}</div>
-                  </div>
-                  <button
-                    disabled={cash < cost}
-                    onClick={(): void => {
-                      const res = create(c.iata);
-                      setError(res.ok ? null : res.message);
-                    }}
-                    style={{ ...primaryBtn, opacity: cash < cost ? 0.5 : 1 }}
-                  >
-                    Promote to hub
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </>
-      )}
       {error && <div style={errorText}>{error}</div>}
+      {showAdd && (
+        <AddHubModal
+          airports={airports}
+          unlocked={unlocked}
+          existingHubIatas={new Set(hubs.map((h) => h.iata))}
+          onClose={(): void => setShowAdd(false)}
+          onPick={(iata): void => {
+            const res = pickHub(iata);
+            if (res.ok) setShowAdd(false);
+            else setError(res.message);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AddHubModal({
+  airports, unlocked, existingHubIatas, onClose, onPick,
+}: {
+  airports: readonly Airport[];
+  unlocked: readonly number[];
+  existingHubIatas: ReadonlySet<string>;
+  onClose: () => void;
+  onPick: (iata: string) => void;
+}) {
+  const candidates = useMemo(() => {
+    return airports
+      .filter((a) => unlocked.includes(a.region) && a.sizeTier === 4 && !existingHubIatas.has(a.iata))
+      .sort((a, b) => a.country.localeCompare(b.country) || (a.city || '').localeCompare(b.city || ''));
+  }, [airports, unlocked, existingHubIatas]);
+
+  return (
+    <div style={modalBackdrop} onClick={onClose}>
+      <div style={modalShell} onClick={(e): void => e.stopPropagation()}>
+        <h3 style={{ margin: '0 0 8px', color: '#F8FAFC' }}>Add hub</h3>
+        <p style={{ color: '#94A3B8', fontSize: 12, marginTop: 0 }}>
+          Each new hub lets you originate routes from that airport.
+          The first hub in any region is free; extras cost based on tier.
+        </p>
+        <ul style={list}>
+          {candidates.slice(0, 50).map((a) => (
+            <li key={a.iata} style={card}>
+              <div style={cardHeader}>
+                <div>
+                  <div style={cardTitle}>{a.iata}</div>
+                  <div style={cardSubtitle}>{a.city || a.country} ({countryName(a.country)})</div>
+                </div>
+                <button
+                  onClick={(): void => onPick(a.iata)}
+                  style={{ ...primaryBtn, width: 'auto', padding: '8px 14px', minHeight: 36 }}
+                >
+                  Pick
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+        <button onClick={onClose} style={cancelBtn}>Close</button>
+      </div>
     </div>
   );
 }
@@ -298,6 +318,7 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
   const fleet = useGameStore(selectFleet);
   const cash = useGameStore(selectCash);
   const unlocked = useGameStore(selectUnlockedRegions);
+  const hubs = useGameStore(selectHubs);
   const openRoute = useGameStore((s) => s.openRoute);
   const airports = useMemo(() => loadTopAirports(), []);
   const unlockedAirports = useMemo(
@@ -309,17 +330,25 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
   const [acUid, setAcUid] = useState<string>(idleAircraft[0]?.uid ?? '');
   const selectedAc = idleAircraft.find((a) => a.uid === acUid);
   const def = selectedAc ? getAircraftDef(selectedAc.defId) : undefined;
-  const [originIata, setOriginIata] = useState<string>('');
+  const [originIata, setOriginIata] = useState<string>(hubs[0]?.iata ?? '');
   const [destIata, setDestIata] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
 
-  const originAirports = useMemo(
-    () => sortAirports(unlockedAirports.slice()), [unlockedAirports],
-  );
+  // Origin is restricted to the player's hubs — routes have to start
+  // somewhere they actually operate from (Phase 10 hub rework).
+  const originAirports = useMemo(() => {
+    const result: Airport[] = [];
+    for (const h of hubs) {
+      const a = airports.find((x) => x.iata === h.iata);
+      if (a) result.push(a);
+    }
+    return sortAirports(result);
+  }, [hubs, airports]);
+
   const destAirports = useMemo(() => {
     if (!def) return [];
     const origin = unlockedAirports.find((a) => a.iata === originIata);
-    if (!origin) return sortAirports(unlockedAirports.slice());
+    if (!origin) return [];
     return sortAirports(
       unlockedAirports.filter((a) => {
         if (a.iata === originIata) return false;
@@ -328,6 +357,23 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
       }),
     );
   }, [unlockedAirports, originIata, def]);
+
+  // Group destinations by country (ISO → friendly name) so the picker
+  // is navigable even with hundreds of airports per region.
+  const destGroupedByCountry = useMemo(() => {
+    const groups = new Map<string, Airport[]>();
+    for (const a of destAirports) {
+      const key = a.country || '??';
+      const arr = groups.get(key);
+      if (arr) arr.push(a); else groups.set(key, [a]);
+    }
+    const out: { iso: string; label: string; airports: Airport[] }[] = [];
+    for (const [iso, arr] of groups) {
+      out.push({ iso, label: countryName(iso), airports: arr });
+    }
+    out.sort((a, b) => a.label.localeCompare(b.label));
+    return out;
+  }, [destAirports]);
 
   const distance = useMemo(() => {
     const o = airports.find((a) => a.iata === originIata);
@@ -365,22 +411,44 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
               })}
             </select>
 
-            <label style={formLabel}>Origin</label>
-            <AirportSelect
-              value={originIata}
-              options={originAirports}
-              onChange={(v): void => { setOriginIata(v); setDestIata(''); }}
-              dataTutorial={!originIata ? 'routes-origin-select' : undefined}
-            />
+            <label style={formLabel}>Origin (hub)</label>
+            {hubs.length === 0 ? (
+              <div style={empty}>No hubs yet. Add one from Network → Hubs.</div>
+            ) : (
+              <select
+                {...(!originIata ? { 'data-tutorial': 'routes-origin-select' } : {})}
+                value={originIata}
+                onChange={(e): void => { setOriginIata(e.target.value); setDestIata(''); }}
+                style={selectStyle}
+              >
+                <option value="">— pick a hub —</option>
+                {originAirports.map((a) => (
+                  <option key={a.iata} value={a.iata}>
+                    {a.iata} · {a.city || a.country} ({countryName(a.country)})
+                  </option>
+                ))}
+              </select>
+            )}
 
             <label style={formLabel}>Destination</label>
-            <AirportSelect
-              value={destIata}
-              options={destAirports}
-              onChange={setDestIata}
+            <select
+              {...(originIata && !destIata ? { 'data-tutorial': 'routes-dest-select' } : {})}
               disabled={!originIata}
-              dataTutorial={originIata && !destIata ? 'routes-dest-select' : undefined}
-            />
+              value={destIata}
+              onChange={(e): void => setDestIata(e.target.value)}
+              style={selectStyle}
+            >
+              <option value="">— pick a country / airport —</option>
+              {destGroupedByCountry.map((g) => (
+                <optgroup key={g.iso} label={g.label}>
+                  {g.airports.map((a) => (
+                    <option key={a.iata} value={a.iata}>
+                      {a.iata} · {a.city || g.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
 
             {distance > 0 && (
               <div style={summaryBox}>
@@ -408,6 +476,11 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+const COUNTRY_DISPLAY = new Intl.DisplayNames(['en'], { type: 'region' });
+function countryName(iso: string): string {
+  try { return COUNTRY_DISPLAY.of(iso) ?? iso; } catch { return iso; }
+}
+
 function sortAirports(arr: Airport[]): Airport[] {
   return arr.sort((a, b) =>
     b.sizeTier - a.sizeTier
@@ -416,32 +489,6 @@ function sortAirports(arr: Airport[]): Airport[] {
   );
 }
 
-function AirportSelect({
-  value, options, onChange, disabled, dataTutorial,
-}: {
-  value: string;
-  options: readonly Airport[];
-  onChange: (v: string) => void;
-  disabled?: boolean;
-  dataTutorial?: string | undefined;
-}) {
-  return (
-    <select
-      {...(dataTutorial ? { 'data-tutorial': dataTutorial } : {})}
-      disabled={disabled}
-      value={value}
-      onChange={(e): void => onChange(e.target.value)}
-      style={selectStyle}
-    >
-      <option value="">— select airport —</option>
-      {options.slice(0, 600).map((a) => (
-        <option key={a.iata} value={a.iata}>
-          {a.iata} · {a.city || a.country} ({a.country})
-        </option>
-      ))}
-    </select>
-  );
-}
 
 // ───────────────────────────────────────────────────────────────────────
 const shell: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100%' };
@@ -549,4 +596,15 @@ const confirmBtn: React.CSSProperties = {
 const errorText: React.CSSProperties = {
   marginTop: 8, padding: '6px 10px', fontSize: 11, color: '#F87171',
   background: 'rgba(248,113,113,0.08)', borderRadius: 6,
+};
+const hubsHeader: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  margin: '4px 0 8px',
+};
+const addHubBtn: React.CSSProperties = {
+  background: '#5AC8FA', color: '#0B1120', border: 0,
+  padding: '8px 14px', borderRadius: 8, fontWeight: 700,
+  cursor: 'pointer', minHeight: 36, fontFamily: 'inherit',
 };

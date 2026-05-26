@@ -23,6 +23,8 @@ import {
   closeRoute as closeRouteAction,
   completeTutorial as completeTutorialAction,
   createHub as createHubAction,
+  dismissHubPick as dismissHubPickAction,
+  pickHub as pickHubAction,
   hireManager as hireManagerAction,
   openRoute as openRouteAction,
   repairAircraft as repairAircraftAction,
@@ -58,6 +60,8 @@ interface GameStore {
   upgradeFuelCapacity: () => ActionResult;
   unlockRegion: (regionId: number) => ActionResult;
   createHub: (iata: string) => ActionResult;
+  pickHub: (iata: string) => ActionResult;
+  dismissHubPick: () => ActionResult;
   upgradeHub: (iata: string) => ActionResult;
   hireManager: (iata: string, kind: ManagerKind) => ActionResult;
   claimCollectible: (id: string) => ActionResult;
@@ -131,6 +135,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     runAction(set, get, (s) => unlockRegionAction(s, regionId)),
   createHub: (iata) =>
     runAction(set, get, (s) => createHubAction(s, iata)),
+  pickHub: (iata) =>
+    runAction(set, get, (s) => pickHubAction(s, iata)),
+  dismissHubPick: () =>
+    runAction(set, get, (s) => dismissHubPickAction(s)),
   upgradeHub: (iata) =>
     runAction(set, get, (s) => upgradeHubAction(s, iata)),
   hireManager: (iata, kind) =>
@@ -197,3 +205,4 @@ export const selectTutorialStep = (s: GameStore) => s.state?.tutorialStep ?? 0;
 export const selectGoalChainStep = (s: GameStore) => s.state?.goalChainStep ?? 0;
 export const selectPendingOfflineSummary = (s: GameStore) => s.state?.pendingOfflineSummary ?? null;
 export const selectPendingDailyReward = (s: GameStore) => s.state?.pendingDailyReward ?? null;
+export const selectPendingHubPickRegion = (s: GameStore) => s.state?.pendingHubPickRegion ?? null;

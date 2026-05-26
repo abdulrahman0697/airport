@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadTopAirports } from '../data/airports';
 import { ActionError, createHub, openRoute, upgradeHub, buyAircraft, unlockRegion } from './actions';
-import { createInitialState } from './initialState';
 import {
   HUB_BONUS_PER_LEVEL,
   hubCreationCost,
@@ -11,18 +10,11 @@ import {
   routesAtAirport,
 } from './hubs';
 import { legRevenue } from './economy';
+import { loadedTestState } from './test-fixtures';
 import type { Hub } from './types';
 
 function loaded() {
-  const s = createInitialState(0);
-  return {
-    ...s,
-    cash: 10_000_000_000,
-    tierUnlocked: 4,
-    lifetimeEarnings: 10_000_000_000,
-    unlockedRegions: [1, 2, 3, 4, 5, 6, 7, 8, 9],
-    fuel: { ...s.fuel, supplyRate: 1_000_000, capacity: 10_000_000, reserve: 10_000_000 },
-  };
+  return loadedTestState();
 }
 
 describe('routesAtAirport', () => {
@@ -34,41 +26,32 @@ describe('routesAtAirport', () => {
   });
 });
 
-describe('createHub', () => {
-  it('refuses an airport with fewer than 2 routes', () => {
-    const s = loaded();
+describe('createHub / pickHub (Phase 10 rework)', () => {
+  it('rejects creating a hub at an airport that is already one', () => {
+    const s = loaded(); // already has LHR as a hub
     try {
-      createHub(s, s.routes[0]!.originIata);
+      createHub(s, 'LHR');
       throw new Error('expected throw');
     } catch (e) {
-      expect((e as ActionError).code).toBe('HUB_NEEDS_ROUTES');
+      expect((e as ActionError).code).toBe('HUB_EXISTS');
     }
   });
 
-  it('creates a hub once an airport carries ≥ 2 routes', () => {
-    let s = loaded();
-    const startOrigin = s.routes[0]!.originIata;
-    // Open a second route from the starter origin so it has 2 routes.
-    s = buyAircraft(s, 't2.e190');
-    const newAc = s.fleet[s.fleet.length - 1]!;
-    // Pick a destination different from the first route's destination
-    // and within range and unlocked. Use any large EU airport that
-    // isn't the existing dest.
+  it('creates a hub at any unlocked airport (no ≥2 route requirement)', () => {
+    // The pre-Phase-10 createHub required ≥ 2 routes touching the
+    // airport. With the hub rework that gate is gone — any airport in
+    // an unlocked region can become a hub for a one-time fee.
+    const s = loaded();
     const airports = loadTopAirports();
     const candidate = airports.find((a) =>
-      a.iata !== startOrigin
-      && a.iata !== s.routes[0]!.destIata
-      && a.region === 3
-      && a.sizeTier === 4,
+      a.iata !== 'LHR' && a.region === 3 && a.sizeTier === 4,
     );
-    if (!candidate) throw new Error('no candidate destination');
-    s = openRoute(s, startOrigin, candidate.iata, newAc.uid);
-    expect(routesAtAirport(s, startOrigin)).toBe(2);
-
+    if (!candidate) throw new Error('no candidate hub airport');
     const before = s.cash;
-    s = createHub(s, startOrigin);
-    expect(s.hubs.find((h) => h.iata === startOrigin)?.level).toBe(1);
-    expect(s.cash).toBeLessThan(before);
+    const after = createHub(s, candidate.iata);
+    expect(after.hubs.find((h) => h.iata === candidate.iata)?.level).toBe(1);
+    // Second hub in the same region is paid.
+    expect(after.cash).toBeLessThan(before);
   });
 });
 
@@ -155,19 +138,18 @@ describe('hub bonus is applied to leg revenue', () => {
 
 describe('region gating', () => {
   it('blocks opening a route into a locked region', () => {
-    let s = createInitialState(0);
-    s = { ...s, cash: 1e9, tierUnlocked: 4, fuel: { ...s.fuel, supplyRate: 1e9, capacity: 1e9, reserve: 1e9 } };
+    let s = loaded();
+    // Re-lock the NA region so we can verify the gate fires.
+    s = { ...s, unlockedRegions: [3] };
     s = buyAircraft(s, 't2.e190');
     const newAc = s.fleet[s.fleet.length - 1]!;
-    // Initial unlockedRegions includes only region 3. Use a North-American
-    // (region 1) endpoint to force the gate.
-    expect(() => openRoute(s, s.routes[0]!.originIata, 'JFK', newAc.uid))
+    expect(() => openRoute(s, 'LHR', 'JFK', newAc.uid))
       .toThrow(/REGION_LOCKED|not yet unlocked/);
   });
 
   it('allows the route after the region is unlocked', () => {
-    let s = createInitialState(0);
-    s = { ...s, cash: 1e9, tierUnlocked: 4, fuel: { ...s.fuel, supplyRate: 1e9, capacity: 1e9, reserve: 1e9 } };
+    let s = loaded();
+    s = { ...s, unlockedRegions: [3] };
     s = unlockRegion(s, 1);
     expect(s.unlockedRegions).toContain(1);
   });
@@ -175,9 +157,7 @@ describe('region gating', () => {
 
 describe('hubCreationCost', () => {
   it('scales with airport size tier', () => {
-    // The starter origin is a large_airport (sizeTier 4).
-    const s = createInitialState(0);
-    const cost = hubCreationCost(s.routes[0]!.originIata);
-    expect(cost).toBe(50_000);
+    // LHR is a large_airport (sizeTier 4).
+    expect(hubCreationCost('LHR')).toBe(50_000);
   });
 });
