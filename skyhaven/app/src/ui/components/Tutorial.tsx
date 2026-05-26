@@ -1,11 +1,12 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   selectTailColor,
   selectTutorialCompleted,
   selectTutorialStep,
   useGameStore,
 } from '../../state/store';
+import { usePanelStore, type PanelId } from './PanelHost';
 import type { SaveState } from '../../engine/types';
 
 /**
@@ -15,18 +16,21 @@ import type { SaveState } from '../../engine/types';
  * input (rename) or watches the real game state for the player to
  * perform the action (sign a contract, buy a plane, open a route).
  * A glowing spotlight ring sits over the target UI element; a
- * tooltip card near it explains what to do. Auto-advances when the
- * state check passes.
+ * tooltip card on the *opposite* end of the screen explains what to
+ * do without obscuring the target. Auto-advances on state check.
  *
- * No skip link in release builds (BRD §5.2 + locked decision). The
- * tutorial is failure-proof: the player can navigate freely; the
- * tutorial just waits.
+ * Failure-proof: navigation isn't blocked; the tutorial just waits.
  */
 
 type Step =
   | { kind: 'info'; title: string; body: string; cta: string }
   | { kind: 'identity'; title: string; body: string }
-  | { kind: 'wait-state'; title: string; body: string; target: string; check: (s: SaveState) => boolean }
+  | {
+      kind: 'wait-state'; title: string; body: string;
+      /** `target` shifts based on whether the relevant panel is open. */
+      targetFor: (panel: PanelId) => string;
+      check: (s: SaveState) => boolean;
+    }
   | { kind: 'wait-time'; title: string; body: string; durationMs: number };
 
 const STEPS: readonly Step[] = [
@@ -44,22 +48,22 @@ const STEPS: readonly Step[] = [
   {
     kind: 'wait-state',
     title: 'Secure more fuel',
-    body: 'Tap the fuel gauge on the right edge, then sign the Local Refinery contract. More supply lets you fly more planes.',
-    target: 'fuel-gauge',
+    body: 'Tap the glowing fuel gauge, then sign the highlighted contract. More supply means more aircraft can fly.',
+    targetFor: (panel) => panel === 'fuel' ? 'fuel-sign-contract' : 'fuel-gauge',
     check: (s) => s.fuel.contracts.length >= 2,
   },
   {
     kind: 'wait-state',
     title: 'Buy a second aircraft',
-    body: 'Open the Fleet tab → "Buy aircraft" → grab any T1. We need more wings to grow.',
-    target: 'fleet-tab',
+    body: 'Open the Fleet tab, switch to the highlighted "Buy aircraft" tab, and grab any T1.',
+    targetFor: (panel) => panel === 'fleet' ? 'fleet-buy-tab' : 'fleet-tab',
     check: (s) => s.fleet.length >= 2,
   },
   {
     kind: 'wait-state',
     title: 'Open a new route',
-    body: 'Open the Routes tab → "+ New route". Pick an origin and destination — the new aircraft will start earning.',
-    target: 'routes-tab',
+    body: 'Open the Routes tab, then tap the highlighted "+ New route" button.',
+    targetFor: (panel) => panel === 'routes' ? 'routes-new-button' : 'routes-tab',
     check: (s) => s.routes.length >= 2,
   },
   {
@@ -86,22 +90,22 @@ export function Tutorial() {
   const complete = useGameStore((s) => s.completeTutorial);
   const setIdentity = useGameStore((s) => s.setAirlineIdentity);
 
+  const activePanel = usePanelStore((s) => s.active);
   const current = step < STEPS.length ? STEPS[step]! : null;
+  const target = current?.kind === 'wait-state' ? current.targetFor(activePanel) : null;
+  const rect = useTargetRect(target);
 
-  // Auto-advance when a wait-state's check passes.
   useEffect(() => {
     if (!current || current.kind !== 'wait-state' || !state) return;
     if (current.check(state)) advance();
   }, [current, state, advance]);
 
-  // Auto-advance wait-time steps after their duration.
   useEffect(() => {
     if (!current || current.kind !== 'wait-time') return;
     const id = setTimeout(() => advance(), current.durationMs);
     return () => clearTimeout(id);
   }, [current, advance]);
 
-  // Once the player has walked past the last step, finalise the tutorial.
   useEffect(() => {
     if (!completed && step >= STEPS.length) complete();
   }, [completed, step, complete]);
@@ -109,17 +113,16 @@ export function Tutorial() {
   if (completed) return null;
   if (!current) return null;
 
-  const isSpotlight = current.kind === 'wait-state';
-
   return (
     <>
-      {isSpotlight && <Spotlight target={(current as { target: string }).target} />}
+      {current.kind === 'wait-state' && rect && <Spotlight rect={rect} />}
       <TutorialCard
         step={step}
         total={STEPS.length}
         current={current}
         tailColor={tailColor}
         airlineName={airlineName}
+        targetRect={rect}
         onAdvance={advance}
         onSetIdentity={(name, color): void => { setIdentity(name, color); advance(); }}
       />
@@ -127,41 +130,51 @@ export function Tutorial() {
   );
 }
 
-// ─── Spotlight ring + soft dim ───────────────────────────────────────
-function Spotlight({ target }: { target: string }) {
+// ─── Hook: live-track a data-tutorial target's bounding rect ─────────
+function useTargetRect(target: string | null): DOMRect | null {
   const [rect, setRect] = useState<DOMRect | null>(null);
-
   useEffect(() => {
-    let cancelled = false;
+    if (!target) { setRect(null); return; }
     const measure = (): void => {
-      if (cancelled) return;
       const el = document.querySelector<HTMLElement>(`[data-tutorial="${target}"]`);
-      setRect(el ? el.getBoundingClientRect() : null);
+      if (!el) { setRect((cur) => (cur ? null : cur)); return; }
+      const next = el.getBoundingClientRect();
+      setRect((cur) => {
+        if (!cur) return next;
+        // Only re-set if the rect actually moved — avoids React thrash.
+        const same =
+          cur.top === next.top && cur.left === next.left
+          && cur.width === next.width && cur.height === next.height;
+        return same ? cur : next;
+      });
     };
     measure();
-    // Poll for lazy-loaded elements (e.g. inside lazy-imported panels).
+    // Poll for lazy-loaded targets inside lazy panels.
     const id = setInterval(measure, 300);
     window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, true);
     return () => {
-      cancelled = true;
       clearInterval(id);
       window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure, true);
     };
   }, [target]);
+  return rect;
+}
 
-  if (!rect) return null;
+// ─── Spotlight ring + soft dim ───────────────────────────────────────
+function Spotlight({ rect }: { rect: DOMRect }) {
   const padding = 8;
-
   return (
     <motion.div
-      key={target}
+      key={`${rect.left}-${rect.top}-${rect.width}`}
       initial={{ opacity: 0 }}
       animate={{
         opacity: 1,
         scale: [1, 1.06, 1],
       }}
       transition={{
-        opacity: { duration: 0.2 },
+        opacity: { duration: 0.22 },
         scale: { duration: 1.6, repeat: Infinity, ease: 'easeInOut' },
       }}
       style={{
@@ -172,8 +185,10 @@ function Spotlight({ target }: { target: string }) {
         height: rect.height + padding * 2,
         borderRadius: 14,
         border: '2px solid #5AC8FA',
+        // Outer dim is lighter than before so panel contents stay readable
+        // when the player taps through to (say) the FuelPanel.
         boxShadow:
-          '0 0 0 9999px rgba(0,0,0,0.55), 0 0 32px rgba(90,200,250,0.65), inset 0 0 18px rgba(90,200,250,0.18)',
+          '0 0 0 9999px rgba(0,0,0,0.45), 0 0 32px rgba(90,200,250,0.7), inset 0 0 18px rgba(90,200,250,0.18)',
         pointerEvents: 'none',
         zIndex: 60,
       }}
@@ -181,47 +196,46 @@ function Spotlight({ target }: { target: string }) {
   );
 }
 
-// ─── The card that floats over the UI ────────────────────────────────
+// ─── The tutorial card ───────────────────────────────────────────────
 function TutorialCard({
-  step,
-  total,
-  current,
-  tailColor,
-  airlineName,
-  onAdvance,
-  onSetIdentity,
+  step, total, current, tailColor, airlineName, targetRect,
+  onAdvance, onSetIdentity,
 }: {
   step: number;
   total: number;
   current: Step;
   tailColor: string;
   airlineName: string;
+  targetRect: DOMRect | null;
   onAdvance: () => void;
   onSetIdentity: (name: string, color: string) => void;
 }) {
-  // For spotlight steps the card sits near the *top* so it doesn't
-  // obscure the bottom-tab buttons / fuel gauge spotlight.
-  const placement = current.kind === 'wait-state' ? 'top' : 'center';
+  const placement = useMemo(() => {
+    if (current.kind !== 'wait-state' || !targetRect) return 'center' as const;
+    // Place the card on the OPPOSITE end of the screen from the target,
+    // with comfortable margin. The fuel gauge sits high-right, the
+    // bottom tabs sit at the bottom — opposite-end placement keeps the
+    // card from ever covering the highlighted button.
+    const middle = window.innerHeight / 2;
+    const targetMid = targetRect.top + targetRect.height / 2;
+    return targetMid > middle ? ('top' as const) : ('bottom' as const);
+  }, [current.kind, targetRect]);
 
   return (
     <AnimatePresence mode="wait">
       <motion.div
-        key={`step-${step}`}
-        initial={{ y: placement === 'top' ? -20 : 20, opacity: 0 }}
+        key={`step-${step}-${placement}`}
+        initial={{ y: placement === 'top' ? -24 : placement === 'bottom' ? 24 : 16, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        exit={{ y: placement === 'top' ? -20 : 20, opacity: 0 }}
-        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-        style={(placement === 'center' ? shellCenter : shellTop) as Record<string, unknown>}
+        exit={{ opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 360, damping: 28 }}
+        style={(placement === 'center' ? shellCenter : placement === 'top' ? shellTop : shellBottom) as Record<string, unknown>}
       >
         <div style={card}>
           <div style={kicker}>
             <span>Step {step + 1} of {total}</span>
-            {current.kind === 'wait-state' && (
-              <span style={waitDot}>● waiting for you</span>
-            )}
-            {current.kind === 'wait-time' && (
-              <span style={waitDotNeutral}>● auto-advance</span>
-            )}
+            {current.kind === 'wait-state' && <span style={waitTag}>● waiting for you</span>}
+            {current.kind === 'wait-time' && <span style={waitTagNeutral}>● auto-advance</span>}
           </div>
           <h2 style={title}>{current.title}</h2>
           <p style={body}>{current.body}</p>
@@ -301,9 +315,22 @@ const shellCenter: React.CSSProperties = {
   zIndex: 62,
   pointerEvents: 'none',
 };
+// Target is in the BOTTOM half (bottom-tab spotlights) → card at TOP.
 const shellTop: React.CSSProperties = {
   position: 'fixed',
-  top: 'calc(env(safe-area-inset-top, 0px) + 90px)',
+  top: 'calc(env(safe-area-inset-top, 0px) + 88px)',
+  left: 12,
+  right: 12,
+  zIndex: 62,
+  display: 'flex',
+  justifyContent: 'center',
+  pointerEvents: 'none',
+};
+// Target is in the TOP half (fuel-gauge spotlight) → card at BOTTOM,
+// safely above the bottom-tab strip + the goal-chain ribbon.
+const shellBottom: React.CSSProperties = {
+  position: 'fixed',
+  bottom: 'calc(64px + env(safe-area-inset-bottom, 0px) + 80px)',
   left: 12,
   right: 12,
   zIndex: 62,
@@ -316,9 +343,9 @@ const card: React.CSSProperties = {
   maxWidth: 380,
   background: 'linear-gradient(160deg, #1A2244, #0B1120)',
   borderRadius: 16,
-  padding: '18px 20px 20px',
-  border: '1px solid rgba(90,200,250,0.35)',
-  boxShadow: '0 20px 60px rgba(0,0,0,0.55), 0 0 30px rgba(90,200,250,0.18)',
+  padding: '16px 18px 18px',
+  border: '1px solid rgba(90,200,250,0.45)',
+  boxShadow: '0 18px 60px rgba(0,0,0,0.55), 0 0 36px rgba(90,200,250,0.20)',
   pointerEvents: 'auto',
 };
 const kicker: React.CSSProperties = {
@@ -327,30 +354,32 @@ const kicker: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
+  gap: 12,
 };
-const waitDot: React.CSSProperties = {
+const waitTag: React.CSSProperties = {
   fontSize: 9,
   color: '#5AC8FA',
-  letterSpacing: '0.08em',
+  letterSpacing: '0.06em',
   textTransform: 'none',
 };
-const waitDotNeutral: React.CSSProperties = {
+const waitTagNeutral: React.CSSProperties = {
   fontSize: 9,
   color: '#94A3B8',
-  letterSpacing: '0.08em',
+  letterSpacing: '0.06em',
   textTransform: 'none',
 };
 const title: React.CSSProperties = {
-  margin: '6px 0 8px',
-  fontSize: 20,
+  margin: '6px 0 6px',
+  fontSize: 18,
   color: '#F8FAFC',
   fontWeight: 700,
+  lineHeight: 1.2,
 };
 const body: React.CSSProperties = {
-  margin: '0 0 14px',
+  margin: '0 0 12px',
   color: '#F8FAFC',
   fontSize: 13,
-  lineHeight: 1.55,
+  lineHeight: 1.5,
 };
 const primaryBtn: React.CSSProperties = {
   width: '100%',

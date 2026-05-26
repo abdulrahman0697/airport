@@ -47,8 +47,12 @@ export function FleetPanel() {
             style={{ ...tabBtn, ...(tab === 'owned' ? tabActive : {}) }}>
             Owned ({fleet.length})
           </button>
-          <button role="tab" onClick={(): void => setTab('buy')}
-            style={{ ...tabBtn, ...(tab === 'buy' ? tabActive : {}) }}>
+          <button
+            role="tab"
+            data-tutorial="fleet-buy-tab"
+            onClick={(): void => setTab('buy')}
+            style={{ ...tabBtn, ...(tab === 'buy' ? tabActive : {}) }}
+          >
             Buy aircraft
           </button>
           <button role="tab" onClick={(): void => setTab('vintage')}

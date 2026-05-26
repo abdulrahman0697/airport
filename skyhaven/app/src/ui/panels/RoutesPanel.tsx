@@ -48,7 +48,13 @@ export function RoutesPanel() {
           </button>
         </div>
         {tab === 'routes' && (
-          <button onClick={(): void => setShowNew(true)} style={newBtn}>+ New route</button>
+          <button
+            data-tutorial="routes-new-button"
+            onClick={(): void => setShowNew(true)}
+            style={newBtn}
+          >
+            + New route
+          </button>
         )}
       </div>
       <div style={body}>

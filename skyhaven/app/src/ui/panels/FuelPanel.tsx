@@ -57,10 +57,14 @@ export function FuelPanel() {
 
         <h3 style={sectionTitle}>Fuel contracts</h3>
         <ul style={list}>
-          {FUEL_CONTRACTS.map((c) => {
-            const signed = fuel.contracts.includes(c.id);
-            const afford = cash >= c.cost;
-            return (
+          {(() => {
+            let firstUnsignedTagged = false;
+            return FUEL_CONTRACTS.map((c) => {
+              const signed = fuel.contracts.includes(c.id);
+              const afford = cash >= c.cost;
+              const isFirstUnsigned = !signed && !firstUnsignedTagged;
+              if (isFirstUnsigned) firstUnsignedTagged = true;
+              return (
               <li key={c.id} style={card}>
                 <div style={cardHeader}>
                   <div>
@@ -75,6 +79,7 @@ export function FuelPanel() {
                 </div>
                 {!signed && (
                   <button
+                    {...(isFirstUnsigned ? { 'data-tutorial': 'fuel-sign-contract' } : {})}
                     onClick={(): void => trySign(c.id)}
                     disabled={!afford && c.cost > 0}
                     style={{ ...signBtn, opacity: afford || c.cost === 0 ? 1 : 0.5 }}
@@ -84,7 +89,8 @@ export function FuelPanel() {
                 )}
               </li>
             );
-          })}
+            });
+          })()}
         </ul>
 
         <h3 style={sectionTitle}>Reserve capacity</h3>
