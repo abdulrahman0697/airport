@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AIRCRAFT_DEFS, getAircraftDef } from '../../data/aircraft';
 import { conditionBand, repairCost } from '../../engine/condition';
+import { MAX_TIER } from '../../engine/tierUnlocks';
 import {
   UPGRADE_LABELS,
   UPGRADE_SPECS,
@@ -17,6 +18,8 @@ import {
 } from '../../state/store';
 import { formatCash } from '../format';
 
+type BuyCategoryFilter = 'passenger' | 'cargo';
+
 export function FleetPanel() {
   const [tab, setTab] = useState<'owned' | 'buy'>('owned');
   const fleet = useGameStore(selectFleet);
@@ -27,18 +30,12 @@ export function FleetPanel() {
         <h2 style={title}>Fleet</h2>
         <div style={subtitle}>{fleet.length} aircraft</div>
         <div role="tablist" style={tabs}>
-          <button
-            role="tab"
-            onClick={(): void => setTab('owned')}
-            style={{ ...tabBtn, ...(tab === 'owned' ? tabActive : {}) }}
-          >
+          <button role="tab" onClick={(): void => setTab('owned')}
+            style={{ ...tabBtn, ...(tab === 'owned' ? tabActive : {}) }}>
             Owned ({fleet.length})
           </button>
-          <button
-            role="tab"
-            onClick={(): void => setTab('buy')}
-            style={{ ...tabBtn, ...(tab === 'buy' ? tabActive : {}) }}
-          >
+          <button role="tab" onClick={(): void => setTab('buy')}
+            style={{ ...tabBtn, ...(tab === 'buy' ? tabActive : {}) }}>
             Buy aircraft
           </button>
         </div>
@@ -50,6 +47,7 @@ export function FleetPanel() {
   );
 }
 
+// ──── Owned tab ──────────────────────────────────────────────────────
 function OwnedList() {
   const fleet = useGameStore(selectFleet);
   if (fleet.length === 0) return <div style={empty}>No aircraft. Switch to "Buy aircraft" to start your fleet.</div>;
@@ -71,6 +69,9 @@ function FleetRow({ aircraft }: { aircraft: OwnedAircraft }) {
   const band = conditionBand(aircraft.condition);
   const condColor = band === 'normal' ? '#34D399' : band === 'degraded' ? '#F59E0B' : '#F87171';
   const repCost = repairCost(aircraft);
+  const isCargo = def.category === 'cargo';
+  const tierLabel = isCargo ? 'Cargo' : `T${def.tier}`;
+  const capLabel = isCargo ? `${def.capacity} units` : `${def.capacity} pax`;
 
   const tryUpgrade = (kind: UpgradeKind): void => {
     const res = applyUpgrade(aircraft.uid, kind);
@@ -85,9 +86,12 @@ function FleetRow({ aircraft }: { aircraft: OwnedAircraft }) {
     <li style={card}>
       <div style={cardHeader}>
         <div>
-          <div style={cardTitle}>{def.displayName}</div>
+          <div style={cardTitle}>
+            {def.displayName}
+            {isCargo && <span style={cargoBadge}>CARGO</span>}
+          </div>
           <div style={cardSubtitle}>
-            T{def.tier} · {def.capacity} pax · {def.rangeKm.toLocaleString()} km
+            {tierLabel} · {capLabel} · {def.rangeKm.toLocaleString()} km
             {aircraft.routeId ? ' · in service' : ' · in hangar'}
           </div>
         </div>
@@ -137,12 +141,61 @@ function FleetRow({ aircraft }: { aircraft: OwnedAircraft }) {
   );
 }
 
+// ──── Buy aircraft tab ───────────────────────────────────────────────
 function BuyList() {
   const tier = useGameStore(selectTier);
+  const [category, setCategory] = useState<BuyCategoryFilter>('passenger');
+  const cargoUnlocked = tier >= 5;
+
+  const grouped = useMemo(() => {
+    const filtered = AIRCRAFT_DEFS.filter((d) =>
+      category === 'cargo' ? d.category === 'cargo' : d.category === 'passenger',
+    );
+    if (category === 'cargo') return [{ tier: 0, label: 'Cargo', items: filtered }];
+    const out: { tier: number; label: string; items: AircraftDef[] }[] = [];
+    for (let t = 1; t <= MAX_TIER; t++) {
+      const items = filtered.filter((d) => d.tier === t);
+      if (items.length) out.push({ tier: t, label: `Tier ${t}`, items });
+    }
+    return out;
+  }, [category]);
+
   return (
-    <ul style={list}>
-      {AIRCRAFT_DEFS.map((d) => <BuyRow key={d.id} def={d} unlocked={d.tier <= tier} />)}
-    </ul>
+    <>
+      <div style={categoryRow}>
+        <button
+          onClick={(): void => setCategory('passenger')}
+          style={{ ...catBtn, ...(category === 'passenger' ? catActive : {}) }}
+        >
+          Passenger
+        </button>
+        <button
+          onClick={(): void => setCategory('cargo')}
+          style={{ ...catBtn, ...(category === 'cargo' ? catActive : {}) }}
+        >
+          Cargo {cargoUnlocked ? '' : '· locked'}
+        </button>
+      </div>
+      {category === 'cargo' && !cargoUnlocked && (
+        <div style={empty}>
+          Cargo unlocks at Tier 5 (currently T{tier}). Reach $25M lifetime earnings to open the cargo lane.
+        </div>
+      )}
+      {grouped.map(({ tier: t, label, items }) => (
+        <section key={t} style={tierBlock}>
+          <h3 style={tierHeading}>{label}</h3>
+          <ul style={list}>
+            {items.map((d) => (
+              <BuyRow
+                key={d.id}
+                def={d}
+                unlocked={d.category === 'cargo' ? cargoUnlocked : d.tier <= tier}
+              />
+            ))}
+          </ul>
+        </section>
+      ))}
+    </>
   );
 }
 
@@ -151,6 +204,10 @@ function BuyRow({ def, unlocked }: { def: AircraftDef; unlocked: boolean }) {
   const buy = useGameStore((s) => s.buyAircraft);
   const [error, setError] = useState<string | null>(null);
   const afford = cash >= def.basePurchaseCost;
+  const isCargo = def.category === 'cargo';
+  const lockedLabel = isCargo ? 'Unlock at T5' : `Unlock at T${def.tier}`;
+  const tierLabel = isCargo ? 'Cargo' : `T${def.tier}`;
+  const capLabel = isCargo ? `${def.capacity} units` : `${def.capacity} pax`;
 
   const tryBuy = (): void => {
     const res = buy(def.id);
@@ -161,14 +218,17 @@ function BuyRow({ def, unlocked }: { def: AircraftDef; unlocked: boolean }) {
     <li style={card}>
       <div style={cardHeader}>
         <div>
-          <div style={cardTitle}>{def.displayName}</div>
+          <div style={cardTitle}>
+            {def.displayName}
+            {isCargo && <span style={cargoBadge}>CARGO</span>}
+          </div>
           <div style={cardSubtitle}>
-            T{def.tier} · {def.capacity} pax · {def.rangeKm.toLocaleString()} km · {def.cruiseSpeedKmh} km/h
+            {tierLabel} · {capLabel} · {def.rangeKm.toLocaleString()} km · {def.cruiseSpeedKmh} km/h
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={priceText}>${formatCash(def.basePurchaseCost, 1)}</div>
-          {!unlocked && <div style={lockedPill}>Locked · T{def.tier}</div>}
+          {!unlocked && <div style={lockedPill}>{lockedLabel}</div>}
         </div>
       </div>
       <button
@@ -176,13 +236,14 @@ function BuyRow({ def, unlocked }: { def: AircraftDef; unlocked: boolean }) {
         onClick={tryBuy}
         style={{ ...buyBtn, opacity: !unlocked ? 0.35 : afford ? 1 : 0.6 }}
       >
-        {!unlocked ? `Unlock at T${def.tier}` : afford ? 'Buy' : 'Not enough cash'}
+        {!unlocked ? lockedLabel : afford ? 'Buy' : 'Not enough cash'}
       </button>
       {error && <div style={errorText}>{error}</div>}
     </li>
   );
 }
 
+// ─── Styles ──────────────────────────────────────────────────────────
 const shell: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100%' };
 const header: React.CSSProperties = { padding: '20px 16px 8px', borderBottom: '1px solid rgba(255,255,255,0.06)' };
 const title: React.CSSProperties = { margin: 0, fontSize: 22, color: '#F8FAFC' };
@@ -200,7 +261,10 @@ const card: React.CSSProperties = {
   border: '1px solid rgba(255,255,255,0.06)',
 };
 const cardHeader: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 };
-const cardTitle: React.CSSProperties = { color: '#F8FAFC', fontSize: 15, fontWeight: 600 };
+const cardTitle: React.CSSProperties = {
+  color: '#F8FAFC', fontSize: 15, fontWeight: 600,
+  display: 'inline-flex', alignItems: 'center', gap: 8,
+};
 const cardSubtitle: React.CSSProperties = { color: '#94A3B8', fontSize: 11, marginTop: 2 };
 const upgradeGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginTop: 10 };
 const upgradeBtn: React.CSSProperties = {
@@ -228,8 +292,34 @@ const lockedPill: React.CSSProperties = {
   textTransform: 'uppercase', background: 'rgba(255,255,255,0.05)',
   padding: '2px 6px', borderRadius: 4, display: 'inline-block',
 };
+const cargoBadge: React.CSSProperties = {
+  fontSize: 9, letterSpacing: '0.1em', fontWeight: 700,
+  color: '#F4C75B', background: 'rgba(244,199,91,0.14)',
+  border: '1px solid rgba(244,199,91,0.4)',
+  padding: '2px 6px', borderRadius: 4,
+};
 const errorText: React.CSSProperties = {
   marginTop: 8, padding: '6px 10px', fontSize: 11, color: '#F87171',
   background: 'rgba(248,113,113,0.08)', borderRadius: 6,
 };
 const empty: React.CSSProperties = { padding: 32, textAlign: 'center', color: '#94A3B8' };
+const categoryRow: React.CSSProperties = {
+  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12,
+};
+const catBtn: React.CSSProperties = {
+  background: 'rgba(11,17,32,0.6)', border: '1px solid rgba(255,255,255,0.08)',
+  color: '#94A3B8', padding: '10px', borderRadius: 8, cursor: 'pointer',
+  fontSize: 13, fontFamily: 'inherit', minHeight: 40,
+};
+const catActive: React.CSSProperties = {
+  background: 'rgba(90,200,250,0.18)', color: '#5AC8FA',
+  borderColor: 'rgba(90,200,250,0.4)',
+};
+const tierBlock: React.CSSProperties = { marginBottom: 14 };
+const tierHeading: React.CSSProperties = {
+  margin: '0 4px 6px',
+  fontSize: 11,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  color: '#94A3B8',
+};

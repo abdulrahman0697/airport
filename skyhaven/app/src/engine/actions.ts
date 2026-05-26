@@ -25,6 +25,7 @@ import {
   MAX_HUB_LEVEL,
   routesAtAirport,
 } from './hubs';
+import { airportSupportsAircraft, minRunwayForAircraft } from './runway';
 import { upgradeCost, UPGRADE_SPECS, type UpgradeKind } from './upgrades';
 import type { Collectible, Hub, OwnedAircraft, Route, RoutePricing, SaveState } from './types';
 
@@ -62,7 +63,12 @@ function nextRouteUid(state: SaveState): string {
 export function buyAircraft(state: SaveState, defId: string): SaveState {
   const def = getAircraftDef(defId);
   if (!def) throw new ActionError('UNKNOWN_AIRCRAFT', `No aircraft def ${defId}`);
-  if (def.tier > state.tierUnlocked) {
+  if (def.category === 'cargo') {
+    // Cargo lane unlocks when the player first reaches T5 (BRD §4.5).
+    if (state.tierUnlocked < 5) {
+      throw new ActionError('CARGO_LOCKED', 'Cargo lane unlocks at Tier 5');
+    }
+  } else if (def.tier > state.tierUnlocked) {
     throw new ActionError('TIER_LOCKED', `Tier ${def.tier} not yet unlocked`);
   }
   if (state.cash < def.basePurchaseCost) {
@@ -141,6 +147,16 @@ export function openRoute(
       `${def.displayName} max range ${def.rangeKm} km, route is ${Math.round(distanceKm)} km`);
   }
 
+  // Runway gate (BRD §4.2): both endpoints must accept this aircraft.
+  if (!airportSupportsAircraft(origin.runwayCategory, def)) {
+    throw new ActionError('RUNWAY_TOO_SMALL',
+      `${origin.iata}'s runway can't take a ${def.displayName} (needs cat ${minRunwayForAircraft(def)})`);
+  }
+  if (!airportSupportsAircraft(dest.runwayCategory, def)) {
+    throw new ActionError('RUNWAY_TOO_SMALL',
+      `${dest.iata}'s runway can't take a ${def.displayName} (needs cat ${minRunwayForAircraft(def)})`);
+  }
+
   // Strict fuel gate (BRD §4.6 + locked decision): block if opening this
   // route would push demand past supply.
   const burn = aircraftBurnRate(aircraft);
@@ -156,7 +172,11 @@ export function openRoute(
     throw new ActionError('INSUFFICIENT_CASH', `Need $${cost.toLocaleString()} to open this route`);
   }
 
-  const baseLoad = 0.55 + 0.03 * aircraft.upgrades.marketing;
+  // Cargo always ships full (BRD §4.5). Passenger uses the marketing
+  // upgrade + initial-load curve we've used since Phase 3.
+  const loadFactor = def.category === 'cargo'
+    ? 1.0
+    : Math.min(0.98, 0.55 + 0.03 * aircraft.upgrades.marketing);
   const route: Route = {
     id: nextRouteUid(state),
     originIata,
@@ -164,7 +184,7 @@ export function openRoute(
     distanceKm,
     aircraftUid,
     pricing,
-    loadFactor: Math.min(0.98, baseLoad),
+    loadFactor,
     legProgress: 0,
     legDirection: 'outbound',
   };
@@ -206,6 +226,10 @@ export function setRoutePricing(state: SaveState, routeId: string, pricing: Rout
   if (rIdx < 0) throw new ActionError('NO_ROUTE', `No route ${routeId}`);
   const route = state.routes[rIdx]!;
   const aircraft = state.fleet.find((a) => a.uid === route.aircraftUid);
+  const def = aircraft ? getAircraftDef(aircraft.defId) : undefined;
+  if (def?.category === 'cargo') {
+    throw new ActionError('CARGO_NO_PRICING', 'Cargo routes ship full at a fixed rate');
+  }
   const baseLoad = 0.55 + 0.03 * (aircraft?.upgrades.marketing ?? 0);
   const newLoad = Math.min(0.98, baseLoad * PRICING_LOAD_RECALC[pricing]);
   const routes = state.routes.slice();

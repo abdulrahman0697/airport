@@ -87,6 +87,7 @@ function RouteRow({ route }: { route: Route }) {
   const band = conditionBand(aircraft.condition);
   const condColor = band === 'normal' ? '#34D399' : band === 'degraded' ? '#F59E0B' : '#F87171';
   const touchesHub = hubs.some((h) => h.iata === route.originIata || h.iata === route.destIata);
+  const isCargo = def.category === 'cargo';
 
   return (
     <li style={card}>
@@ -95,6 +96,7 @@ function RouteRow({ route }: { route: Route }) {
           <div style={cardTitle}>
             {route.originIata} ↔ {route.destIata}
             {touchesHub && <span style={hubBadge}>HUB</span>}
+            {isCargo && <span style={cargoBadge}>CARGO</span>}
           </div>
           <div style={cardSubtitle}>
             {def.displayName} · {Math.round(route.distanceKm).toLocaleString()} km · leg {leg.toFixed(1)}s
@@ -103,24 +105,28 @@ function RouteRow({ route }: { route: Route }) {
         <div style={{ textAlign: 'right' }}>
           <div style={rateText}>{formatRate(cps)}</div>
           <div style={{ color: condColor, fontSize: 11, marginTop: 2 }}>
-            {aircraft.condition.toFixed(0)}% · {(route.loadFactor * 100).toFixed(0)}% load
+            {aircraft.condition.toFixed(0)}%
+            {!isCargo && ` · ${(route.loadFactor * 100).toFixed(0)}% load`}
+            {isCargo && ' · full'}
           </div>
         </div>
       </div>
 
-      <div style={pricingRow}>
-        {(['economy', 'balanced', 'premium'] as const).map((p) => (
-          <button key={p}
-            onClick={(): void => {
-              const res = setPricing(route.id, p);
-              setError(res.ok ? null : res.message);
-            }}
-            style={{ ...pricingBtn, ...(route.pricing === p ? pricingActive : {}) }}
-          >
-            {p[0]!.toUpperCase() + p.slice(1)}
-          </button>
-        ))}
-      </div>
+      {!isCargo && (
+        <div style={pricingRow}>
+          {(['economy', 'balanced', 'premium'] as const).map((p) => (
+            <button key={p}
+              onClick={(): void => {
+                const res = setPricing(route.id, p);
+                setError(res.ok ? null : res.message);
+              }}
+              style={{ ...pricingBtn, ...(route.pricing === p ? pricingActive : {}) }}
+            >
+              {p[0]!.toUpperCase() + p.slice(1)}
+            </button>
+          ))}
+        </div>
+      )}
       <button
         onClick={(): void => {
           const res = closeRoute(route.id);
@@ -476,6 +482,12 @@ const hubBadge: React.CSSProperties = {
   fontSize: 9, letterSpacing: '0.1em', fontWeight: 700,
   color: '#F4C75B', background: 'rgba(244,199,91,0.14)',
   border: '1px solid rgba(244,199,91,0.4)',
+  padding: '2px 6px', borderRadius: 4,
+};
+const cargoBadge: React.CSSProperties = {
+  fontSize: 9, letterSpacing: '0.1em', fontWeight: 700,
+  color: '#8B5CF6', background: 'rgba(139,92,246,0.14)',
+  border: '1px solid rgba(139,92,246,0.4)',
   padding: '2px 6px', borderRadius: 4,
 };
 const signedPill: React.CSSProperties = {

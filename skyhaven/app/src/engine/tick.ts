@@ -283,7 +283,7 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
 
   const tierUnlocked = Math.max(
     state.tierUnlocked,
-    maxTierUnlockedFor(lifetime, 4),
+    maxTierUnlockedFor(lifetime),
   );
 
   return {
