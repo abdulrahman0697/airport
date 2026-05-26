@@ -1,6 +1,8 @@
 import { Application, Container, Ticker } from 'pixi.js';
 import { loadTopAirports } from '../data/airports';
+import type { Route } from '../engine/types';
 import { createAirportPins } from './AirportPins';
+import { ArcsLayer } from './Arcs';
 import { createBasemap } from './Basemap';
 import { Camera } from './Camera';
 import { createClouds, type CloudLayer } from './Clouds';
@@ -11,12 +13,12 @@ import { createClouds, type CloudLayer } from './Clouds';
  *   root
  *   ├── basemap     (transformed by camera, no parallax)
  *   ├── clouds      (transformed by camera × parallax factor)
+ *   ├── arcs        (route paths + animated dots, under pins)
  *   └── pins        (transformed by camera, no parallax)
  *
  * Owns the input handlers (pointer / wheel) and the ticker loop.
- * The simulation engine (Phase 2+) lives separately and does not touch
- * this file directly — communication is one-way via `setRouteArcs(...)`
- * style methods added later.
+ * Phase 5: `setRoutes()` / `setTailColor()` push UI-side state into the
+ * arcs layer.
  */
 
 const REDUCED_MOTION = (() => {
@@ -28,6 +30,8 @@ export interface WorldStage {
   readonly app: Application;
   destroy(): void;
   fps(): number;
+  setRoutes(routes: readonly Route[]): void;
+  setTailColor(hex: string): void;
 }
 
 export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
@@ -56,25 +60,25 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
   root.label = 'world-root';
   app.stage.addChild(root);
 
+  const airports = loadTopAirports();
   const basemap = createBasemap();
   const clouds: CloudLayer = createClouds();
-  const pins = createAirportPins(loadTopAirports());
+  const arcsLayer = new ArcsLayer(airports);
+  const pins = createAirportPins(airports);
 
   root.addChild(basemap);
   root.addChild(clouds.container);
+  root.addChild(arcsLayer.container);
   root.addChild(pins);
 
   function applyCamera(): void {
     root.scale.set(camera.state.scale);
     root.position.set(-camera.state.tx * camera.state.scale, -camera.state.ty * camera.state.scale);
-    // Parallax: clouds drift slower than the world. Apply a small
-    // counter-translation proportional to the camera offset.
     const px = (1 - clouds.parallaxFactor) * camera.state.tx * camera.state.scale;
     const py = (1 - clouds.parallaxFactor) * camera.state.ty * camera.state.scale;
     clouds.container.position.set(px / camera.state.scale, py / camera.state.scale);
   }
 
-  // Input — pointer drag, wheel zoom, pinch zoom.
   let dragging = false;
   let lastX = 0;
   let lastY = 0;
@@ -147,14 +151,12 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
   app.canvas.addEventListener('pointercancel', onUp);
   app.canvas.addEventListener('wheel', onWheel, { passive: false });
 
-  // Resize → keep camera viewport in sync.
   const ro = new ResizeObserver(() => {
     camera.setViewport(host.clientWidth, host.clientHeight);
     applyCamera();
   });
   ro.observe(host);
 
-  // WebGL context loss recovery (BRD §2.6 / §14).
   const onLost = (e: Event): void => {
     e.preventDefault();
     // eslint-disable-next-line no-console
@@ -168,7 +170,6 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
   app.canvas.addEventListener('webglcontextlost', onLost);
   app.canvas.addEventListener('webglcontextrestored', onRestored);
 
-  // Tick: camera momentum + cloud drift.
   const onTick = (ticker: Ticker): void => {
     const dtMs = ticker.deltaMS;
     if (!REDUCED_MOTION) {
@@ -184,6 +185,8 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
   return {
     app,
     fps: () => app.ticker.FPS,
+    setRoutes: (routes) => arcsLayer.setRoutes(routes),
+    setTailColor: (hex) => arcsLayer.setTailColor(hex),
     destroy: () => {
       app.ticker.remove(onTick);
       app.canvas.removeEventListener('pointerdown', onDown);
@@ -194,6 +197,7 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
       app.canvas.removeEventListener('webglcontextlost', onLost);
       app.canvas.removeEventListener('webglcontextrestored', onRestored);
       ro.disconnect();
+      arcsLayer.destroy();
       app.destroy(true, { children: true, texture: true });
     },
   };

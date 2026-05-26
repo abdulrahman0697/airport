@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
+import { useGameStore } from '../../state/store';
 import type { WorldStage } from '../../world/WorldStage';
 
 export function WorldView() {
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const stageRef = useRef<WorldStage | null>(null);
   const [fps, setFps] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let stage: WorldStage | undefined;
     let cancelled = false;
     let raf = 0;
 
@@ -15,10 +16,23 @@ export function WorldView() {
       try {
         const { createWorldStage } = await import('../../world/WorldStage');
         if (cancelled || !hostRef.current) return;
-        stage = await createWorldStage(hostRef.current);
+        const stage = await createWorldStage(hostRef.current);
+        if (cancelled) {
+          stage.destroy();
+          return;
+        }
+        stageRef.current = stage;
+
+        // Initial push of routes + tail color from the current store state.
+        const s = useGameStore.getState().state;
+        if (s) {
+          stage.setTailColor(s.tailColor);
+          stage.setRoutes(s.routes);
+        }
+
         const loop = (): void => {
-          if (!stage) return;
-          setFps(Math.round(stage.fps()));
+          if (!stageRef.current) return;
+          setFps(Math.round(stageRef.current.fps()));
           raf = requestAnimationFrame(loop);
         };
         raf = requestAnimationFrame(loop);
@@ -32,8 +46,24 @@ export function WorldView() {
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
-      stage?.destroy();
+      stageRef.current?.destroy();
+      stageRef.current = null;
     };
+  }, []);
+
+  // Subscribe to routes + tail color and push into the stage when present.
+  useEffect(() => {
+    const unsub = useGameStore.subscribe((state, prev) => {
+      const stage = stageRef.current;
+      if (!stage || !state.state) return;
+      if (!prev.state || state.state.routes !== prev.state.routes) {
+        stage.setRoutes(state.state.routes);
+      }
+      if (!prev.state || state.state.tailColor !== prev.state.tailColor) {
+        stage.setTailColor(state.state.tailColor);
+      }
+    });
+    return unsub;
   }, []);
 
   return (

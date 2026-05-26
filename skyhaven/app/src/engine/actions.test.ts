@@ -14,13 +14,13 @@ import { createInitialState } from './initialState';
 function freshState() {
   const s = createInitialState(0);
   // Generous everything so we exercise the action logic without bumping
-  // into cash / tier / fuel gates. Fuel-gate behaviour has its own suite
-  // (fuel.test.ts).
+  // into cash / tier / fuel / region gates. Each gate has its own suite.
   return {
     ...s,
     cash: 10_000_000_000,
     tierUnlocked: 4,
     lifetimeEarnings: 10_000_000_000,
+    unlockedRegions: [1, 2, 3, 4, 5, 6, 7, 8, 9],
     fuel: { ...s.fuel, supplyRate: 1_000_000, capacity: 10_000_000, reserve: 10_000_000 },
   };
 }

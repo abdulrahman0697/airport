@@ -13,11 +13,19 @@ import { getAircraftDef } from '../data/aircraft';
 import { loadTopAirports } from '../data/airports';
 import { FUEL_CAPACITY_TIERS, nextCapacityTier } from '../data/fuelCapacity';
 import { FUEL_CONTRACTS, getFuelContract } from '../data/fuelContracts';
+import { getRegion, REGIONS } from '../data/regions';
 import { conditionBand, repairCost } from './condition';
 import { haversineKm } from './distance';
 import { aircraftBurnRate, hasFuelHeadroom, withRecomputedDemand } from './fuel';
+import {
+  emptyHubManagers,
+  hubCreationCost,
+  hubUpgradeCost,
+  MAX_HUB_LEVEL,
+  routesAtAirport,
+} from './hubs';
 import { upgradeCost, UPGRADE_SPECS, type UpgradeKind } from './upgrades';
-import type { OwnedAircraft, Route, RoutePricing, SaveState } from './types';
+import type { Hub, OwnedAircraft, Route, RoutePricing, SaveState } from './types';
 
 export class ActionError extends Error {
   constructor(public readonly code: string, message: string) {
@@ -106,6 +114,17 @@ export function openRoute(
   const origin = airports.find((a) => a.iata === originIata);
   const dest = airports.find((a) => a.iata === destIata);
   if (!origin || !dest) throw new ActionError('UNKNOWN_AIRPORT', 'Airport not found');
+
+  // Region gate (BRD §4.4) — both endpoints must be in unlocked regions.
+  for (const ap of [origin, dest]) {
+    if (!state.unlockedRegions.includes(ap.region)) {
+      const region = getRegion(ap.region);
+      throw new ActionError(
+        'REGION_LOCKED',
+        `${region?.name ?? `Region ${ap.region}`} not yet unlocked`,
+      );
+    }
+  }
 
   const aIdx = state.fleet.findIndex((a) => a.uid === aircraftUid);
   if (aIdx < 0) throw new ActionError('NO_AIRCRAFT', `No aircraft ${aircraftUid}`);
@@ -287,9 +306,61 @@ export function upgradeFuelCapacity(state: SaveState): SaveState {
   };
 }
 
-// Re-export the tier table so the store / UI can render it without
-// importing the data module separately.
-export { FUEL_CAPACITY_TIERS, FUEL_CONTRACTS };
+// ─── Unlock region ───────────────────────────────────────────────────
+export function unlockRegion(state: SaveState, regionId: number): SaveState {
+  const def = getRegion(regionId);
+  if (!def) throw new ActionError('UNKNOWN_REGION', `No region ${regionId}`);
+  if (state.unlockedRegions.includes(regionId)) {
+    throw new ActionError('REGION_ALREADY_UNLOCKED', `${def.name} already unlocked`);
+  }
+  if (state.cash < def.unlockCost) {
+    throw new ActionError(
+      'INSUFFICIENT_CASH',
+      `Need $${def.unlockCost.toLocaleString()} to unlock ${def.name}`,
+    );
+  }
+  return {
+    ...state,
+    cash: state.cash - def.unlockCost,
+    unlockedRegions: [...state.unlockedRegions, regionId].sort((a, b) => a - b),
+  };
+}
+
+// ─── Create hub ──────────────────────────────────────────────────────
+export function createHub(state: SaveState, iata: string): SaveState {
+  if (state.hubs.some((h) => h.iata === iata)) {
+    throw new ActionError('HUB_EXISTS', `${iata} is already a hub`);
+  }
+  if (routesAtAirport(state, iata) < 2) {
+    throw new ActionError('HUB_NEEDS_ROUTES', `${iata} needs ≥ 2 connected routes`);
+  }
+  const cost = hubCreationCost(iata);
+  if (state.cash < cost) {
+    throw new ActionError('INSUFFICIENT_CASH', `Need $${cost.toLocaleString()} to create hub`);
+  }
+  const hub: Hub = { iata, level: 1, managers: emptyHubManagers() };
+  return { ...state, cash: state.cash - cost, hubs: [...state.hubs, hub] };
+}
+
+// ─── Upgrade hub ─────────────────────────────────────────────────────
+export function upgradeHub(state: SaveState, iata: string): SaveState {
+  const idx = state.hubs.findIndex((h) => h.iata === iata);
+  if (idx < 0) throw new ActionError('NO_HUB', `${iata} is not a hub`);
+  const hub = state.hubs[idx]!;
+  if (hub.level >= MAX_HUB_LEVEL) {
+    throw new ActionError('HUB_MAXED', `${iata} is already at max level`);
+  }
+  const cost = hubUpgradeCost(iata, hub.level);
+  if (state.cash < cost) {
+    throw new ActionError('INSUFFICIENT_CASH', `Need $${cost.toLocaleString()} to upgrade`);
+  }
+  const hubs = state.hubs.slice();
+  hubs[idx] = { ...hub, level: hub.level + 1 };
+  return { ...state, cash: state.cash - cost, hubs };
+}
+
+// Re-export so the store / UI can render data tables without separate imports.
+export { FUEL_CAPACITY_TIERS, FUEL_CONTRACTS, REGIONS };
 
 /** Convenience selector for the UI's "needs attention" badge. */
 export function fleetSummary(state: SaveState): {

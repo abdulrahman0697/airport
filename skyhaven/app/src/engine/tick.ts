@@ -85,7 +85,7 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
       progress -= 1;
       direction = direction === 'outbound' ? 'inbound' : 'outbound';
       const effectiveCondition = Math.max(0, aircraft.condition - conditionDelta);
-      revenueThisTick += legRevenue(r, { ...aircraft, condition: effectiveCondition });
+      revenueThisTick += legRevenue(r, { ...aircraft, condition: effectiveCondition }, state.hubs);
       hoursAccumulated += gameHoursPerLeg;
       conditionDelta += def.conditionDecayRate * gameHoursPerLeg;
     }

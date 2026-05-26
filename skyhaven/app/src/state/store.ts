@@ -16,11 +16,14 @@ import {
   applyUpgrade as applyUpgradeAction,
   buyAircraft as buyAircraftAction,
   closeRoute as closeRouteAction,
+  createHub as createHubAction,
   openRoute as openRouteAction,
   repairAircraft as repairAircraftAction,
   setRoutePricing as setRoutePricingAction,
   signFuelContract as signFuelContractAction,
+  unlockRegion as unlockRegionAction,
   upgradeFuelCapacity as upgradeFuelCapacityAction,
+  upgradeHub as upgradeHubAction,
 } from '../engine/actions';
 import { tick, type TickContext } from '../engine/tick';
 import type { RoutePricing, SaveState } from '../engine/types';
@@ -41,6 +44,9 @@ interface GameStore {
   repairAircraft: (aircraftUid: string) => ActionResult;
   signFuelContract: (contractId: string) => ActionResult;
   upgradeFuelCapacity: () => ActionResult;
+  unlockRegion: (regionId: number) => ActionResult;
+  createHub: (iata: string) => ActionResult;
+  upgradeHub: (iata: string) => ActionResult;
 }
 
 function runAction(
@@ -83,6 +89,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     runAction(set, get, (s) => signFuelContractAction(s, contractId)),
   upgradeFuelCapacity: () =>
     runAction(set, get, (s) => upgradeFuelCapacityAction(s)),
+  unlockRegion: (regionId) =>
+    runAction(set, get, (s) => unlockRegionAction(s, regionId)),
+  createHub: (iata) =>
+    runAction(set, get, (s) => createHubAction(s, iata)),
+  upgradeHub: (iata) =>
+    runAction(set, get, (s) => upgradeHubAction(s, iata)),
 }));
 
 export type { GameStore };
@@ -95,3 +107,5 @@ export const selectTailColor = (s: GameStore): string => s.state?.tailColor ?? '
 export const selectTier = (s: GameStore): number => s.state?.tierUnlocked ?? 1;
 export const selectFleet = (s: GameStore) => s.state?.fleet ?? [];
 export const selectRoutes = (s: GameStore) => s.state?.routes ?? [];
+export const selectHubs = (s: GameStore) => s.state?.hubs ?? [];
+export const selectUnlockedRegions = (s: GameStore) => s.state?.unlockedRegions ?? [];
