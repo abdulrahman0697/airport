@@ -9,6 +9,7 @@ import {
   selectTailColor,
   useGameStore,
 } from '../../state/store';
+import { countryName } from '../countryNames';
 import { formatCash } from '../format';
 import { haptics } from '../juice/haptics';
 
@@ -19,7 +20,6 @@ import { haptics } from '../juice/haptics';
  * taps one of the major airports in the region to make it their hub.
  * The first hub in a region is free; subsequent hubs cost.
  */
-const COUNTRY_NAMES = new Intl.DisplayNames(['en'], { type: 'region' });
 
 export function HubPicker() {
   const pending = useGameStore(selectPendingHubPickRegion);
@@ -49,7 +49,7 @@ export function HubPicker() {
       if (arr) arr.push(a); else groups.set(a.country, [a]);
     }
     return [...groups.entries()]
-      .map(([iso, arr]) => ({ iso, label: safeCountryName(iso), airports: arr }))
+      .map(([iso, arr]) => ({ iso, label: countryName(iso), airports: arr }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [airports]);
 
@@ -192,10 +192,6 @@ export function HubPicker() {
       </motion.div>
     </AnimatePresence>
   );
-}
-
-function safeCountryName(iso: string): string {
-  try { return COUNTRY_NAMES.of(iso) ?? iso; } catch { return iso; }
 }
 
 /**

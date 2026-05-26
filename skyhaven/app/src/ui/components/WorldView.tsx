@@ -143,7 +143,10 @@ export function WorldView() {
 
 const hostStyle: React.CSSProperties = {
   position: 'fixed',
-  inset: 0,
+  top: 'var(--world-top)',
+  left: 0,
+  right: 0,
+  bottom: 0,
   background: '#0B1120',
   overflow: 'hidden',
   touchAction: 'none',

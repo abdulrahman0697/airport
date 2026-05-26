@@ -20,6 +20,7 @@ import {
   selectUnlockedRegions,
   useGameStore,
 } from '../../state/store';
+import { countryName } from '../countryNames';
 import { formatCash, formatRate } from '../format';
 import { haptics } from '../juice/haptics';
 
@@ -393,7 +394,15 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
   const def = selectedAc ? getAircraftDef(selectedAc.defId) : undefined;
   const [originIata, setOriginIata] = useState<string>(hubs[0]?.iata ?? '');
   const [destIata, setDestIata] = useState<string>('');
+  const [destExpanded, setDestExpanded] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const toggleDestCountry = (iso: string): void => {
+    setDestExpanded((cur) => {
+      const next = new Set(cur);
+      if (next.has(iso)) next.delete(iso); else next.add(iso);
+      return next;
+    });
+  };
 
   // Origin is restricted to the player's hubs — routes have to start
   // somewhere they actually operate from (Phase 10 hub rework).
@@ -512,24 +521,81 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
             )}
 
             <label style={formLabel}>Destination</label>
-            <select
-              {...(originIata && !destIata ? { 'data-tutorial': 'routes-dest-select' } : {})}
-              disabled={!originIata}
-              value={destIata}
-              onChange={(e): void => setDestIata(e.target.value)}
-              style={selectStyle}
-            >
-              <option value="">— pick a country / airport —</option>
-              {destGroupedByCountry.map((g) => (
-                <optgroup key={g.iso} label={g.label}>
-                  {g.airports.map((a) => (
-                    <option key={a.iata} value={a.iata}>
-                      {a.iata} · {a.city || g.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+            {!originIata ? (
+              <div style={empty}>Pick an origin hub first.</div>
+            ) : (() => {
+              const destAirport = destIata
+                ? destAirports.find((a) => a.iata === destIata) ?? null
+                : null;
+              return (
+                <div
+                  {...(!destIata ? { 'data-tutorial': 'routes-dest-select' } : {})}
+                  style={destAccordion}
+                >
+                  <div style={destCurrentRow}>
+                    {destAirport
+                      ? (
+                        <span style={destCurrentText}>
+                          <b>{destAirport.iata}</b> · {destAirport.city || countryName(destAirport.country)}
+                        </span>
+                      )
+                      : <span style={destCurrentPlaceholder}>— pick a country / airport —</span>}
+                    {destIata && (
+                      <button
+                        onClick={(): void => setDestIata('')}
+                        style={destClearBtn}
+                        aria-label="Clear destination"
+                      >
+                        clear
+                      </button>
+                    )}
+                  </div>
+                  <div style={destScroller}>
+                    {destGroupedByCountry.length === 0 ? (
+                      <div style={empty}>No reachable destinations in range.</div>
+                    ) : destGroupedByCountry.map((group) => {
+                      const open = destExpanded.has(group.iso);
+                      return (
+                        <section key={group.iso} style={addHubCountry}>
+                          <button
+                            onClick={(): void => toggleDestCountry(group.iso)}
+                            style={addHubCountryHeaderBtn}
+                            aria-expanded={open}
+                          >
+                            <span>{group.label}</span>
+                            <span style={addHubCountryChev}>{open ? '▾' : '▸'} {group.airports.length}</span>
+                          </button>
+                          {open && (
+                            <ul style={list}>
+                              {group.airports.map((a) => {
+                                const selected = destIata === a.iata;
+                                return (
+                                  <li key={a.iata} style={destListItem}>
+                                    <button
+                                      onClick={(): void => setDestIata(a.iata)}
+                                      style={{
+                                        ...destItemBtn,
+                                        ...(selected ? destItemSelected : {}),
+                                      }}
+                                    >
+                                      <div style={destItemLeft}>
+                                        <div style={destItemIata}>{a.iata}</div>
+                                        <div style={destItemCity}>{a.city || group.label}</div>
+                                      </div>
+                                      {selected && <span style={destItemCheck}>✓</span>}
+                                    </button>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </section>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             {distance > 0 && (
               <div style={summaryBox}>
@@ -560,11 +626,6 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   );
-}
-
-const COUNTRY_DISPLAY = new Intl.DisplayNames(['en'], { type: 'region' });
-function countryName(iso: string): string {
-  try { return COUNTRY_DISPLAY.of(iso) ?? iso; } catch { return iso; }
 }
 
 function sortAirports(arr: Airport[]): Airport[] {
@@ -713,6 +774,55 @@ const addHubCountryHeaderBtn: React.CSSProperties = {
 };
 const addHubCountryChev: React.CSSProperties = {
   fontSize: 11, color: '#94A3B8', letterSpacing: '0.02em',
+};
+const destAccordion: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', gap: 8,
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: 10, padding: 10,
+};
+const destCurrentRow: React.CSSProperties = {
+  display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
+};
+const destCurrentText: React.CSSProperties = {
+  fontSize: 13, color: '#F8FAFC',
+};
+const destCurrentPlaceholder: React.CSSProperties = {
+  fontSize: 12, color: '#94A3B8',
+};
+const destClearBtn: React.CSSProperties = {
+  background: 'transparent', border: '1px solid rgba(248,113,113,0.45)',
+  color: '#F87171', borderRadius: 6, padding: '4px 8px',
+  fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
+  cursor: 'pointer', fontFamily: 'inherit',
+};
+const destScroller: React.CSSProperties = {
+  maxHeight: 260, overflowY: 'auto',
+  display: 'flex', flexDirection: 'column', gap: 8,
+  paddingRight: 4,
+};
+const destListItem: React.CSSProperties = { margin: 0 };
+const destItemBtn: React.CSSProperties = {
+  width: '100%',
+  background: 'rgba(11,17,32,0.55)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 8,
+  padding: '8px 12px',
+  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+  cursor: 'pointer', fontFamily: 'inherit',
+  textAlign: 'left', color: '#F8FAFC', minHeight: 44,
+};
+const destItemSelected: React.CSSProperties = {
+  background: 'rgba(90,200,250,0.18)',
+  borderColor: 'rgba(90,200,250,0.6)',
+};
+const destItemLeft: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 2 };
+const destItemIata: React.CSSProperties = {
+  fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', color: '#F8FAFC',
+};
+const destItemCity: React.CSSProperties = { fontSize: 11, color: '#94A3B8' };
+const destItemCheck: React.CSSProperties = {
+  color: '#5AC8FA', fontSize: 14, fontWeight: 700,
 };
 const addHubRight: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4,

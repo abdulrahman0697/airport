@@ -80,7 +80,7 @@ const panelShell: React.CSSProperties = {
   bottom: 64,
   left: 0,
   right: 0,
-  top: 56,
+  top: 'var(--world-top)',
   background: '#111A2E',
   borderTopLeftRadius: 18,
   borderTopRightRadius: 18,

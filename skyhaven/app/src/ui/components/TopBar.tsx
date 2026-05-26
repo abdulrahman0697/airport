@@ -89,20 +89,21 @@ export function TopBar() {
 
 const shell: React.CSSProperties = {
   position: 'fixed',
-  top: 'max(8px, env(safe-area-inset-top))',
-  left: 8,
-  right: 8,
+  top: 'env(safe-area-inset-top, 0px)',
+  left: 0,
+  right: 0,
   padding: '12px 14px',
+  paddingLeft: 'max(14px, env(safe-area-inset-left, 0px))',
+  paddingRight: 'max(14px, env(safe-area-inset-right, 0px))',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 10,
-  background: 'rgba(15, 23, 47, 0.92)',
-  border: '1px solid rgba(90,200,250,0.18)',
-  borderRadius: 14,
-  boxShadow: '0 10px 28px rgba(0,0,0,0.45)',
-  backdropFilter: 'blur(8px)',
-  zIndex: 10,
+  // Opaque section above the game — no map visible behind it.
+  background: '#0B1120',
+  borderBottom: '1px solid rgba(90,200,250,0.18)',
+  boxShadow: '0 6px 18px rgba(0,0,0,0.55)',
+  zIndex: 30,
 };
 
 const brandBtn: React.CSSProperties = {

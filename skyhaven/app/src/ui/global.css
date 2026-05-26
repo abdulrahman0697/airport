@@ -16,7 +16,19 @@
   --eco-gold: #F4C75B;
   --eco-platinum: #E5E4E2;
 
+  /* Reserved vertical space the top bar occupies. The world view, fuel
+     gauge, event banner and any other in-game overlay anchor below
+     this so the top bar lives in its own dedicated section. */
+  --world-top: calc(env(safe-area-inset-top, 0px) + 100px);
+
   color-scheme: dark;
+}
+
+html, body {
+  background: var(--bg-deep);
+  margin: 0;
+  padding: 0;
+  color: var(--text-primary);
 }
 
 * { box-sizing: border-box; }

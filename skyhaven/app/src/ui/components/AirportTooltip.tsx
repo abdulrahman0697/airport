@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Airport } from '../../data/airports';
 import { getRegion } from '../../data/regions';
+import { countryName } from '../countryNames';
 
 /**
  * Small popover that appears next to a tapped airport pin. Shows the
@@ -51,7 +52,7 @@ export function AirportTooltip({ airport, x, y, unlocked, onClose }: Props) {
       </div>
       <div style={city}>{airport.city || '—'}</div>
       <div style={meta}>
-        {region?.name ?? `Region ${airport.region}`} · {airport.country}
+        {region?.name ?? `Region ${airport.region}`} · {countryName(airport.country)}
       </div>
       <div style={meta}>
         Tier {airport.sizeTier} airport · Runway cat {airport.runwayCategory}

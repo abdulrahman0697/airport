@@ -68,7 +68,7 @@ export function EventBanner() {
 // ─── Styles ──────────────────────────────────────────────────────────
 const shell: React.CSSProperties = {
   position: 'fixed',
-  top: 'calc(env(safe-area-inset-top, 0px) + 64px)',
+  top: 'calc(var(--world-top) + 8px)',
   left: 10,
   right: 64, // leave space for FuelGauge on the right
   display: 'flex',

@@ -75,7 +75,7 @@ export function FuelGauge() {
 const shell: React.CSSProperties = {
   position: 'fixed',
   right: 10,
-  top: 'max(72px, calc(env(safe-area-inset-top) + 60px))',
+  top: 'calc(var(--world-top) + 8px)',
   width: 44,
   background: 'rgba(11, 17, 32, 0.78)',
   backdropFilter: 'blur(8px)',
