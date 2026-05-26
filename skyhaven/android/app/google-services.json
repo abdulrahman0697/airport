@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "354002953206",
+    "project_id": "sky-haven-game",
+    "storage_bucket": "sky-haven-game.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:354002953206:android:20e423b3f3df87aa335dd7",
+        "android_client_info": {
+          "package_name": "com.skyhaven.tycoon"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "354002953206-eltdcikvbuq1u4fonf3c5ggknp87niu4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDQtjpYBADMzoXVj3bavPFAJcRqs1vpAzM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "354002953206-eltdcikvbuq1u4fonf3c5ggknp87niu4.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
