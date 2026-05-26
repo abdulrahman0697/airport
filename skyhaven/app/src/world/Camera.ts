@@ -76,6 +76,20 @@ export class Camera {
     this.clamp();
   }
 
+  /**
+   * Centre the viewport on a world-space point at the given camera
+   * scale. Clamped via `clamp()` afterwards.
+   */
+  centerOn(worldX: number, worldY: number, scale: number): void {
+    const next = Math.min(this.cfg.maxScale, Math.max(this.cfg.minScale, scale));
+    this.state.scale = next;
+    this.state.tx = worldX - this.cfg.viewportWidth / 2 / next;
+    this.state.ty = worldY - this.cfg.viewportHeight / 2 / next;
+    this.vx = 0;
+    this.vy = 0;
+    this.clamp();
+  }
+
   /** Per-frame integration of momentum. dtMs is the frame delta in ms. */
   tick(dtMs: number): void {
     if (this.vx === 0 && this.vy === 0) return;

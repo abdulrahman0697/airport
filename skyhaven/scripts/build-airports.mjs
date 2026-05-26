@@ -119,6 +119,9 @@ for (let r = 1; r < rows.length; r++) {
   const sizeTier = SIZE_TIER[type];
   const runwayCategory = RUNWAY_BY_SIZE[sizeTier];
 
+  const name = (row[idx.name] || '').trim();
+  const isIntl = /\b(international|intl)\b/i.test(name);
+
   all.push({
     iata,
     lat: +lat.toFixed(4),
@@ -128,6 +131,8 @@ for (let r = 1; r < rows.length; r++) {
     region,
     sizeTier,
     runwayCategory,
+    name,
+    intl: isIntl,
   });
 }
 

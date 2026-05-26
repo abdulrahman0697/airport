@@ -1,6 +1,8 @@
 import { Application, Container, Ticker } from 'pixi.js';
 import { loadTopAirports, type Airport } from '../data/airports';
+import { getRegion } from '../data/regions';
 import type { Collectible, Route } from '../engine/types';
+import { lonLatToWorld } from './projection';
 import { createAirportPins, type AirportPinsLayer } from './AirportPins';
 import { ArcsLayer } from './Arcs';
 import { createBasemap } from './Basemap';
@@ -38,6 +40,7 @@ export interface WorldStage {
   setCollectibleTapHandler(fn: (id: string) => void): void;
   setUnlockedRegions(regions: ReadonlySet<number>): void;
   setAirportTapHandler(fn: (airport: Airport, screen: { x: number; y: number }) => void): void;
+  zoomToRegion(regionId: number, scale?: number): void;
 }
 
 export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
@@ -253,6 +256,13 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
       unlockedRegions = regions;
       refreshPinRegions();
       countries.setUnlockedRegions(regions);
+    },
+    zoomToRegion: (regionId, scale = 1.6) => {
+      const region = getRegion(regionId);
+      if (!region) return;
+      const { x, y } = lonLatToWorld(region.centerLon, region.centerLat);
+      camera.centerOn(x, y, scale);
+      applyCamera();
     },
     setAirportTapHandler: (fn) => { airportTapHandler = fn; },
     destroy: () => {

@@ -70,3 +70,20 @@ a:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
   50%  { transform: translate3d(2%, 1%, 0)   scale(1.10); opacity: 1.00; }
   100% { transform: translate3d(-1%, 3%, 0)  scale(1.06); opacity: 0.90; }
 }
+
+/* Wordmark shimmer used by the intro splash title. */
+@keyframes title-shimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.title-shimmer {
+  background-image: linear-gradient(110deg,
+    #F8FAFC 0%, #F8FAFC 35%, #FCE9A5 45%, #F8FAFC 55%, #F8FAFC 100%);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent;
+  animation: title-shimmer 6s ease-in-out infinite;
+}

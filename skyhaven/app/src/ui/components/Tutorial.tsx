@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  selectPendingHubPickRegion,
   selectTailColor,
   selectTutorialCompleted,
   selectTutorialStep,
@@ -123,7 +124,11 @@ export function Tutorial() {
   }, [completed, step, complete]);
 
   const introDismissed = useUiStore((s) => s.introDismissed);
+  const pendingHubPick = useGameStore(selectPendingHubPickRegion);
   if (!introDismissed) return null;
+  // Hub picker takes priority over the tutorial so the player doesn't
+  // see overlapping cards on first launch (BRD §5.2 sequencing).
+  if (pendingHubPick !== null) return null;
   if (completed) return null;
   if (!current) return null;
 

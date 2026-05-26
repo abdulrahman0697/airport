@@ -18,6 +18,10 @@ export interface Airport {
   readonly sizeTier: number;
   /** 1..4 (4 = supports Mega-Liner). */
   readonly runwayCategory: number;
+  /** Full airport name from OurAirports. */
+  readonly name: string;
+  /** True if the airport's name reads as international. */
+  readonly intl: boolean;
 }
 
 import topData from './airports.top.json' with { type: 'json' };

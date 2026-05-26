@@ -38,6 +38,11 @@ export function WorldView() {
           stage.setUnlockedRegions(new Set<number>(s.unlockedRegions));
           stage.setRoutes(s.routes);
           stage.setCollectibles(s.collectibles);
+          // If exactly one region is unlocked, zoom in on it so the
+          // player isn't staring at an empty globe.
+          if (s.unlockedRegions.length === 1) {
+            stage.zoomToRegion(s.unlockedRegions[0]!);
+          }
         }
 
         let lastFpsAt = 0;

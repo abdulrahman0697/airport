@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { selectTailColor, useGameStore } from '../../state/store';
 import { useUiStore } from '../../state/uiStore';
 import { haptics } from '../juice/haptics';
@@ -7,30 +7,61 @@ import { haptics } from '../juice/haptics';
 /**
  * Introduction splash (BRD §2.6 / §5.1 — branded motion beat).
  *
- * Full-screen overlay shown for every app launch until the player taps
- * "Start". The "Live" version of this screen leans into motion: a
- * gradient sky drifts, multiple animated aircraft cross at different
- * altitudes leaving glowing trails, a runway pulse, a terminal with
- * blinking gates. All in inline SVG so it stays resolution-independent
- * and zero-weight on the bundle.
+ * Premium-feeling pre-game screen with layered motion:
+ *  - deep multi-stop gradient background with drifting aurora
+ *  - parallax star/light particles (twinkling on different cycles)
+ *  - large title with a continuous gold→cyan→violet shimmer sweep
+ *  - foreground scene: 4 aircraft cruising on staggered trails,
+ *    runway with strobing approach lights, terminal silhouettes
+ *    with blinking gates, moon with halo
+ *  - tagline carousel cycling 3 lines
+ *  - bottom-corner "v0.1.0 · Phase 10" build tag
  *
- * Dismissal flips a `introDismissed` flag in the UI store. The Tutorial
- * watches that flag and only fires its steps once the splash is gone.
+ * Dismissal flips `introDismissed` in the UI store; Tutorial waits
+ * for it.
  */
+const TAGLINES = [
+  'Build the airline that owns the sky.',
+  'Routes earn around the clock.',
+  'Choose your hub. Plot the world. Lift off.',
+];
+
 export function IntroSplash() {
   const introDismissed = useUiStore((s) => s.introDismissed);
   const dismissIntro = useUiStore((s) => s.dismissIntro);
   const tailColor = useGameStore(selectTailColor);
   const [exiting, setExiting] = useState(false);
+  const [taglineIdx, setTaglineIdx] = useState(0);
 
   useEffect(() => {
     if (introDismissed) setExiting(true);
   }, [introDismissed]);
 
+  useEffect(() => {
+    const id = setInterval(() => setTaglineIdx((n) => (n + 1) % TAGLINES.length), 3200);
+    return () => clearInterval(id);
+  }, []);
+
+  // Deterministic particle layer — different sizes, twinkle cycles.
+  const particles = useMemo(() => {
+    const out: { cx: number; cy: number; r: number; delay: number; dur: number; }[] = [];
+    let s = 1234;
+    const rand = (): number => { s = (s * 1664525 + 1013904223) >>> 0; return s / 0xFFFFFFFF; };
+    for (let i = 0; i < 80; i++) {
+      out.push({
+        cx: rand() * 100,
+        cy: rand() * 60,
+        r: 0.4 + rand() * 1.4,
+        delay: rand() * 3,
+        dur: 2 + rand() * 3,
+      });
+    }
+    return out;
+  }, []);
+
   const start = (): void => {
     haptics.medium();
     setExiting(true);
-    // Give the exit animation time before unmounting via store flip.
     setTimeout(() => dismissIntro(), 280);
   };
 
@@ -48,6 +79,32 @@ export function IntroSplash() {
           {/* Animated sky backdrop — a slowly drifting aurora. */}
           <div style={skyAurora as React.CSSProperties} aria-hidden />
 
+          {/* Twinkling particle field (CSS-driven). */}
+          <svg
+            viewBox="0 0 100 60"
+            preserveAspectRatio="none"
+            style={particleLayer as React.CSSProperties}
+            aria-hidden
+          >
+            {particles.map((p, i) => (
+              <circle
+                key={i}
+                cx={p.cx}
+                cy={p.cy}
+                r={p.r / 4}
+                fill="#C4ECFF"
+              >
+                <animate
+                  attributeName="opacity"
+                  values="0.15;0.95;0.15"
+                  dur={`${p.dur}s`}
+                  begin={`-${p.delay}s`}
+                  repeatCount="indefinite"
+                />
+              </circle>
+            ))}
+          </svg>
+
           {/* Glow flares behind the wordmark. */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -57,6 +114,15 @@ export function IntroSplash() {
             aria-hidden
           />
 
+          {/* Premium decorative top-bar with the studio mark. */}
+          <div style={studioBar as React.CSSProperties}>
+            <span style={studioMark as React.CSSProperties} />
+            <span style={studioName as React.CSSProperties}>SKYHAVEN STUDIOS</span>
+          </div>
+
+          {/* Build tag bottom-right. */}
+          <div style={buildTag as React.CSSProperties}>v0.1.0 · Phase 10</div>
+
           <div style={inner}>
             <motion.div
               initial={{ y: 12, opacity: 0 }}
@@ -64,14 +130,15 @@ export function IntroSplash() {
               transition={{ delay: 0.05, duration: 0.4 }}
               style={kicker as Record<string, unknown>}
             >
-              SkyHaven Studios presents
+              ✦ A SkyHaven Studios Original ✦
             </motion.div>
 
             <motion.h1
               initial={{ scale: 0.94, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.18, type: 'spring', stiffness: 280, damping: 22 }}
-              style={{ ...title, textShadow: `0 0 36px ${tailColor}66` } as Record<string, unknown>}
+              className="title-shimmer"
+              style={{ ...title, textShadow: `0 0 50px ${tailColor}88, 0 4px 16px rgba(0,0,0,0.6)` } as Record<string, unknown>}
             >
               SKYHAVEN
               <br />
@@ -84,7 +151,7 @@ export function IntroSplash() {
               transition={{ delay: 0.5, duration: 0.5 }}
               style={tagline as Record<string, unknown>}
             >
-              Wings of the World
+              · WINGS OF THE WORLD ·
             </motion.div>
 
             {/* Decorative scene with multiple animated aircraft + runway. */}
@@ -230,11 +297,21 @@ export function IntroSplash() {
 
             <motion.div
               initial={{ opacity: 0 }}
-              animate={{ opacity: 0.65 }}
+              animate={{ opacity: 0.75 }}
               transition={{ delay: 1.3, duration: 0.6 }}
               style={footer as Record<string, unknown>}
             >
-              Build the airline that owns the sky.
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={taglineIdx}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.4 }}
+                >
+                  {TAGLINES[taglineIdx]}
+                </motion.span>
+              </AnimatePresence>
             </motion.div>
           </div>
         </motion.div>
@@ -290,17 +367,58 @@ const kicker: React.CSSProperties = {
   opacity: 0.85,
 };
 const title: React.CSSProperties = {
-  margin: '12px 0 6px',
-  fontSize: 56,
+  margin: '14px 0 8px',
+  fontSize: 64,
   fontWeight: 900,
   letterSpacing: '0.04em',
   color: '#F8FAFC',
   lineHeight: 0.92,
 };
 const titleSub: React.CSSProperties = {
-  fontSize: 32,
+  fontSize: 36,
   fontWeight: 800,
-  letterSpacing: '0.34em',
+  letterSpacing: '0.36em',
+};
+const particleLayer: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  width: '100%',
+  height: '100%',
+  pointerEvents: 'none',
+};
+const studioBar: React.CSSProperties = {
+  position: 'absolute',
+  top: 18,
+  left: 0,
+  right: 0,
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  gap: 8,
+  pointerEvents: 'none',
+};
+const studioMark: React.CSSProperties = {
+  width: 10,
+  height: 10,
+  borderRadius: 5,
+  background: 'linear-gradient(135deg, #5AC8FA, #8B5CF6)',
+  boxShadow: '0 0 12px rgba(90,200,250,0.6)',
+};
+const studioName: React.CSSProperties = {
+  fontSize: 9,
+  letterSpacing: '0.42em',
+  color: '#C4ECFF',
+  fontWeight: 700,
+};
+const buildTag: React.CSSProperties = {
+  position: 'absolute',
+  bottom: 14,
+  right: 18,
+  fontSize: 9,
+  letterSpacing: '0.16em',
+  color: '#94A3B8',
+  opacity: 0.65,
+  pointerEvents: 'none',
 };
 const tagline: React.CSSProperties = {
   fontSize: 12,

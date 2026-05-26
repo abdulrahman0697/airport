@@ -32,11 +32,21 @@ export function HubPicker() {
   const airports = useMemo(() => {
     if (pending === null) return [] as Airport[];
     return loadTopAirports()
-      .filter((a) => a.region === pending && a.sizeTier === 4)
+      .filter((a) => a.region === pending && a.sizeTier === 4 && isInternational(a))
       .sort((a, b) =>
         (a.country.localeCompare(b.country))
         || (a.city || '').localeCompare(b.city || ''));
   }, [pending]);
+  const airportsByCountry = useMemo(() => {
+    const groups = new Map<string, Airport[]>();
+    for (const a of airports) {
+      const arr = groups.get(a.country);
+      if (arr) arr.push(a); else groups.set(a.country, [a]);
+    }
+    return [...groups.entries()]
+      .map(([iso, arr]) => ({ iso, label: safeCountryName(iso), airports: arr }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [airports]);
 
   const handlePick = (iata: string): void => {
     const res = pickHub(iata);
@@ -84,40 +94,45 @@ export function HubPicker() {
                 : 'Pick an additional hub — extra hubs grow your network reach.'}
             </p>
 
-            <ul style={list}>
-              {airports.map((a) => {
-                const cost = hubPickCost(state, a.iata);
-                const country = safeCountryName(a.country);
-                const owned = state.hubs.some((h) => h.iata === a.iata);
-                return (
-                  <li key={a.iata} style={item}>
-                    <button
-                      onClick={(): void => handlePick(a.iata)}
-                      disabled={owned || (state.cash < cost)}
-                      style={{
-                        ...itemBtn,
-                        opacity: owned ? 0.4 : state.cash < cost ? 0.55 : 1,
-                      }}
-                    >
-                      <div style={itemLeft}>
-                        <div style={iata}>{a.iata}</div>
-                        <div style={cityRow}>
-                          <span style={city}>{a.city || country}</span>
-                          <span style={countryLabel}>{country}</span>
-                        </div>
-                      </div>
-                      <div style={itemRight}>
-                        {owned
-                          ? <span style={ownedPill}>Hub</span>
-                          : cost === 0
-                            ? <span style={freePill}>Free</span>
-                            : <span style={costText}>${formatCash(cost, 1)}</span>}
-                      </div>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            <div style={listScroller}>
+              {airportsByCountry.map((group) => (
+                <section key={group.iso} style={countrySection}>
+                  <div style={countryHeader}>{group.label}</div>
+                  <ul style={list}>
+                    {group.airports.map((a) => {
+                      const cost = hubPickCost(state, a.iata);
+                      const owned = state.hubs.some((h) => h.iata === a.iata);
+                      return (
+                        <li key={a.iata} style={item}>
+                          <button
+                            onClick={(): void => handlePick(a.iata)}
+                            disabled={owned || (state.cash < cost)}
+                            style={{
+                              ...itemBtn,
+                              opacity: owned ? 0.4 : state.cash < cost ? 0.55 : 1,
+                            }}
+                          >
+                            <div style={itemLeft}>
+                              <div style={iata}>{a.iata}</div>
+                              <div style={cityRow}>
+                                <span style={city}>{a.city || group.label}</span>
+                              </div>
+                            </div>
+                            <div style={itemRight}>
+                              {owned
+                                ? <span style={ownedPill}>Hub</span>
+                                : cost === 0
+                                  ? <span style={freePill}>Free</span>
+                                  : <span style={costText}>${formatCash(cost, 1)}</span>}
+                            </div>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ))}
+            </div>
 
             {error && <div style={errorText}>{error}</div>}
 
@@ -133,6 +148,16 @@ export function HubPicker() {
 
 function safeCountryName(iso: string): string {
   try { return COUNTRY_NAMES.of(iso) ?? iso; } catch { return iso; }
+}
+
+/**
+ * Phase 10 polish: hub list is too long because Tier-4 includes some
+ * national airports that aren't really international. The build script
+ * now flags each airport with an `intl` boolean derived from its name;
+ * this picker honours that flag.
+ */
+function isInternational(a: Airport): boolean {
+  return a.intl;
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────
@@ -170,8 +195,21 @@ const body: React.CSSProperties = {
 };
 const list: React.CSSProperties = {
   listStyle: 'none', margin: 0, padding: 0,
-  display: 'flex', flexDirection: 'column', gap: 6,
-  overflowY: 'auto', flex: 1, minHeight: 0,
+  display: 'flex', flexDirection: 'column', gap: 4,
+};
+const listScroller: React.CSSProperties = {
+  flex: 1, minHeight: 0, overflowY: 'auto',
+  display: 'flex', flexDirection: 'column', gap: 12,
+  paddingRight: 4,
+};
+const countrySection: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', gap: 4,
+};
+const countryHeader: React.CSSProperties = {
+  fontSize: 10, letterSpacing: '0.18em', textTransform: 'uppercase',
+  color: '#5AC8FA', fontWeight: 700,
+  padding: '4px 4px 4px 4px',
+  borderBottom: '1px solid rgba(90,200,250,0.18)',
 };
 const item: React.CSSProperties = { margin: 0 };
 const itemBtn: React.CSSProperties = {
@@ -194,7 +232,6 @@ const iata: React.CSSProperties = {
 };
 const cityRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8 };
 const city: React.CSSProperties = { fontSize: 11, color: '#F8FAFC' };
-const countryLabel: React.CSSProperties = { fontSize: 10, color: '#94A3B8' };
 const itemRight: React.CSSProperties = { display: 'flex', alignItems: 'center' };
 const freePill: React.CSSProperties = {
   fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',

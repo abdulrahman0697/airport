@@ -5,7 +5,7 @@ import { REGIONS } from '../../data/regions';
 import { conditionBand } from '../../engine/condition';
 import { haversineKm } from '../../engine/distance';
 import { cashPerSecond, legDurationMs } from '../../engine/economy';
-import { routeOpenCost } from '../../engine/actions';
+import { hubPickCost, routeOpenCost } from '../../engine/actions';
 import {
   hubUpgradeCost,
   MAX_HUB_LEVEL,
@@ -231,10 +231,26 @@ function AddHubModal({
   onClose: () => void;
   onPick: (iata: string) => void;
 }) {
-  const candidates = useMemo(() => {
-    return airports
-      .filter((a) => unlocked.includes(a.region) && a.sizeTier === 4 && !existingHubIatas.has(a.iata))
-      .sort((a, b) => a.country.localeCompare(b.country) || (a.city || '').localeCompare(b.city || ''));
+  const state = useGameStore((s) => s.state);
+  const cash = useGameStore(selectCash);
+  const groupedByCountry = useMemo(() => {
+    const filtered = airports.filter((a) =>
+      unlocked.includes(a.region)
+      && a.sizeTier === 4
+      && a.intl
+      && !existingHubIatas.has(a.iata),
+    );
+    const groups = new Map<string, Airport[]>();
+    for (const a of filtered) {
+      const arr = groups.get(a.country);
+      if (arr) arr.push(a); else groups.set(a.country, [a]);
+    }
+    return [...groups.entries()]
+      .map(([iso, arr]) => ({
+        iso, label: countryName(iso),
+        airports: arr.sort((a, b) => (a.city || '').localeCompare(b.city || '')),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
   }, [airports, unlocked, existingHubIatas]);
 
   return (
@@ -243,26 +259,51 @@ function AddHubModal({
         <h3 style={{ margin: '0 0 8px', color: '#F8FAFC' }}>Add hub</h3>
         <p style={{ color: '#94A3B8', fontSize: 12, marginTop: 0 }}>
           Each new hub lets you originate routes from that airport.
-          The first hub in any region is free; extras cost based on tier.
+          The first hub in any region is free; extras cost a one-time
+          fee based on the airport's size tier.
         </p>
-        <ul style={list}>
-          {candidates.slice(0, 50).map((a) => (
-            <li key={a.iata} style={card}>
-              <div style={cardHeader}>
-                <div>
-                  <div style={cardTitle}>{a.iata}</div>
-                  <div style={cardSubtitle}>{a.city || a.country} ({countryName(a.country)})</div>
-                </div>
-                <button
-                  onClick={(): void => onPick(a.iata)}
-                  style={{ ...primaryBtn, width: 'auto', padding: '8px 14px', minHeight: 36 }}
-                >
-                  Pick
-                </button>
-              </div>
-            </li>
+        <div style={addHubScroller}>
+          {groupedByCountry.map((group) => (
+            <section key={group.iso} style={addHubCountry}>
+              <div style={addHubCountryHeader}>{group.label}</div>
+              <ul style={list}>
+                {group.airports.map((a) => {
+                  const cost = state ? hubPickCost(state, a.iata) : 0;
+                  const afford = cash >= cost;
+                  return (
+                    <li key={a.iata} style={card}>
+                      <div style={cardHeader}>
+                        <div>
+                          <div style={cardTitle}>{a.iata}</div>
+                          <div style={cardSubtitle}>{a.city || group.label}</div>
+                        </div>
+                        <div style={addHubRight}>
+                          {cost === 0
+                            ? <span style={freePill}>Free</span>
+                            : <span style={costText}>${formatCash(cost, 1)}</span>}
+                          <button
+                            disabled={!afford && cost > 0}
+                            onClick={(): void => onPick(a.iata)}
+                            style={{
+                              ...primaryBtn,
+                              width: 'auto',
+                              padding: '8px 14px',
+                              minHeight: 36,
+                              marginTop: 6,
+                              opacity: afford || cost === 0 ? 1 : 0.5,
+                            }}
+                          >
+                            Pick
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
         <button onClick={onClose} style={cancelBtn}>Close</button>
       </div>
     </div>
@@ -352,6 +393,7 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
     return sortAirports(
       unlockedAirports.filter((a) => {
         if (a.iata === originIata) return false;
+        if (!a.intl) return false;
         const d = haversineKm(origin.lat, origin.lon, a.lat, a.lon);
         return d <= def.rangeKm && d >= 100;
       }),
@@ -607,4 +649,24 @@ const addHubBtn: React.CSSProperties = {
   background: '#5AC8FA', color: '#0B1120', border: 0,
   padding: '8px 14px', borderRadius: 8, fontWeight: 700,
   cursor: 'pointer', minHeight: 36, fontFamily: 'inherit',
+};
+const addHubScroller: React.CSSProperties = {
+  flex: 1, minHeight: 0, overflowY: 'auto',
+  display: 'flex', flexDirection: 'column', gap: 12, marginTop: 10,
+};
+const addHubCountry: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4 };
+const addHubCountryHeader: React.CSSProperties = {
+  fontSize: 10, letterSpacing: '0.18em', textTransform: 'uppercase',
+  color: '#5AC8FA', fontWeight: 700,
+  padding: '4px 4px',
+  borderBottom: '1px solid rgba(90,200,250,0.18)',
+};
+const addHubRight: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4,
+};
+const freePill: React.CSSProperties = {
+  fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
+  color: '#34D399', background: 'rgba(52,211,153,0.14)',
+  border: '1px solid rgba(52,211,153,0.4)',
+  padding: '3px 8px', borderRadius: 4, fontWeight: 700,
 };

@@ -65,13 +65,16 @@ export function HeroMoments() {
   }, [tier, tailColor, tutorialCompleted]);
 
   useEffect(() => {
+    // Wait for the store to actually load — until the state arrives
+    // `regions` is the frozen EMPTY_NUMBERS singleton; treating that as
+    // "no regions" and the next render as "+1 region" was firing the
+    // celebration on every launch.
+    if (regions.length === 0) return;
     if (seenRegions.current === null) {
       seenRegions.current = new Set(regions);
       return;
     }
     if (!tutorialCompleted) {
-      // Still record any new regions silently so the tutorial doesn't
-      // trigger a stale popup the moment it completes.
       for (const r of regions) seenRegions.current.add(r);
       return;
     }
