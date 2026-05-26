@@ -71,9 +71,13 @@ export function createGameLoop(deps: GameLoopDeps = { now: () => Date.now() }): 
 
       const restored = await loadSave(deps.now());
       const baseInitial = restored ?? createInitialState(deps.now());
-      // First-of-day login: streak bookkeeping happens here so the
-      // pendingDailyReward modal fires as part of the resume flow.
-      const initial = applyDailyLogin(baseInitial, deps.now());
+      // First-of-day login is deferred while the tutorial is running
+      // so the modal doesn't overlap the playable walkthrough. When
+      // the tutorial completes, App.tsx's effect re-runs applyDailyLogin
+      // via the `applyDailyLoginNow` store action.
+      const initial = baseInitial.tutorialCompleted
+        ? applyDailyLogin(baseInitial, deps.now())
+        : baseInitial;
       useGameStore.getState().setState(initial);
 
       scheduler = createSaveScheduler(() => {

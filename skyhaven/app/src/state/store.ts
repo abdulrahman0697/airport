@@ -35,6 +35,7 @@ import {
   upgradeFuelCapacity as upgradeFuelCapacityAction,
   upgradeHub as upgradeHubAction,
 } from '../engine/actions';
+import { applyDailyLogin } from '../engine/dailyLogin';
 import { tick, type TickContext } from '../engine/tick';
 import type { ManagerKind } from '../data/managers';
 import type { RoutePricing, SaveState } from '../engine/types';
@@ -70,6 +71,8 @@ interface GameStore {
   acknowledgeOfflineSummary: () => ActionResult;
   claimDailyReward: () => ActionResult;
   setOfflineSummary: (s: { elapsedMs: number; earnings: number } | null) => void;
+  /** Apply daily-login streak using the current wall clock. */
+  applyDailyLoginNow: () => void;
 }
 
 function runAction(
@@ -148,6 +151,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const cur = get().state;
     if (!cur) return;
     set({ state: setOfflineSummaryAction(cur, summary) });
+  },
+  applyDailyLoginNow: (): void => {
+    const cur = get().state;
+    if (!cur) return;
+    set({ state: applyDailyLogin(cur, Date.now()) });
   },
 }));
 

@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { createGameLoop } from '../state/gameLoop';
+import { selectTutorialCompleted, useGameStore } from '../state/store';
 import { BottomTabs } from './components/BottomTabs';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { DailyReward } from './components/DailyReward';
@@ -20,6 +21,18 @@ export function App() {
     void loop.start();
     return () => { void loop.stop(); };
   }, []);
+
+  // Deferred daily-login: the modal only fires once the tutorial has
+  // completed, so the player doesn't get a streak popup overlapping
+  // the playable walkthrough on first launch.
+  const tutorialCompleted = useGameStore(selectTutorialCompleted);
+  const prevCompleted = useRef(tutorialCompleted);
+  useEffect(() => {
+    if (!prevCompleted.current && tutorialCompleted) {
+      useGameStore.getState().applyDailyLoginNow();
+    }
+    prevCompleted.current = tutorialCompleted;
+  }, [tutorialCompleted]);
 
   return (
     <ErrorBoundary>

@@ -22,13 +22,20 @@ import type { SaveState } from '../../engine/types';
  * Failure-proof: navigation isn't blocked; the tutorial just waits.
  */
 
+/**
+ * A target spec is either a single data-tutorial key or a *chain*.
+ * useTargetRect tries each key in order and locks on to the first
+ * element that's actually in the DOM, so the spotlight can shift as
+ * the player progresses through nested UI (panel → buy tab → atr-42).
+ */
+type TargetSpec = string | readonly string[];
+
 type Step =
   | { kind: 'info'; title: string; body: string; cta: string }
   | { kind: 'identity'; title: string; body: string }
   | {
       kind: 'wait-state'; title: string; body: string;
-      /** `target` shifts based on whether the relevant panel is open. */
-      targetFor: (panel: PanelId) => string;
+      targetFor: (panel: PanelId) => TargetSpec;
       check: (s: SaveState) => boolean;
     }
   | { kind: 'wait-time'; title: string; body: string; durationMs: number };
@@ -48,22 +55,26 @@ const STEPS: readonly Step[] = [
   {
     kind: 'wait-state',
     title: 'Secure more fuel',
-    body: 'Tap the glowing fuel gauge, then sign the highlighted contract. More supply means more aircraft can fly.',
+    body: 'Tap the glowing fuel gauge, then sign the highlighted Local Refinery contract.',
     targetFor: (panel) => panel === 'fuel' ? 'fuel-sign-contract' : 'fuel-gauge',
     check: (s) => s.fuel.contracts.length >= 2,
   },
   {
     kind: 'wait-state',
-    title: 'Buy a second aircraft',
-    body: 'Open the Fleet tab, switch to the highlighted "Buy aircraft" tab, and grab any T1.',
-    targetFor: (panel) => panel === 'fleet' ? 'fleet-buy-tab' : 'fleet-tab',
+    title: 'Buy your second aircraft',
+    body: 'Open Fleet, switch to "Buy aircraft", then buy the highlighted ATR 42 ($25K).',
+    targetFor: (panel) => panel === 'fleet'
+      ? ['buy-aircraft-atr42', 'fleet-buy-tab']
+      : 'fleet-tab',
     check: (s) => s.fleet.length >= 2,
   },
   {
     kind: 'wait-state',
     title: 'Open a new route',
-    body: 'Open the Routes tab, then tap the highlighted "+ New route" button.',
-    targetFor: (panel) => panel === 'routes' ? 'routes-new-button' : 'routes-tab',
+    body: 'Tap "+ New route", then pick an origin, a destination, and confirm.',
+    targetFor: (panel) => panel === 'routes'
+      ? ['routes-confirm-button', 'routes-dest-select', 'routes-origin-select', 'routes-new-button']
+      : 'routes-tab',
     check: (s) => s.routes.length >= 2,
   },
   {
@@ -131,17 +142,22 @@ export function Tutorial() {
 }
 
 // ─── Hook: live-track a data-tutorial target's bounding rect ─────────
-function useTargetRect(target: string | null): DOMRect | null {
+function useTargetRect(target: TargetSpec | null): DOMRect | null {
   const [rect, setRect] = useState<DOMRect | null>(null);
+  const key = Array.isArray(target) ? target.join('|') : (target ?? '');
   useEffect(() => {
     if (!target) { setRect(null); return; }
+    const targets = Array.isArray(target) ? target : [target as string];
     const measure = (): void => {
-      const el = document.querySelector<HTMLElement>(`[data-tutorial="${target}"]`);
-      if (!el) { setRect((cur) => (cur ? null : cur)); return; }
-      const next = el.getBoundingClientRect();
+      let found: HTMLElement | null = null;
+      for (const t of targets) {
+        const el = document.querySelector<HTMLElement>(`[data-tutorial="${t}"]`);
+        if (el) { found = el; break; }
+      }
+      if (!found) { setRect((cur) => (cur ? null : cur)); return; }
+      const next = found.getBoundingClientRect();
       setRect((cur) => {
         if (!cur) return next;
-        // Only re-set if the rect actually moved — avoids React thrash.
         const same =
           cur.top === next.top && cur.left === next.left
           && cur.width === next.width && cur.height === next.height;
@@ -149,8 +165,7 @@ function useTargetRect(target: string | null): DOMRect | null {
       });
     };
     measure();
-    // Poll for lazy-loaded targets inside lazy panels.
-    const id = setInterval(measure, 300);
+    const id = setInterval(measure, 250);
     window.addEventListener('resize', measure);
     window.addEventListener('scroll', measure, true);
     return () => {
@@ -158,7 +173,8 @@ function useTargetRect(target: string | null): DOMRect | null {
       window.removeEventListener('resize', measure);
       window.removeEventListener('scroll', measure, true);
     };
-  }, [target]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
   return rect;
 }
 
@@ -190,7 +206,10 @@ function Spotlight({ rect }: { rect: DOMRect }) {
         boxShadow:
           '0 0 0 9999px rgba(0,0,0,0.45), 0 0 32px rgba(90,200,250,0.7), inset 0 0 18px rgba(90,200,250,0.18)',
         pointerEvents: 'none',
-        zIndex: 60,
+        // Above the new-route modal (z-index 100) so the ring shows
+        // through the modal backdrop when the highlighted control is
+        // inside the modal.
+        zIndex: 200,
       }}
     />
   );
@@ -212,13 +231,13 @@ function TutorialCard({
 }) {
   const placement = useMemo(() => {
     if (current.kind !== 'wait-state' || !targetRect) return 'center' as const;
-    // Place the card on the OPPOSITE end of the screen from the target,
-    // with comfortable margin. The fuel gauge sits high-right, the
-    // bottom tabs sit at the bottom — opposite-end placement keeps the
-    // card from ever covering the highlighted button.
-    const middle = window.innerHeight / 2;
-    const targetMid = targetRect.top + targetRect.height / 2;
-    return targetMid > middle ? ('top' as const) : ('bottom' as const);
+    // Card-at-bottom is only safe when the target is firmly in the top
+    // ~30% of the screen (e.g. the fuel gauge). Anything below that —
+    // bottom tabs, modal selects, modal confirm buttons — places the
+    // card at the top so it never sits over content the player needs
+    // to read or tap.
+    if (targetRect.bottom < window.innerHeight * 0.30) return 'bottom' as const;
+    return 'top' as const;
   }, [current.kind, targetRect]);
 
   return (
@@ -312,7 +331,7 @@ const shellCenter: React.CSSProperties = {
   display: 'grid',
   placeItems: 'center',
   padding: 16,
-  zIndex: 62,
+  zIndex: 202,
   pointerEvents: 'none',
 };
 // Target is in the BOTTOM half (bottom-tab spotlights) → card at TOP.

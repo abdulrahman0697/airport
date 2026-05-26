@@ -255,6 +255,7 @@ function BuyRow({ def, unlocked }: { def: AircraftDef; unlocked: boolean }) {
         </div>
       </div>
       <button
+        {...(def.id === 't1.atr42' && unlocked && afford ? { 'data-tutorial': 'buy-aircraft-atr42' } : {})}
         disabled={!unlocked || !afford}
         onClick={tryBuy}
         style={{ ...buyBtn, opacity: !unlocked ? 0.35 : afford ? 1 : 0.6 }}

@@ -55,9 +55,6 @@ function tickEvents(state: SaveState, ctx: TickContext): {
   nextCheckMs: number;
 } {
   // Preserve the array reference if no event expires this tick.
-  // Otherwise `state.activeEvents` would churn references every tick
-  // (filter always returns a new array) and downstream subscribers
-  // re-render at 10 Hz for no reason.
   let events: readonly ActiveEvent[] = state.activeEvents;
   let anyExpired = false;
   for (let i = 0; i < state.activeEvents.length; i++) {
@@ -68,11 +65,20 @@ function tickEvents(state: SaveState, ctx: TickContext): {
     events = expireEvents(state.activeEvents, ctx.nowMs);
   }
 
+  // No new events while the tutorial is in flight (per BRD §5.3 + locked
+  // decision: the player should reach the goal chain before live-ops
+  // start firing). The check timestamp rolls forward to `now` so events
+  // don't all spawn in one burst the moment the tutorial completes.
+  if (!state.tutorialCompleted) {
+    return {
+      events,
+      seed: state.seed,
+      nextCheckMs: ctx.nowMs + EVENT_CHECK_INTERVAL_MS,
+    };
+  }
+
   let seed = state.seed;
   let nextCheckMs = state.nextEventCheckMs;
-  // Defensive: if a save migrated or loaded with a far-past scheduler
-  // timestamp slips past `rebaseSchedulerFields`, the catch-up loop
-  // would burn billions of iterations. Cap at a sane horizon.
   const MAX_CATCHUP_ROLLS = 16;
   if (nextCheckMs < ctx.nowMs - MAX_CATCHUP_ROLLS * EVENT_CHECK_INTERVAL_MS) {
     nextCheckMs = ctx.nowMs - MAX_CATCHUP_ROLLS * EVENT_CHECK_INTERVAL_MS;
@@ -107,6 +113,15 @@ function tickCollectibles(state: SaveState, ctx: TickContext, seed: number): {
   }
   if (anyExpired) {
     collectibles = state.collectibles.filter((c) => ctx.nowMs < c.expiresAt);
+  }
+  // No new collectibles during the tutorial either — keeps the screen
+  // clean of orbs while the player is being walked through the basics.
+  if (!state.tutorialCompleted) {
+    return {
+      collectibles,
+      seed,
+      nextSpawnMs: ctx.nowMs + COLLECTIBLE_INTERVAL_MS,
+    };
   }
   let s = seed;
   let nextSpawnMs = state.nextCollectibleSpawnMs;

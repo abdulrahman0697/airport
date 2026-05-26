@@ -369,6 +369,7 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
               value={originIata}
               options={originAirports}
               onChange={(v): void => { setOriginIata(v); setDestIata(''); }}
+              dataTutorial={!originIata ? 'routes-origin-select' : undefined}
             />
 
             <label style={formLabel}>Destination</label>
@@ -377,6 +378,7 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
               options={destAirports}
               onChange={setDestIata}
               disabled={!originIata}
+              dataTutorial={originIata && !destIata ? 'routes-dest-select' : undefined}
             />
 
             {distance > 0 && (
@@ -388,8 +390,12 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
 
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
               <button onClick={onClose} style={cancelBtn}>Cancel</button>
-              <button onClick={onConfirm} disabled={!canOpen}
-                style={{ ...confirmBtn, opacity: canOpen ? 1 : 0.4 }}>
+              <button
+                onClick={onConfirm}
+                disabled={!canOpen}
+                {...(canOpen ? { 'data-tutorial': 'routes-confirm-button' } : {})}
+                style={{ ...confirmBtn, opacity: canOpen ? 1 : 0.4 }}
+              >
                 Open route
               </button>
             </div>
@@ -410,15 +416,17 @@ function sortAirports(arr: Airport[]): Airport[] {
 }
 
 function AirportSelect({
-  value, options, onChange, disabled,
+  value, options, onChange, disabled, dataTutorial,
 }: {
   value: string;
   options: readonly Airport[];
   onChange: (v: string) => void;
   disabled?: boolean;
+  dataTutorial?: string | undefined;
 }) {
   return (
     <select
+      {...(dataTutorial ? { 'data-tutorial': dataTutorial } : {})}
       disabled={disabled}
       value={value}
       onChange={(e): void => onChange(e.target.value)}
