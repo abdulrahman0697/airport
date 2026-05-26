@@ -27,6 +27,8 @@ import type { ActiveEvent, Hub, Route } from './types';
 
 export const EVENT_CHECK_INTERVAL_MS = 60_000; // roll every game-minute
 const EVENT_SPAWN_PROBABILITY = 0.4;            // 40% chance per roll
+/** Real-time popup window before an event's effects begin. */
+export const EVENT_ANNOUNCE_MS = 4_000;
 const COLLECTIBLE_INTERVAL_MS = 90_000;
 const COLLECTIBLE_SPAWN_PROBABILITY = 0.6;
 
@@ -71,13 +73,38 @@ export function rollEvent(
   const id = `evt-${kind}-${nowMs}-${(s % 1_000_000).toString(36)}`;
   return {
     newSeed: s,
-    event: { id, kind, regionId, startedAt: nowMs, durationMs: def.durationMs },
+    event: {
+      id, kind, regionId,
+      announcedAt: nowMs,
+      startedAt: nowMs + EVENT_ANNOUNCE_MS,
+      durationMs: def.durationMs,
+    },
   };
+}
+
+/** True while an event is showing its pre-effect popup. */
+export function isAnnounced(e: ActiveEvent, nowMs: number): boolean {
+  return nowMs < e.startedAt;
+}
+
+/** True while an event's effects are applying. */
+export function isRunning(e: ActiveEvent, nowMs: number): boolean {
+  return nowMs >= e.startedAt && nowMs < e.startedAt + e.durationMs;
 }
 
 /** Expire any events whose window closed by `nowMs`. */
 export function expireEvents(events: readonly ActiveEvent[], nowMs: number): ActiveEvent[] {
   return events.filter((e) => nowMs < e.startedAt + e.durationMs);
+}
+
+/** Return only the events whose effects are currently applying. */
+export function runningEvents(events: readonly ActiveEvent[], nowMs: number): readonly ActiveEvent[] {
+  // Common-case fast paths.
+  if (events.length === 0) return events;
+  let anyAnnounced = false;
+  for (const e of events) if (isAnnounced(e, nowMs)) { anyAnnounced = true; break; }
+  if (!anyAnnounced) return events;
+  return events.filter((e) => isRunning(e, nowMs));
 }
 
 /** Tourism-Boom regional check — does the route touch the boomed region? */

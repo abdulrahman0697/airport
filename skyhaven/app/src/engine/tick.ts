@@ -28,6 +28,7 @@ import {
   fuelSupplyEventMultiplier,
   nextSeed,
   rollEvent,
+  runningEvents as runningEventsOf,
 } from './events';
 import { MAINTENANCE_CHIEF_THRESHOLD } from './managers';
 import { maxTierUnlockedFor } from './tierUnlocks';
@@ -75,9 +76,16 @@ function tickEvents(state: SaveState, ctx: TickContext): {
   }
   let iterations = 0;
   while (ctx.nowMs >= nextCheckMs && iterations < MAX_CATCHUP_ROLLS) {
-    const { newSeed, event } = rollEvent(seed, state.unlockedRegions, nextCheckMs);
-    seed = newSeed;
-    if (event) events = [...events, event];
+    // User-locked rule: only one event in flight at a time. Skip the
+    // roll when another event is still announced or running. We still
+    // advance the seed so determinism doesn't drift.
+    if (events.length === 0) {
+      const { newSeed, event } = rollEvent(seed, state.unlockedRegions, nextCheckMs);
+      seed = newSeed;
+      if (event) events = [...events, event];
+    } else {
+      seed = nextSeed(seed);
+    }
     nextCheckMs += EVENT_CHECK_INTERVAL_MS;
     iterations++;
   }
@@ -181,9 +189,12 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
   const eventResult = tickEvents(state, ctx);
   const collectibleResult = tickCollectibles(state, ctx, eventResult.seed);
   const activeEvents = eventResult.events;
+  // Only the *running* phase of each event applies effects. The
+  // announce phase shows a popup but doesn't modify revenue or fuel.
+  const running = runningEventsOf(activeEvents, ctx.nowMs);
 
   // ── Fuel reserve evolution with event modifier ──────────────────
-  const supplyMul = fuelSupplyEventMultiplier(activeEvents);
+  const supplyMul = fuelSupplyEventMultiplier(running);
   const effectiveSupply = state.fuel.supplyRate * supplyMul;
   const dtSec = ctx.dtMs / 1000;
   const netRate = effectiveSupply - state.fuel.demandRate;
@@ -229,7 +240,7 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
         r,
         { ...aircraft, condition: effectiveCondition },
         state.hubs,
-        activeEvents,
+        running,
       );
       hoursAccumulated += gameHoursPerLeg;
       conditionDelta += def.conditionDecayRate * gameHoursPerLeg;

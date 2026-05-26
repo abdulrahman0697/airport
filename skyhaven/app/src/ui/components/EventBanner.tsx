@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { EVENT_DEFS } from '../../data/events';
 import { getRegion } from '../../data/regions';
+import { isRunning } from '../../engine/events';
 import { selectActiveEvents, useGameStore } from '../../state/store';
 
 /**
@@ -12,7 +13,7 @@ import { selectActiveEvents, useGameStore } from '../../state/store';
  * vertically when multiple events overlap.
  */
 export function EventBanner() {
-  const events = useGameStore(selectActiveEvents);
+  const allEvents = useGameStore(selectActiveEvents);
   // Force a re-render every second so the countdown ticks even when
   // the game state doesn't otherwise update.
   const [, setTick] = useState(0);
@@ -21,8 +22,11 @@ export function EventBanner() {
     return () => clearInterval(id);
   }, []);
 
-  if (events.length === 0) return null;
   const now = Date.now();
+  // Only show events whose effects are actually applying. Announced
+  // events live in the EventPopup until their start time.
+  const events = allEvents.filter((e) => isRunning(e, now));
+  if (events.length === 0) return null;
 
   return (
     <div style={shell} aria-label="Active events">

@@ -1,23 +1,37 @@
 /**
  * Roaming collectibles layer (BRD §4.12).
  *
- * Tap-target sprites drifting on top of the world. The collectible's
- * world position is set by the engine when it spawns; we render a
- * pulsing icon and forward taps to the supplied callback. The render
- * is cheap — at most ~3 collectibles on screen at a time per the
- * tick's spawn budget.
+ * Tap-target sprites drifting on top of the world. Each collectible
+ * carries a per-id velocity (hashed from its id for stability across
+ * reloads) and a pulse animation. The icons are baked once per reward
+ * kind into a high-resolution texture so the GPU samples them cleanly
+ * at any zoom and the visual stays sharp.
  */
 import { Container, Graphics, Sprite, type Renderer, type Texture } from 'pixi.js';
 import { lonLatToWorld } from './projection';
 import type { Collectible } from '../engine/types';
 
-const PULSE_PERIOD_MS = 1600;
+const PULSE_PERIOD_MS = 1500;
+/** Visible world-units size of a collectible at neutral pulse. */
+const SPRITE_WORLD_SIZE = 64;
+/** Max drift from the spawn anchor (world units). */
+const DRIFT_RADIUS = 90;
 
 interface Entry {
   id: string;
   sprite: Sprite;
   reward: Collectible['reward'];
-  baseScale: number;
+  anchorX: number;
+  anchorY: number;
+  /** Per-second drift velocity, world units. */
+  vx: number;
+  vy: number;
+  /** Current drift offset from anchor. */
+  dx: number;
+  dy: number;
+  /** Phase offset (radians) for the pulse — keyed off id so different
+   *  collectibles pulse out of sync, which reads more alive. */
+  pulsePhase: number;
 }
 
 export class CollectiblesLayer {
@@ -31,8 +45,8 @@ export class CollectiblesLayer {
     this.container.label = 'collectibles';
     this.container.eventMode = 'passive';
     this.textures = {
-      cash: makeIcon(renderer, 0xF4C75B, 0xFCE9A5),
-      fuel: makeIcon(renderer, 0x5AC8FA, 0xC4ECFF),
+      cash: makeIcon(renderer, 'cash'),
+      fuel: makeIcon(renderer, 'fuel'),
     };
     this.onTap = onTap;
   }
@@ -42,18 +56,36 @@ export class CollectiblesLayer {
     for (const c of items) {
       seen.add(c.id);
       if (this.entries.has(c.id)) continue;
+
       const tex = c.reward.kind === 'cash' ? this.textures.cash : this.textures.fuel;
       const sprite = new Sprite(tex);
-      const baseScale = 0.6;
       sprite.anchor.set(0.5);
-      sprite.scale.set(baseScale);
+      sprite.width = SPRITE_WORLD_SIZE;
+      sprite.height = SPRITE_WORLD_SIZE;
       const { x, y } = lonLatToWorld(c.lon, c.lat);
       sprite.position.set(x, y);
+      // Generous hit area: the visible halo is ~26 world units radius;
+      // we expand the hit zone to make tapping easy on small phones.
       sprite.eventMode = 'static';
       sprite.cursor = 'pointer';
+      sprite.hitArea = {
+        contains: (px: number, py: number): boolean => px * px + py * py <= 36 * 36,
+      };
       sprite.on('pointertap', () => this.onTap(c.id, c.reward));
+
+      const h = hashString(c.id);
+      const angle = (h % 360) * (Math.PI / 180);
+      const speed = 14 + ((h >> 9) % 11); // 14–24 world-units / sec
+      const vx = Math.cos(angle) * speed;
+      const vy = Math.sin(angle) * speed * 0.55; // gentler vertical drift
+
       this.container.addChild(sprite);
-      this.entries.set(c.id, { id: c.id, sprite, reward: c.reward, baseScale });
+      this.entries.set(c.id, {
+        id: c.id, sprite, reward: c.reward,
+        anchorX: x, anchorY: y,
+        vx, vy, dx: 0, dy: 0,
+        pulsePhase: (h % 1000) / 1000 * Math.PI * 2,
+      });
     }
     for (const [id, entry] of this.entries) {
       if (seen.has(id)) continue;
@@ -64,10 +96,28 @@ export class CollectiblesLayer {
 
   tick(dtMs: number): void {
     this.now += dtMs;
-    const phase = (this.now % PULSE_PERIOD_MS) / PULSE_PERIOD_MS;
-    const pulse = 1 + Math.sin(phase * Math.PI * 2) * 0.18;
+    const dt = dtMs / 1000;
     for (const e of this.entries.values()) {
-      e.sprite.scale.set(e.baseScale * pulse);
+      // Drift with soft bounce at the radius boundary so collectibles
+      // stay near the spawn point and don't wander across the map.
+      e.dx += e.vx * dt;
+      e.dy += e.vy * dt;
+      if (Math.hypot(e.dx, e.dy) > DRIFT_RADIUS) {
+        // Reflect velocity along the radial normal so it heads back in.
+        const len = Math.hypot(e.dx, e.dy) || 1;
+        const nx = e.dx / len;
+        const ny = e.dy / len;
+        const dot = e.vx * nx + e.vy * ny;
+        e.vx -= 2 * dot * nx;
+        e.vy -= 2 * dot * ny;
+      }
+      e.sprite.position.set(e.anchorX + e.dx, e.anchorY + e.dy);
+
+      // Pulse: gentle ± scale wobble + soft rotation for life.
+      const phase = (this.now / PULSE_PERIOD_MS) * Math.PI * 2 + e.pulsePhase;
+      const pulse = 1 + Math.sin(phase) * 0.12;
+      e.sprite.scale.set(pulse * (SPRITE_WORLD_SIZE / e.sprite.texture.width));
+      e.sprite.rotation = Math.sin(phase * 0.3) * 0.06;
     }
   }
 
@@ -80,15 +130,62 @@ export class CollectiblesLayer {
   }
 }
 
-/** A round icon with a coloured core and a soft halo. */
-function makeIcon(renderer: Renderer, core: number, halo: number): Texture {
+/**
+ * Build a richly-layered icon for a reward kind. The texture is sized
+ * generously and rendered at 4× resolution; the sprite gets scaled
+ * down at display time so the GPU has plenty of pixels to sample from
+ * at any zoom.
+ */
+function makeIcon(renderer: Renderer, kind: 'cash' | 'fuel'): Texture {
+  const size = 96;          // world-units canvas (4× resolution → 384 backing px)
+  const cx = size / 2;
+  const cy = size / 2;
+  const core = kind === 'cash' ? 0xF4C75B : 0x5AC8FA;
+  const accent = kind === 'cash' ? 0xFCE9A5 : 0xC4ECFF;
+  const deep = kind === 'cash' ? 0xA86B1A : 0x1E5A82;
   const g = new Graphics();
-  const cx = 18;
-  g.circle(cx, cx, 16).fill({ color: halo, alpha: 0.2 });
-  g.circle(cx, cx, 11).fill({ color: halo, alpha: 0.35 });
-  g.circle(cx, cx, 7).fill({ color: core, alpha: 1.0 });
-  g.circle(cx, cx, 3).fill({ color: 0xffffff, alpha: 0.9 });
-  const t = renderer.generateTexture({ target: g, resolution: 4, antialias: true });
+
+  // Outer glow rings (alpha falloff).
+  g.circle(cx, cy, 44).fill({ color: accent, alpha: 0.06 });
+  g.circle(cx, cy, 36).fill({ color: accent, alpha: 0.10 });
+  g.circle(cx, cy, 28).fill({ color: accent, alpha: 0.18 });
+
+  // Coin body with rim shadow.
+  g.circle(cx, cy, 22).fill({ color: deep, alpha: 0.9 });
+  g.circle(cx, cy, 20).fill({ color: core, alpha: 1.0 });
+  g.circle(cx, cy, 17).fill({ color: accent, alpha: 0.95 });
+  g.circle(cx, cy, 14).fill({ color: core, alpha: 1.0 });
+
+  // Inner glyph — abstract "$" for cash, droplet for fuel.
+  if (kind === 'cash') {
+    // Stylised "$": a vertical bar plus two horizontal accents.
+    g.rect(cx - 1.5, cy - 9, 3, 18).fill({ color: 0xffffff, alpha: 0.95 });
+    g.rect(cx - 7, cy - 4, 14, 2.4).fill({ color: 0xffffff, alpha: 0.9 });
+    g.rect(cx - 7, cy + 1.5, 14, 2.4).fill({ color: 0xffffff, alpha: 0.9 });
+  } else {
+    // Droplet: a circle with a tapered triangle on top.
+    g.circle(cx, cy + 2, 6).fill({ color: 0xffffff, alpha: 0.95 });
+    g.moveTo(cx, cy - 10).lineTo(cx - 5, cy + 1).lineTo(cx + 5, cy + 1).closePath()
+      .fill({ color: 0xffffff, alpha: 0.95 });
+  }
+
+  // Specular highlight.
+  g.circle(cx - 6, cy - 6, 3.5).fill({ color: 0xffffff, alpha: 0.5 });
+
+  const t = renderer.generateTexture({
+    target: g,
+    resolution: 4,
+    antialias: true,
+  });
   g.destroy();
   return t;
+}
+
+function hashString(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
 }

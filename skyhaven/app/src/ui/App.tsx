@@ -3,6 +3,7 @@ import { createGameLoop } from '../state/gameLoop';
 import { BottomTabs } from './components/BottomTabs';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { EventBanner } from './components/EventBanner';
+import { EventPopup } from './components/EventPopup';
 import { FuelGauge } from './components/FuelGauge';
 import { PanelHost } from './components/PanelHost';
 import { TopBar } from './components/TopBar';
@@ -23,6 +24,7 @@ export function App() {
       <FuelGauge />
       <PanelHost />
       <BottomTabs />
+      <EventPopup />
     </ErrorBoundary>
   );
 }

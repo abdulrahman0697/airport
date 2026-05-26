@@ -8,7 +8,7 @@
  * `migrations.ts` and bumps `CURRENT_SCHEMA_VERSION`.
  */
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 export type AircraftCategory = 'passenger' | 'cargo' | 'classic';
 export type RoutePricing = 'economy' | 'balanced' | 'premium';
@@ -86,9 +86,11 @@ export interface ActiveEvent {
   readonly kind: import('../data/events').EventKind;
   /** null for global events, region id otherwise. */
   readonly regionId: number | null;
-  /** Epoch ms when the event started. */
+  /** Epoch ms when the event was announced (popup phase begins). */
+  readonly announcedAt: number;
+  /** Epoch ms when the event becomes active (banner + effects begin). */
   readonly startedAt: number;
-  /** Real-time duration in ms (frozen at spawn for determinism). */
+  /** Real-time duration of the active phase in ms. */
   readonly durationMs: number;
 }
 

@@ -38,6 +38,21 @@ const MIGRATIONS: Record<number, Migration> = {
     nextEventCheckMs: nowMs + 60_000,
     nextCollectibleSpawnMs: nowMs + 90_000,
   }),
+  // v2 → v3 (Phase 6 polish): events now have an `announcedAt` field
+  // so the UI can render an explanatory popup before the banner. v2
+  // events get `announcedAt = startedAt` so they skip the announce
+  // phase and behave exactly as before.
+  2: (s) => ({
+    ...s,
+    schemaVersion: 3,
+    activeEvents: (Array.isArray(s.activeEvents) ? s.activeEvents : []).map((e) => {
+      const evt = e as Record<string, unknown>;
+      return {
+        ...evt,
+        announcedAt: typeof evt.announcedAt === 'number' ? evt.announcedAt : evt.startedAt,
+      };
+    }),
+  }),
 };
 
 /**
