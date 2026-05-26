@@ -1,15 +1,14 @@
 /**
  * Route-arc rendering layer (BRD §9.1 "Energised route arcs").
  *
- * Each player route renders as a stroked great-circle path in the
- * airline's tail color, with:
- *  - a glowing aircraft dot at the current leg position
- *  - three continuously-cycling light pulses travelling along the
- *    arc (Phase 10 "energised arcs" treatment)
+ * Each player route renders as:
+ *  - a stroked great-circle path in the airline's tail color
+ *  - three continuously-cycling light pulses
+ *  - a small plane icon at the current leg position, rotated to face
+ *    the direction of travel and tappable to show route details
  *
- * The layer is rebuildable: `setRoutes()` diffs by route id and
- * incrementally creates / updates / removes child graphics. `tick(dt)`
- * advances the pulse animation each frame.
+ * The plane glyph is a Pixi Graphics drawn once at creation; we just
+ * update its `position` and `rotation` per frame.
  */
 import { Container, Graphics } from 'pixi.js';
 import type { Airport } from '../data/airports';
@@ -17,18 +16,20 @@ import type { Route } from '../engine/types';
 import { greatCirclePath, pointAlongPath } from './geo';
 
 const PULSE_COUNT = 3;
-/** ms for a pulse to traverse the full arc end-to-end. */
 const PULSE_CYCLE_MS = 4_200;
+const PLANE_TAP_RADIUS = 18;
 
 interface ArcEntry {
   routeId: string;
   pathContainer: Graphics;
-  dot: Graphics;
+  plane: Graphics;
   pulses: Graphics[];
   path: ReturnType<typeof greatCirclePath>;
   legProgress: number;
   legDirection: Route['legDirection'];
 }
+
+export type ArcTapHandler = (routeId: string, screen: { x: number; y: number }) => void;
 
 export class ArcsLayer {
   readonly container = new Container();
@@ -36,6 +37,7 @@ export class ArcsLayer {
   private airportByIata = new Map<string, Airport>();
   private tailColor = 0x5ac8fa;
   private now = 0;
+  private onTap: ArcTapHandler = () => undefined;
 
   constructor(airports: readonly Airport[]) {
     this.container.label = 'arcs';
@@ -48,9 +50,13 @@ export class ArcsLayer {
     this.tailColor = n;
     for (const e of this.entries.values()) {
       this.drawPath(e);
-      this.drawDot(e);
-      this.drawPulses(e);
+      this.drawPlane(e);
+      this.updatePulsesNow(e);
     }
+  }
+
+  setTapHandler(fn: ArcTapHandler): void {
+    this.onTap = fn;
   }
 
   setRoutes(routes: readonly Route[]): void {
@@ -66,22 +72,21 @@ export class ArcsLayer {
       ) {
         existing.legProgress = r.legProgress;
         existing.legDirection = r.legDirection;
-        this.drawDot(existing);
+        this.positionPlane(existing);
       }
     }
     for (const [id, entry] of this.entries) {
       if (seen.has(id)) continue;
       entry.pathContainer.destroy();
-      entry.dot.destroy();
+      entry.plane.destroy();
       for (const p of entry.pulses) p.destroy();
       this.entries.delete(id);
     }
   }
 
-  /** Advance pulse animation. Called every frame from WorldStage's ticker. */
   tick(dtMs: number): void {
     this.now += dtMs;
-    for (const e of this.entries.values()) this.drawPulses(e);
+    for (const e of this.entries.values()) this.updatePulsesNow(e);
   }
 
   private add(r: Route): void {
@@ -90,7 +95,7 @@ export class ArcsLayer {
     if (!o || !d) return;
     const path = greatCirclePath(o.lat, o.lon, d.lat, d.lon, 48);
     const pathContainer = new Graphics();
-    const dot = new Graphics();
+    const plane = new Graphics();
     const pulses: Graphics[] = [];
     this.container.addChild(pathContainer);
     for (let i = 0; i < PULSE_COUNT; i++) {
@@ -98,11 +103,11 @@ export class ArcsLayer {
       this.container.addChild(g);
       pulses.push(g);
     }
-    this.container.addChild(dot);
+    this.container.addChild(plane);
     const entry: ArcEntry = {
       routeId: r.id,
       pathContainer,
-      dot,
+      plane,
       pulses,
       path,
       legProgress: r.legProgress,
@@ -110,8 +115,21 @@ export class ArcsLayer {
     };
     this.entries.set(r.id, entry);
     this.drawPath(entry);
-    this.drawDot(entry);
-    this.drawPulses(entry);
+    this.drawPlane(entry);
+    this.positionPlane(entry);
+    this.updatePulsesNow(entry);
+
+    // Plane is tappable.
+    plane.eventMode = 'static';
+    plane.cursor = 'pointer';
+    plane.hitArea = {
+      contains: (px: number, py: number): boolean =>
+        px * px + py * py <= PLANE_TAP_RADIUS * PLANE_TAP_RADIUS,
+    };
+    plane.on('pointertap', (event) => {
+      const g = event.global;
+      this.onTap(r.id, { x: g.x, y: g.y });
+    });
   }
 
   private drawPath(entry: ArcEntry): void {
@@ -127,29 +145,66 @@ export class ArcsLayer {
     g.stroke({ color: this.tailColor, alpha: 0.85, width: 1.6, cap: 'round', join: 'round' });
   }
 
-  private drawDot(entry: ArcEntry): void {
-    const g = entry.dot;
+  /**
+   * Draw the plane glyph centred at (0, 0) pointing right (+x). Per-
+   * frame `positionPlane` sets sprite-space position + rotation; the
+   * glyph itself is drawn once.
+   */
+  private drawPlane(entry: ArcEntry): void {
+    const g = entry.plane;
     g.clear();
-    const t = entry.legDirection === 'outbound' ? entry.legProgress : 1 - entry.legProgress;
-    const p = pointAlongPath(entry.path, t);
-    g.circle(p.x, p.y, 6).fill({ color: this.tailColor, alpha: 0.30 });
-    g.circle(p.x, p.y, 3.4).fill({ color: this.tailColor, alpha: 0.85 });
-    g.circle(p.x, p.y, 1.6).fill({ color: 0xffffff, alpha: 1.0 });
+    // Soft halo behind the plane.
+    g.circle(0, 0, 8).fill({ color: this.tailColor, alpha: 0.18 });
+    // Fuselage — slim triangle pointing right with a wider centre.
+    g.moveTo(8, 0)
+      .lineTo(-5, 2.5)
+      .lineTo(-5, -2.5)
+      .closePath()
+      .fill({ color: 0xffffff, alpha: 0.97 });
+    // Wings — swept back.
+    g.moveTo(1, 0)
+      .lineTo(-2.5, -6)
+      .lineTo(-4, -6)
+      .lineTo(-3, 0)
+      .lineTo(-4, 6)
+      .lineTo(-2.5, 6)
+      .closePath()
+      .fill({ color: this.tailColor, alpha: 0.95 });
+    // Tail fin.
+    g.moveTo(-5, 0)
+      .lineTo(-7, -3)
+      .lineTo(-7, 0)
+      .closePath()
+      .fill({ color: this.tailColor, alpha: 0.95 });
+    g.moveTo(-5, 0)
+      .lineTo(-7, 3)
+      .lineTo(-7, 0)
+      .closePath()
+      .fill({ color: this.tailColor, alpha: 0.6 });
   }
 
-  /**
-   * Three light pulses travel from origin → destination on a loop,
-   * staggered by 1/N phase so the eye reads constant motion. The
-   * pulses use the tail colour and fade in / out at the endpoints
-   * so they don't pop.
-   */
-  private drawPulses(entry: ArcEntry): void {
+  private positionPlane(entry: ArcEntry): void {
+    const t = entry.legDirection === 'outbound' ? entry.legProgress : 1 - entry.legProgress;
+    const p = pointAlongPath(entry.path, t);
+    entry.plane.position.set(p.x, p.y);
+    // Compute tangent at t using a forward neighbour.
+    const eps = 0.01;
+    const tForward = entry.legDirection === 'outbound'
+      ? Math.min(0.999, t + eps)
+      : Math.max(0.001, t + eps);
+    const next = pointAlongPath(entry.path, tForward);
+    const dx = next.x - p.x;
+    const dy = next.y - p.y;
+    if (dx !== 0 || dy !== 0) {
+      entry.plane.rotation = Math.atan2(dy, dx);
+    }
+  }
+
+  private updatePulsesNow(entry: ArcEntry): void {
     const basePhase = (this.now % PULSE_CYCLE_MS) / PULSE_CYCLE_MS;
     for (let i = 0; i < entry.pulses.length; i++) {
       const g = entry.pulses[i]!;
       const t = (basePhase + i / entry.pulses.length) % 1;
-      // Soft fade at endpoints so pulses don't appear to spawn from
-      // the pin or dive into it.
       const fade = Math.min(1, Math.min(t, 1 - t) * 6);
       const alpha = 0.85 * fade;
       g.clear();
@@ -163,7 +218,7 @@ export class ArcsLayer {
   destroy(): void {
     for (const e of this.entries.values()) {
       e.pathContainer.destroy();
-      e.dot.destroy();
+      e.plane.destroy();
       for (const p of e.pulses) p.destroy();
     }
     this.entries.clear();

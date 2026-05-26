@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { create } from 'zustand';
 
-export type PanelId = 'fleet' | 'routes' | 'fuel' | 'store' | 'crew' | null;
+export type PanelId = 'fleet' | 'routes' | 'fuel' | 'store' | 'crew' | 'office' | null;
 
 interface PanelStore {
   active: PanelId;
@@ -20,6 +20,7 @@ const FleetPanel = lazy(() => import('../panels/FleetPanel').then((m) => ({ defa
 const RoutesPanel = lazy(() => import('../panels/RoutesPanel').then((m) => ({ default: m.RoutesPanel })));
 const FuelPanel = lazy(() => import('../panels/FuelPanel').then((m) => ({ default: m.FuelPanel })));
 const CrewPanel = lazy(() => import('../panels/CrewPanel').then((m) => ({ default: m.CrewPanel })));
+const OfficePanel = lazy(() => import('../panels/OfficePanel').then((m) => ({ default: m.OfficePanel })));
 
 export function PanelHost() {
   const active = usePanelStore((s) => s.active);
@@ -52,6 +53,7 @@ export function PanelHost() {
             {active === 'routes' && <RoutesPanel />}
             {active === 'fuel' && <FuelPanel />}
             {active === 'crew' && <CrewPanel />}
+            {active === 'office' && <OfficePanel />}
             {active === 'store' && <ComingSoonPanel name="Store" />}
           </Suspense>
         </motion.div>

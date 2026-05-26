@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react';
 import { cashPerSecond } from '../../engine/economy';
 import { getAircraftDef } from '../../data/aircraft';
+import { MAX_TIER, TIER_UNLOCK_THRESHOLDS } from '../../engine/tierUnlocks';
 import {
+  selectActiveEvents,
   selectAirlineName,
   selectCash,
+  selectHubs,
+  selectLifetime,
   selectTailColor,
   selectTier,
   useGameStore,
 } from '../../state/store';
 import { formatRate } from '../format';
 import { EcoBadge } from './EcoBadge';
+import { usePanelStore } from './PanelHost';
 import { RollingCash } from './RollingCash';
 
 export function TopBar() {
@@ -17,7 +22,11 @@ export function TopBar() {
   const airlineName = useGameStore(selectAirlineName);
   const tailColor = useGameStore(selectTailColor);
   const tier = useGameStore(selectTier);
+  const lifetime = useGameStore(selectLifetime);
+  const hubs = useGameStore(selectHubs);
+  const activeEvents = useGameStore(selectActiveEvents);
   const state = useGameStore((s) => s.state);
+  const open = usePanelStore((s) => s.open);
 
   const [perSec, setPerSec] = useState(0);
   useEffect(() => {
@@ -27,23 +36,39 @@ export function TopBar() {
     for (const r of state.routes) {
       const a = fleetById.get(r.aircraftUid);
       if (!a || !getAircraftDef(a.defId)) continue;
-      total += cashPerSecond(r, a);
+      total += cashPerSecond(r, a, hubs, activeEvents);
     }
     setPerSec(total);
-  }, [state]);
+  }, [state, hubs, activeEvents]);
 
   if (!state) return null;
 
+  // Tier progress
+  const curThreshold = TIER_UNLOCK_THRESHOLDS[tier] ?? 0;
+  const nextThreshold = tier < MAX_TIER ? (TIER_UNLOCK_THRESHOLDS[tier + 1] ?? curThreshold * 10) : curThreshold;
+  const span = Math.max(1, nextThreshold - curThreshold);
+  const pct = tier >= MAX_TIER ? 1 : Math.max(0, Math.min(1, (lifetime - curThreshold) / span));
+
   return (
     <header style={shell} aria-label="airline header">
-      <div style={brand}>
+      <button onClick={(): void => open('office')} style={brandBtn} aria-label="Open office dashboard">
         <span style={chip(tailColor)} aria-hidden />
-        <div>
+        <div style={brandCol}>
           <div style={brandText}>{airlineName.toUpperCase()}</div>
-          <div style={tierPill}>T{tier} unlocked</div>
+          <div style={tierLine}>
+            <span style={tierTag}>T{tier}</span>
+            <div style={tierBar}>
+              <div style={{
+                ...tierFill,
+                width: `${pct * 100}%`,
+                background: `linear-gradient(90deg, ${tailColor}, #F4C75B)`,
+              }} />
+            </div>
+            {tier < MAX_TIER && <span style={tierNext}>T{tier + 1}</span>}
+          </div>
           <EcoBadge />
         </div>
-      </div>
+      </button>
       <div style={cashCol}>
         <div style={{ fontSize: 18, fontWeight: 700 }}>
           <RollingCash value={cash} />
@@ -64,12 +89,20 @@ const shell: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  pointerEvents: 'none',
   background: 'linear-gradient(to bottom, rgba(11,17,32,0.85), rgba(11,17,32,0))',
   zIndex: 10,
 };
 
-const brand: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8 };
+const brandBtn: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 8,
+  background: 'transparent', border: 0, padding: 0,
+  color: 'inherit', cursor: 'pointer', fontFamily: 'inherit',
+  pointerEvents: 'auto',
+};
+
+const brandCol: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+};
 
 const chip = (color: string): React.CSSProperties => ({
   width: 10,
@@ -86,11 +119,36 @@ const brandText: React.CSSProperties = {
   fontWeight: 600,
 };
 
-const tierPill: React.CSSProperties = {
+const tierLine: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 5,
+  marginTop: 4,
+  width: 130,
+};
+const tierTag: React.CSSProperties = {
   fontSize: 9,
-  letterSpacing: '0.08em',
+  letterSpacing: '0.06em',
   color: '#5AC8FA',
-  marginTop: 2,
+  fontWeight: 700,
+  minWidth: 16,
+};
+const tierBar: React.CSSProperties = {
+  flex: 1,
+  height: 4,
+  background: 'rgba(255,255,255,0.08)',
+  borderRadius: 2,
+  overflow: 'hidden',
+};
+const tierFill: React.CSSProperties = {
+  height: '100%',
+  transition: 'width 400ms ease',
+};
+const tierNext: React.CSSProperties = {
+  fontSize: 9,
+  color: '#94A3B8',
+  letterSpacing: '0.06em',
+  minWidth: 16,
 };
 
 const cashCol: React.CSSProperties = {

@@ -7,12 +7,12 @@ describe('formatCash', () => {
     expect(formatCash(999)).toBe('999');
   });
 
-  it('uses K/M/B/T suffixes', () => {
-    expect(formatCash(1234)).toBe('1.23K');
-    expect(formatCash(12_345)).toBe('12.3K');
-    expect(formatCash(123_456)).toBe('123K');
-    expect(formatCash(1_234_567)).toBe('1.23M');
-    expect(formatCash(1_234_567_890_000)).toBe('1.23T');
+  it('uses K/M/B/T suffixes with 4 sig digits', () => {
+    expect(formatCash(1234)).toBe('1.234K');
+    expect(formatCash(12_345)).toBe('12.35K');
+    expect(formatCash(123_456)).toBe('123.5K');
+    expect(formatCash(1_234_567)).toBe('1.235M');
+    expect(formatCash(1_234_567_890_000)).toBe('1.235T');
   });
 
   it('rolls into alpha suffixes past Dc (1e36)', () => {
@@ -21,6 +21,6 @@ describe('formatCash', () => {
   });
 
   it('handles negative values', () => {
-    expect(formatCash(-2_500)).toBe('-2.50K');
+    expect(formatCash(-2_500)).toBe('-2.500K');
   });
 });

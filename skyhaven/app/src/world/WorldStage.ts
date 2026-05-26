@@ -40,6 +40,7 @@ export interface WorldStage {
   setCollectibleTapHandler(fn: (id: string) => void): void;
   setUnlockedRegions(regions: ReadonlySet<number>): void;
   setAirportTapHandler(fn: (airport: Airport, screen: { x: number; y: number }) => void): void;
+  setRouteTapHandler(fn: (routeId: string, screen: { x: number; y: number }) => void): void;
   zoomToRegion(regionId: number, scale?: number): void;
 }
 
@@ -265,6 +266,7 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
       applyCamera();
     },
     setAirportTapHandler: (fn) => { airportTapHandler = fn; },
+    setRouteTapHandler: (fn) => arcsLayer.setTapHandler(fn),
     destroy: () => {
       app.ticker.remove(onTick);
       app.canvas.removeEventListener('pointerdown', onDown);

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Airport } from '../../data/airports';
-import { selectUnlockedRegions, useGameStore } from '../../state/store';
+import type { Route } from '../../engine/types';
+import { selectRoutes, selectUnlockedRegions, useGameStore } from '../../state/store';
 import type { WorldStage } from '../../world/WorldStage';
 import { AirportTooltip } from './AirportTooltip';
+import { RouteTooltip } from './RouteTooltip';
 
 export function WorldView() {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -10,6 +12,7 @@ export function WorldView() {
   const [fps, setFps] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [tapped, setTapped] = useState<{ airport: Airport; x: number; y: number } | null>(null);
+  const [tappedRoute, setTappedRoute] = useState<{ routeId: string; x: number; y: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,6 +34,11 @@ export function WorldView() {
         });
         stage.setAirportTapHandler((airport, screen) => {
           setTapped({ airport, x: screen.x, y: screen.y });
+          setTappedRoute(null);
+        });
+        stage.setRouteTapHandler((routeId, screen) => {
+          setTappedRoute({ routeId, x: screen.x, y: screen.y });
+          setTapped(null);
         });
         const s = useGameStore.getState().state;
         if (s) {
@@ -92,6 +100,14 @@ export function WorldView() {
   }, []);
 
   const unlocked = useGameStore(selectUnlockedRegions);
+  const routes = useGameStore(selectRoutes);
+  const activeRoute: Route | null = tappedRoute
+    ? routes.find((r) => r.id === tappedRoute.routeId) ?? null
+    : null;
+  useEffect(() => {
+    // Auto-close the tooltip if the route disappears (e.g. user closed it).
+    if (tappedRoute && !activeRoute) setTappedRoute(null);
+  }, [tappedRoute, activeRoute]);
 
   return (
     <div style={hostStyle} ref={hostRef}>
@@ -111,6 +127,14 @@ export function WorldView() {
           y={tapped.y}
           unlocked={unlocked.includes(tapped.airport.region)}
           onClose={(): void => setTapped(null)}
+        />
+      )}
+      {tappedRoute && activeRoute && (
+        <RouteTooltip
+          route={activeRoute}
+          x={tappedRoute.x}
+          y={tappedRoute.y}
+          onClose={(): void => setTappedRoute(null)}
         />
       )}
     </div>

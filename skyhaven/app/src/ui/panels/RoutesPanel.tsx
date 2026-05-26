@@ -426,6 +426,25 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
   const cost = distance > 0 ? routeOpenCost(distance) : 0;
   const canOpen = !!(selectedAc && originIata && destIata && originIata !== destIata && cost > 0 && cash >= cost);
 
+  // Estimated revenue per minute at the current state — uses the same
+  // formulas as the live engine so the player sees a realistic number.
+  const estimatedPerMin = useMemo(() => {
+    if (!selectedAc || !originIata || !destIata || distance <= 0) return 0;
+    const baseLoad = 0.55 + 0.03 * selectedAc.upgrades.marketing;
+    const estRoute = {
+      id: 'est',
+      originIata,
+      destIata,
+      distanceKm: distance,
+      aircraftUid: selectedAc.uid,
+      pricing: 'balanced' as const,
+      loadFactor: Math.min(0.98, baseLoad),
+      legProgress: 0,
+      legDirection: 'outbound' as const,
+    };
+    return cashPerSecond(estRoute, selectedAc, hubs) * 60;
+  }, [selectedAc, originIata, destIata, distance, hubs]);
+
   const onConfirm = (): void => {
     if (!selectedAc) return;
     const res = openRoute(originIata, destIata, selectedAc.uid);
@@ -495,7 +514,12 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
             {distance > 0 && (
               <div style={summaryBox}>
                 <div>Distance: <b>{Math.round(distance).toLocaleString()} km</b></div>
-                <div>Opening fee: <b style={{ color: '#F4C75B' }}>${formatCash(cost, 1)}</b></div>
+                <div>Opening fee: <b style={{ color: '#F4C75B' }}>${formatCash(cost)}</b></div>
+                <div>
+                  Est. revenue: <b style={{ color: '#34D399' }}>
+                    ${formatCash(estimatedPerMin)}/min
+                  </b>
+                </div>
               </div>
             )}
 

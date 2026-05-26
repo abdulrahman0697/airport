@@ -23,7 +23,7 @@ function alphaSuffix(index: number): string {
   return 'a' + s;
 }
 
-export function formatCash(n: number, decimals = 2): string {
+export function formatCash(n: number, decimals = 3): string {
   if (!isFinite(n)) return '—';
   const neg = n < 0;
   const abs = Math.abs(n);
@@ -31,14 +31,16 @@ export function formatCash(n: number, decimals = 2): string {
   const tier = Math.floor(Math.log10(abs) / 3);
   const suffix = tier < SUFFIXES.length ? SUFFIXES[tier]! : alphaSuffix(tier - SUFFIXES.length);
   const scaled = abs / Math.pow(1000, tier);
-  const trimmed = scaled >= 100 ? scaled.toFixed(0)
-    : scaled >= 10 ? scaled.toFixed(Math.min(1, decimals))
-    : scaled.toFixed(decimals);
+  // 4 significant digits in the readout — bumps from "1.95K" → "1.953K".
+  const trimmed = scaled >= 100 ? scaled.toFixed(Math.max(0, decimals - 2))
+    : scaled >= 10 ? scaled.toFixed(Math.max(1, decimals - 1))
+    : scaled.toFixed(Math.max(2, decimals));
   return (neg ? '-' : '') + trimmed + suffix;
 }
 
-/** Round per-second rates to a stable readout (one decimal up to 100/s, then integer). */
+/** Per-minute cash rate (BRD §4.1 — UI prefers /min over /s readout). */
 export function formatRate(perSec: number): string {
   if (!isFinite(perSec)) return '—';
-  return formatCash(perSec, perSec >= 100 ? 0 : 1) + '/s';
+  const perMin = perSec * 60;
+  return formatCash(perMin) + '/min';
 }
