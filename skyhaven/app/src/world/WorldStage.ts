@@ -37,6 +37,12 @@ export interface WorldStage {
 export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
   const app = new Application();
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  // eslint-disable-next-line no-console
+  console.info('[skyhaven] WorldStage init', {
+    hostW: host.clientWidth,
+    hostH: host.clientHeight,
+    dpr,
+  });
   await app.init({
     background: '#0B1120',
     antialias: true,
@@ -48,6 +54,12 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
   host.appendChild(app.canvas);
   app.canvas.style.touchAction = 'none';
   app.canvas.style.userSelect = 'none';
+  // eslint-disable-next-line no-console
+  console.info('[skyhaven] WorldStage canvas', {
+    w: app.canvas.width,
+    h: app.canvas.height,
+    rendererType: app.renderer?.name,
+  });
 
   const camera = new Camera({
     viewportWidth: host.clientWidth,
@@ -70,6 +82,13 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
   root.addChild(clouds.container);
   root.addChild(arcsLayer.container);
   root.addChild(pins);
+  // eslint-disable-next-line no-console
+  console.info('[skyhaven] WorldStage layers ready', {
+    airports: airports.length,
+    pinChunks: pins.children.length,
+    cameraScale: camera.state.scale.toFixed(3),
+    cameraTxTy: [camera.state.tx.toFixed(0), camera.state.ty.toFixed(0)],
+  });
 
   function applyCamera(): void {
     root.scale.set(camera.state.scale);
