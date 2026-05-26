@@ -70,26 +70,38 @@ export function TopBar() {
         </div>
       </button>
       <div style={cashCol}>
-        <div style={{ fontSize: 18, fontWeight: 700 }}>
+        <div style={cashAmount}>
           <RollingCash value={cash} />
         </div>
         <div style={cashRate}>{formatRate(perSec)}</div>
       </div>
+      <button
+        onClick={(): void => open('office')}
+        style={officeBtn(tailColor)}
+        aria-label="Open CEO office"
+        title="CEO office"
+      >
+        <span style={officeGlyph(tailColor)}>CEO</span>
+      </button>
     </header>
   );
 }
 
 const shell: React.CSSProperties = {
   position: 'fixed',
-  top: 0,
-  left: 0,
-  right: 0,
-  padding: '10px 14px',
-  paddingTop: 'max(10px, env(safe-area-inset-top))',
+  top: 'max(8px, env(safe-area-inset-top))',
+  left: 8,
+  right: 8,
+  padding: '12px 14px',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  background: 'linear-gradient(to bottom, rgba(11,17,32,0.85), rgba(11,17,32,0))',
+  gap: 10,
+  background: 'rgba(15, 23, 47, 0.92)',
+  border: '1px solid rgba(90,200,250,0.18)',
+  borderRadius: 14,
+  boxShadow: '0 10px 28px rgba(0,0,0,0.45)',
+  backdropFilter: 'blur(8px)',
   zIndex: 10,
 };
 
@@ -113,10 +125,10 @@ const chip = (color: string): React.CSSProperties => ({
 });
 
 const brandText: React.CSSProperties = {
-  fontSize: 13,
+  fontSize: 14,
   letterSpacing: '0.18em',
   color: '#F8FAFC',
-  fontWeight: 600,
+  fontWeight: 700,
 };
 
 const tierLine: React.CSSProperties = {
@@ -157,9 +169,37 @@ const cashCol: React.CSSProperties = {
   alignItems: 'flex-end',
 };
 
+const cashAmount: React.CSSProperties = {
+  fontSize: 20,
+  fontWeight: 800,
+  color: '#F8FAFC',
+  fontFeatureSettings: '"tnum" 1',
+  lineHeight: 1.1,
+};
+
 const cashRate: React.CSSProperties = {
-  fontSize: 11,
+  fontSize: 12,
   color: '#34D399',
   marginTop: 2,
   letterSpacing: '0.03em',
+  fontFeatureSettings: '"tnum" 1',
 };
+
+const officeBtn = (color: string): React.CSSProperties => ({
+  width: 38, height: 38,
+  borderRadius: 10,
+  border: `1px solid ${color}55`,
+  background: `linear-gradient(160deg, ${color}26, rgba(15,23,47,0.6))`,
+  cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  padding: 0,
+  flexShrink: 0,
+  fontFamily: 'inherit',
+});
+
+const officeGlyph = (color: string): React.CSSProperties => ({
+  fontSize: 10,
+  fontWeight: 800,
+  letterSpacing: '0.08em',
+  color,
+});

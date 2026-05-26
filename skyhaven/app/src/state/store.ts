@@ -18,6 +18,7 @@ import {
   advanceTutorial as advanceTutorialAction,
   applyUpgrade as applyUpgradeAction,
   buyAircraft as buyAircraftAction,
+  chooseStartingRegion as chooseStartingRegionAction,
   claimCollectible as claimCollectibleAction,
   claimDailyReward as claimDailyRewardAction,
   closeRoute as closeRouteAction,
@@ -62,6 +63,7 @@ interface GameStore {
   createHub: (iata: string) => ActionResult;
   pickHub: (iata: string) => ActionResult;
   dismissHubPick: () => ActionResult;
+  chooseStartingRegion: (regionId: number) => ActionResult;
   upgradeHub: (iata: string) => ActionResult;
   hireManager: (iata: string, kind: ManagerKind) => ActionResult;
   claimCollectible: (id: string) => ActionResult;
@@ -139,6 +141,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     runAction(set, get, (s) => pickHubAction(s, iata)),
   dismissHubPick: () =>
     runAction(set, get, (s) => dismissHubPickAction(s)),
+  chooseStartingRegion: (regionId) =>
+    runAction(set, get, (s) => chooseStartingRegionAction(s, regionId)),
   upgradeHub: (iata) =>
     runAction(set, get, (s) => upgradeHubAction(s, iata)),
   hireManager: (iata, kind) =>

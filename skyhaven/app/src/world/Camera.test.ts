@@ -11,15 +11,22 @@ describe('Camera', () => {
     expect(c.state.scale).toBeCloseTo(fitScale);
   });
 
-  it('clamps the camera so the viewport never leaves the world', () => {
+  it('wraps tx modulo WORLD_WIDTH so horizontal pan is infinite', () => {
     const c = new Camera(cfg);
-    c.panBy(-1e6, -1e6);
+    c.panBy(-1e6, 0);
     expect(c.state.tx).toBeGreaterThanOrEqual(0);
-    expect(c.state.ty).toBeGreaterThanOrEqual(0);
-    c.panBy(1e6, 1e6);
-    const viewWorldW = cfg.viewportWidth / c.state.scale;
+    expect(c.state.tx).toBeLessThan(WORLD_WIDTH);
+    c.panBy(1e6, 0);
+    expect(c.state.tx).toBeGreaterThanOrEqual(0);
+    expect(c.state.tx).toBeLessThan(WORLD_WIDTH);
+  });
+
+  it('still clamps vertical pan to the world', () => {
+    const c = new Camera(cfg);
+    c.panBy(0, -1e6);
+    expect(c.state.ty).toBe(0);
+    c.panBy(0, 1e6);
     const viewWorldH = cfg.viewportHeight / c.state.scale;
-    expect(c.state.tx).toBeLessThanOrEqual(WORLD_WIDTH - viewWorldW + 0.001);
     expect(c.state.ty).toBeLessThanOrEqual(WORLD_HEIGHT - viewWorldH + 0.001);
   });
 

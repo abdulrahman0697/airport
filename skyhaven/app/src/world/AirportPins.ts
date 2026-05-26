@@ -21,11 +21,15 @@
  */
 import { Container, Graphics, Sprite, type Renderer, type Texture } from 'pixi.js';
 import type { Airport } from '../data/airports';
-import { lonLatToWorld } from './projection';
+import { lonLatToWorld, WORLD_WIDTH } from './projection';
+
+// Mirror every pin into the ±WORLD_WIDTH wraparound tiles so panning
+// past the dateline still shows airports.
+const TILE_OFFSETS = [-WORLD_WIDTH, 0, WORLD_WIDTH] as const;
 
 interface PinEntry {
   airport: Airport;
-  sprite: Sprite;
+  sprites: Sprite[];
   /** "Major" pin shown at every zoom level. Smaller pins LOD-cull. */
   major: boolean;
   baseScale: number;
@@ -71,28 +75,28 @@ export function createAirportPins(
     const major = aIdx % 6 === 0;
     const initiallyUnlocked = initialUnlocked.has(a.region);
     const tex = initiallyUnlocked ? unlockedTexture : lockedTexture;
-    const sprite = new Sprite(tex);
-    sprite.anchor.set(0.5);
     const baseScale = SPRITE_WORLD_SIZE / TEX_SIZE;
-    sprite.scale.set(baseScale);
     const { x, y } = lonLatToWorld(a.lon, a.lat);
-    sprite.position.set(x, y);
-
-    sprite.eventMode = 'static';
-    sprite.cursor = 'pointer';
-    // Generous circular hit area so the pin is easy to tap on a phone.
-    sprite.hitArea = {
-      contains: (px: number, py: number): boolean => {
-        return px * px + py * py <= (TEX_SIZE / 2) * (TEX_SIZE / 2);
-      },
-    };
-    sprite.on('pointertap', (event) => {
-      const g = event.global;
-      onTap(a, { x: g.x, y: g.y });
-    });
-
-    container.addChild(sprite);
-    entries.push({ airport: a, sprite, major, baseScale });
+    const sprites: Sprite[] = [];
+    for (const off of TILE_OFFSETS) {
+      const sprite = new Sprite(tex);
+      sprite.anchor.set(0.5);
+      sprite.scale.set(baseScale);
+      sprite.position.set(x + off, y);
+      sprite.eventMode = 'static';
+      sprite.cursor = 'pointer';
+      sprite.hitArea = {
+        contains: (px: number, py: number): boolean =>
+          px * px + py * py <= (TEX_SIZE / 2) * (TEX_SIZE / 2),
+      };
+      sprite.on('pointertap', (event) => {
+        const g = event.global;
+        onTap(a, { x: g.x, y: g.y });
+      });
+      container.addChild(sprite);
+      sprites.push(sprite);
+    }
+    entries.push({ airport: a, sprites, major, baseScale });
   }
 
   return {
@@ -105,7 +109,8 @@ export function createAirportPins(
       }
       for (const e of entries) {
         const isUnlocked = regions.has(e.airport.region);
-        e.sprite.texture = isUnlocked ? unlockedTexture : lockedTexture;
+        const tex = isUnlocked ? unlockedTexture : lockedTexture;
+        for (const s of e.sprites) s.texture = tex;
       }
     },
     tick(cameraScale): void {
@@ -117,14 +122,17 @@ export function createAirportPins(
       const lodLow = cameraScale < LOD_LOW_ZOOM_SCALE;
       for (let i = 0; i < entries.length; i++) {
         const e = entries[i]!;
-        if (lodFar && !e.major && (i % 4 !== 0)) { e.sprite.visible = false; continue; }
-        if (lodLow && !e.major && (i % 2 !== 0)) { e.sprite.visible = false; continue; }
-        e.sprite.visible = true;
-        e.sprite.scale.set(counter);
+        const cull =
+          (lodFar && !e.major && (i % 4 !== 0))
+          || (lodLow && !e.major && (i % 2 !== 0));
+        for (const s of e.sprites) {
+          s.visible = !cull;
+          if (!cull) s.scale.set(counter);
+        }
       }
     },
     destroy(): void {
-      for (const e of entries) e.sprite.destroy();
+      for (const e of entries) for (const s of e.sprites) s.destroy();
       entries.length = 0;
       unlockedTexture.destroy(true);
       lockedTexture.destroy(true);

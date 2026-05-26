@@ -48,6 +48,49 @@ const EAST_ASIA = new Set(['CN','HK','JP','KP','KR','MN','MO','TW']);
 const SOUTHEAST_ASIA = new Set(['BN','ID','KH','LA','MM','MY','PH','SG','TH','TL','VN']);
 const OCEANIA = new Set(['AS','AU','CK','FJ','FM','GU','KI','MH','MP','NC','NR','NU','NZ','PF','PG','PN','PW','SB','TK','TO','TV','VU','WS','WF']);
 
+// Curated list of major international hubs whose OurAirports name
+// doesn't include the word "International"/"Intl". This list is the
+// allow-list referenced by the `isIntl` flag below.
+const MAJOR_HUBS = new Set([
+  // Europe
+  'AMS','LHR','LGW','STN','LTN','LCY','MAN','EDI','GLA','BHX','DUB','SNN',
+  'CDG','ORY','LYS','MRS','NCE','TLS','BOD','NTE',
+  'FRA','MUC','DUS','HAM','TXL','BER','CGN','STR','HAJ',
+  'MAD','BCN','PMI','AGP','VLC','SVQ','BIO',
+  'FCO','MXP','LIN','BGY','VCE','NAP','PSA','BLQ',
+  'ZRH','GVA','BSL','VIE','BRU','LUX','LIS','OPO','FAO',
+  'CPH','ARN','OSL','HEL','KEF','WAW','KRK','GDN','PRG','BUD','OTP','SOF','ATH','SKG',
+  'SVO','DME','VKO','LED','IST','SAW','ADB','AYT','ESB',
+  // Middle East
+  'DXB','AUH','DOH','RUH','JED','DMM','MED','AMM','BEY','KWI','BAH','MCT',
+  // North America
+  'JFK','LGA','EWR','LAX','SFO','SJC','OAK','ORD','MDW','ATL','DFW','IAH','HOU','DEN','SEA','MIA','MCO','FLL','BOS','PHX','MSP','DTW','PHL','BWI','IAD','DCA','CLT','SAN','LAS','SLC','PDX','TPA','STL','MCI','SMF','RDU','MEM','BNA','AUS','SAT','OMA','IND','CMH','CVG','PIT','BUF','MKE','PVD','MSY','ABQ','JAX','RIC','SDF','TUL','OKC','ELP','ICT',
+  'YYZ','YUL','YVR','YYC','YEG','YOW','YHZ','YWG','YQB',
+  'MEX','CUN','GDL','MTY','TIJ','PVR','SJD',
+  // Latin America
+  'GRU','GIG','CGH','BSB','SDU','VCP','POA','REC','FOR','SSA','CNF','BEL','CWB','MAO',
+  'EZE','AEP','SCL','LIM','BOG','MDE','CTG','UIO','GYE','CCS','MVD','ASU','LPB','SDQ','PUJ','HAV','SJU','SJO','PTY',
+  // Africa
+  'JNB','CPT','DUR','LOS','ABV','ACC','ADD','NBO','DAR','EBB','KGL','LUN','HRE','MPM','TNR','CMN','RAK','TUN','ALG','CAI','HRG','SSH','LXR','CAS','DKR','ABJ','LAD',
+  // South Asia
+  'BOM','DEL','BLR','MAA','HYD','CCU','COK','GOI','TRV','AMD','PNQ','LKO','JAI','VTZ','IXC','CMB','MLE','KTM','DAC','CGP','ZYL','ISB','KHI','LHE','PEW','UET','KBL',
+  // East Asia
+  'PEK','PKX','PVG','SHA','CAN','SZX','CTU','XIY','KMG','HGH','NKG','WUH','CKG','HRB','SHE','DLC','TSN','HAK','SYX','TAO','XMN','FOC','NNG','CSX','URC','YNT','TYN',
+  'HKG','MFM','TPE','TSA','KHH','RMQ',
+  'HND','NRT','KIX','ITM','NGO','CTS','FUK','OKA','SDJ','KOJ','HIJ','TOY',
+  'ICN','GMP','PUS','CJU','TAE',
+  'ULN',
+  // Southeast Asia
+  'BKK','DMK','HKT','CNX','USM','KBV','HDY','UTP',
+  'SIN','KUL','PEN','BKI','KCH','LGK','JHB',
+  'CGK','HLP','DPS','SUB','UPG','BPN','MES','SRG','BTH',
+  'MNL','CEB','DVO','CRK','KLO','ILO',
+  'HAN','SGN','DAD','CXR','VCA','PQC',
+  'RGN','MDL','PNH','REP','VTE','LPQ','BWN',
+  // Oceania
+  'SYD','MEL','BNE','PER','OOL','CNS','ADL','DRW','HBA','AKL','WLG','CHC','ZQN','ROT','DUD','NPL','NAN','NOU','PPT','POM','SUV','APW','HNL','GUM','SPN',
+]);
+
 function regionOf(iso) {
   if (NA.has(iso)) return 1;
   if (LATAM.has(iso)) return 2;
@@ -120,7 +163,12 @@ for (let r = 1; r < rows.length; r++) {
   const runwayCategory = RUNWAY_BY_SIZE[sizeTier];
 
   const name = (row[idx.name] || '').trim();
-  const isIntl = /\b(international|intl)\b/i.test(name);
+  // OurAirports flags airports as "international" only when the literal
+  // word appears in the name, which silently excludes major hubs like
+  // Amsterdam Schiphol, London Heathrow, Paris-CDG, Frankfurt, Tokyo
+  // Haneda, etc. We fall back to a curated allow-list of recognised
+  // international gateways so the hub picker shows them.
+  const isIntl = /\b(international|intl)\b/i.test(name) || MAJOR_HUBS.has(iata);
 
   all.push({
     iata,

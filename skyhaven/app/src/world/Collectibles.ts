@@ -8,7 +8,7 @@
  * at any zoom and the visual stays sharp.
  */
 import { Container, Graphics, Sprite, type Renderer, type Texture } from 'pixi.js';
-import { lonLatToWorld } from './projection';
+import { lonLatToWorld, WORLD_WIDTH } from './projection';
 import type { Collectible } from '../engine/types';
 
 const PULSE_PERIOD_MS = 1500;
@@ -16,10 +16,13 @@ const PULSE_PERIOD_MS = 1500;
 const SPRITE_WORLD_SIZE = 64;
 /** Max drift from the spawn anchor (world units). */
 const DRIFT_RADIUS = 90;
+// Mirror each collectible into the ±WORLD_WIDTH wraparound tiles so
+// they remain visible across the dateline.
+const TILE_OFFSETS = [-WORLD_WIDTH, 0, WORLD_WIDTH] as const;
 
 interface Entry {
   id: string;
-  sprite: Sprite;
+  sprites: Sprite[];
   reward: Collectible['reward'];
   anchorX: number;
   anchorY: number;
@@ -58,20 +61,23 @@ export class CollectiblesLayer {
       if (this.entries.has(c.id)) continue;
 
       const tex = c.reward.kind === 'cash' ? this.textures.cash : this.textures.fuel;
-      const sprite = new Sprite(tex);
-      sprite.anchor.set(0.5);
-      sprite.width = SPRITE_WORLD_SIZE;
-      sprite.height = SPRITE_WORLD_SIZE;
       const { x, y } = lonLatToWorld(c.lon, c.lat);
-      sprite.position.set(x, y);
-      // Generous hit area: the visible halo is ~26 world units radius;
-      // we expand the hit zone to make tapping easy on small phones.
-      sprite.eventMode = 'static';
-      sprite.cursor = 'pointer';
-      sprite.hitArea = {
-        contains: (px: number, py: number): boolean => px * px + py * py <= 36 * 36,
-      };
-      sprite.on('pointertap', () => this.onTap(c.id, c.reward));
+      const sprites: Sprite[] = [];
+      for (const off of TILE_OFFSETS) {
+        const sprite = new Sprite(tex);
+        sprite.anchor.set(0.5);
+        sprite.width = SPRITE_WORLD_SIZE;
+        sprite.height = SPRITE_WORLD_SIZE;
+        sprite.position.set(x + off, y);
+        sprite.eventMode = 'static';
+        sprite.cursor = 'pointer';
+        sprite.hitArea = {
+          contains: (px: number, py: number): boolean => px * px + py * py <= 36 * 36,
+        };
+        sprite.on('pointertap', () => this.onTap(c.id, c.reward));
+        this.container.addChild(sprite);
+        sprites.push(sprite);
+      }
 
       const h = hashString(c.id);
       const angle = (h % 360) * (Math.PI / 180);
@@ -79,9 +85,8 @@ export class CollectiblesLayer {
       const vx = Math.cos(angle) * speed;
       const vy = Math.sin(angle) * speed * 0.55; // gentler vertical drift
 
-      this.container.addChild(sprite);
       this.entries.set(c.id, {
-        id: c.id, sprite, reward: c.reward,
+        id: c.id, sprites, reward: c.reward,
         anchorX: x, anchorY: y,
         vx, vy, dx: 0, dy: 0,
         pulsePhase: (h % 1000) / 1000 * Math.PI * 2,
@@ -89,7 +94,7 @@ export class CollectiblesLayer {
     }
     for (const [id, entry] of this.entries) {
       if (seen.has(id)) continue;
-      entry.sprite.destroy();
+      for (const s of entry.sprites) s.destroy();
       this.entries.delete(id);
     }
   }
@@ -111,18 +116,21 @@ export class CollectiblesLayer {
         e.vx -= 2 * dot * nx;
         e.vy -= 2 * dot * ny;
       }
-      e.sprite.position.set(e.anchorX + e.dx, e.anchorY + e.dy);
-
-      // Pulse: gentle ± scale wobble + soft rotation for life.
       const phase = (this.now / PULSE_PERIOD_MS) * Math.PI * 2 + e.pulsePhase;
       const pulse = 1 + Math.sin(phase) * 0.12;
-      e.sprite.scale.set(pulse * (SPRITE_WORLD_SIZE / e.sprite.texture.width));
-      e.sprite.rotation = Math.sin(phase * 0.3) * 0.06;
+      const rotation = Math.sin(phase * 0.3) * 0.06;
+      for (let i = 0; i < e.sprites.length; i++) {
+        const off = TILE_OFFSETS[i]!;
+        const s = e.sprites[i]!;
+        s.position.set(e.anchorX + e.dx + off, e.anchorY + e.dy);
+        s.scale.set(pulse * (SPRITE_WORLD_SIZE / s.texture.width));
+        s.rotation = rotation;
+      }
     }
   }
 
   destroy(): void {
-    for (const e of this.entries.values()) e.sprite.destroy();
+    for (const e of this.entries.values()) for (const s of e.sprites) s.destroy();
     this.entries.clear();
     this.textures.cash.destroy(true);
     this.textures.fuel.destroy(true);

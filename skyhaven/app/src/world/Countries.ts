@@ -12,9 +12,12 @@
  * so the cost is bounded.
  */
 import { Container, Graphics } from 'pixi.js';
-import { lonLatToWorld } from './projection';
+import { lonLatToWorld, WORLD_WIDTH } from './projection';
 
 import countryData from '../data/countries.json' with { type: 'json' };
+
+// Tile horizontally so panning past the dateline shows continuous land.
+const TILE_OFFSETS = [-WORLD_WIDTH, 0, WORLD_WIDTH] as const;
 
 interface CountryPoly { iso: string; region: number; ring: number[] }
 const POLYGONS: readonly CountryPoly[] =
@@ -44,17 +47,19 @@ export function createCountries(): CountriesLayer {
   function rebuild(unlockedRegions: ReadonlySet<number>): void {
     locked.clear();
     unlocked.clear();
-    for (const poly of POLYGONS) {
-      const target = unlockedRegions.has(poly.region) ? unlocked : locked;
-      const r = poly.ring;
-      if (r.length < 6) continue;
-      const p0 = lonLatToWorld(r[0]!, r[1]!);
-      target.moveTo(p0.x, p0.y);
-      for (let i = 2; i < r.length; i += 2) {
-        const p = lonLatToWorld(r[i]!, r[i + 1]!);
-        target.lineTo(p.x, p.y);
+    for (const off of TILE_OFFSETS) {
+      for (const poly of POLYGONS) {
+        const target = unlockedRegions.has(poly.region) ? unlocked : locked;
+        const r = poly.ring;
+        if (r.length < 6) continue;
+        const p0 = lonLatToWorld(r[0]!, r[1]!);
+        target.moveTo(p0.x + off, p0.y);
+        for (let i = 2; i < r.length; i += 2) {
+          const p = lonLatToWorld(r[i]!, r[i + 1]!);
+          target.lineTo(p.x + off, p.y);
+        }
+        target.closePath();
       }
-      target.closePath();
     }
     locked.fill({ color: LAND_LOCKED_FILL, alpha: 1.0 });
     locked.stroke({ color: LAND_LOCKED_STROKE, width: 0.7, alpha: 0.6 });

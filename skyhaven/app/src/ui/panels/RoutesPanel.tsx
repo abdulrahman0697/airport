@@ -233,6 +233,14 @@ function AddHubModal({
 }) {
   const state = useGameStore((s) => s.state);
   const cash = useGameStore(selectCash);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleCountry = (iso: string): void => {
+    setExpanded((cur) => {
+      const next = new Set(cur);
+      if (next.has(iso)) next.delete(iso); else next.add(iso);
+      return next;
+    });
+  };
   const groupedByCountry = useMemo(() => {
     const filtered = airports.filter((a) =>
       unlocked.includes(a.region)
@@ -263,46 +271,58 @@ function AddHubModal({
           fee based on the airport's size tier.
         </p>
         <div style={addHubScroller}>
-          {groupedByCountry.map((group) => (
-            <section key={group.iso} style={addHubCountry}>
-              <div style={addHubCountryHeader}>{group.label}</div>
-              <ul style={list}>
-                {group.airports.map((a) => {
-                  const cost = state ? hubPickCost(state, a.iata) : 0;
-                  const afford = cash >= cost;
-                  return (
-                    <li key={a.iata} style={card}>
-                      <div style={cardHeader}>
-                        <div>
-                          <div style={cardTitle}>{a.iata}</div>
-                          <div style={cardSubtitle}>{a.city || group.label}</div>
-                        </div>
-                        <div style={addHubRight}>
-                          {cost === 0
-                            ? <span style={freePill}>Free</span>
-                            : <span style={costText}>${formatCash(cost, 1)}</span>}
-                          <button
-                            disabled={!afford && cost > 0}
-                            onClick={(): void => onPick(a.iata)}
-                            style={{
-                              ...primaryBtn,
-                              width: 'auto',
-                              padding: '8px 14px',
-                              minHeight: 36,
-                              marginTop: 6,
-                              opacity: afford || cost === 0 ? 1 : 0.5,
-                            }}
-                          >
-                            Pick
-                          </button>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))}
+          {groupedByCountry.map((group) => {
+            const open = expanded.has(group.iso);
+            return (
+              <section key={group.iso} style={addHubCountry}>
+                <button
+                  onClick={(): void => toggleCountry(group.iso)}
+                  style={addHubCountryHeaderBtn}
+                  aria-expanded={open}
+                >
+                  <span>{group.label}</span>
+                  <span style={addHubCountryChev}>{open ? '▾' : '▸'} {group.airports.length}</span>
+                </button>
+                {open && (
+                  <ul style={list}>
+                    {group.airports.map((a) => {
+                      const cost = state ? hubPickCost(state, a.iata) : 0;
+                      const afford = cash >= cost;
+                      return (
+                        <li key={a.iata} style={card}>
+                          <div style={cardHeader}>
+                            <div>
+                              <div style={cardTitle}>{a.iata}</div>
+                              <div style={cardSubtitle}>{a.city || group.label}</div>
+                            </div>
+                            <div style={addHubRight}>
+                              {cost === 0
+                                ? <span style={freePill}>Free</span>
+                                : <span style={costText}>${formatCash(cost, 1)}</span>}
+                              <button
+                                disabled={!afford && cost > 0}
+                                onClick={(): void => onPick(a.iata)}
+                                style={{
+                                  ...primaryBtn,
+                                  width: 'auto',
+                                  padding: '8px 14px',
+                                  minHeight: 36,
+                                  marginTop: 6,
+                                  opacity: afford || cost === 0 ? 1 : 0.5,
+                                }}
+                              >
+                                Pick
+                              </button>
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+            );
+          })}
         </div>
         <button onClick={onClose} style={cancelBtn}>Close</button>
       </div>
@@ -679,11 +699,20 @@ const addHubScroller: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', gap: 12, marginTop: 10,
 };
 const addHubCountry: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4 };
-const addHubCountryHeader: React.CSSProperties = {
-  fontSize: 10, letterSpacing: '0.18em', textTransform: 'uppercase',
+const addHubCountryHeaderBtn: React.CSSProperties = {
+  width: '100%',
+  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+  fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase',
   color: '#5AC8FA', fontWeight: 700,
-  padding: '4px 4px',
-  borderBottom: '1px solid rgba(90,200,250,0.18)',
+  padding: '8px 10px',
+  background: 'rgba(90,200,250,0.06)',
+  border: '1px solid rgba(90,200,250,0.18)',
+  borderRadius: 8,
+  cursor: 'pointer', fontFamily: 'inherit',
+  minHeight: 40,
+};
+const addHubCountryChev: React.CSSProperties = {
+  fontSize: 11, color: '#94A3B8', letterSpacing: '0.02em',
 };
 const addHubRight: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4,

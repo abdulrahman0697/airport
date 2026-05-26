@@ -7,6 +7,7 @@ import {
   useGameStore,
 } from '../../state/store';
 import { formatCash } from '../format';
+import { usePanelStore } from './PanelHost';
 
 /**
  * Early-goal chain ribbon (BRD §5.3).
@@ -20,6 +21,7 @@ const FLIP_DURATION_MS = 1800;
 export function GoalChainCard() {
   const tutorialCompleted = useGameStore(selectTutorialCompleted);
   const step = useGameStore(selectGoalChainStep);
+  const activePanel = usePanelStore((s) => s.active);
   const previousStepRef = useRef<number>(step);
   const [flip, setFlip] = useState<{ rewardedStep: number; reward: number } | null>(null);
 
@@ -39,6 +41,10 @@ export function GoalChainCard() {
   }, [step]);
 
   if (!tutorialCompleted) return null;
+  // The card sits above the bottom-tab strip; once a panel is open it
+  // would obscure the panel's last row of content (e.g. the bottom of
+  // the Regions list), so hide it whenever a panel is active.
+  if (activePanel !== null) return null;
   if (step >= GOAL_COUNT && !flip) return null;
 
   const current = step < GOAL_COUNT ? GOAL_CHAIN[step] : null;

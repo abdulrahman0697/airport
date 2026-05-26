@@ -18,8 +18,11 @@ export function createBasemap(): Container {
   const root = new Container();
   root.label = 'basemap';
 
+  // Tile the background across ±WORLD_WIDTH so horizontal pan never
+  // shows the void behind the world. Phase 10 polish: BRD §9.1 infinite
+  // horizontal loop.
   const bg = new Graphics();
-  bg.rect(0, 0, WORLD_WIDTH, WORLD_HEIGHT).fill(0x0b1120);
+  bg.rect(-WORLD_WIDTH, 0, WORLD_WIDTH * 3, WORLD_HEIGHT).fill(0x0b1120);
   root.addChild(bg);
 
   // Twinkling city-light field — random dim points across the canvas.
@@ -28,7 +31,7 @@ export function createBasemap(): Container {
   return root;
 }
 
-/** A static deterministic star/city field. */
+/** A static deterministic star/city field, tiled across ±WORLD_WIDTH. */
 function createStarField(count: number, color: number, maxAlpha: number): Container {
   const layer = new Container();
   layer.label = 'star-field';
@@ -43,7 +46,9 @@ function createStarField(count: number, color: number, maxAlpha: number): Contai
     const y = rand() * WORLD_HEIGHT;
     const r = 0.4 + rand() * 1.2;
     const a = (0.2 + rand() * 0.8) * maxAlpha;
-    g.circle(x, y, r).fill({ color, alpha: a });
+    for (const off of [-WORLD_WIDTH, 0, WORLD_WIDTH]) {
+      g.circle(x + off, y, r).fill({ color, alpha: a });
+    }
   }
   layer.addChild(g);
   return layer;

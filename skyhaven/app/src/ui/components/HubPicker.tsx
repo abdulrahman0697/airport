@@ -1,9 +1,10 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useMemo, useState } from 'react';
 import { loadTopAirports, type Airport } from '../../data/airports';
-import { getRegion } from '../../data/regions';
+import { getRegion, REGIONS } from '../../data/regions';
 import { hubPickCost } from '../../engine/actions';
 import {
+  selectHubs,
   selectPendingHubPickRegion,
   selectTailColor,
   useGameStore,
@@ -23,10 +24,14 @@ const COUNTRY_NAMES = new Intl.DisplayNames(['en'], { type: 'region' });
 export function HubPicker() {
   const pending = useGameStore(selectPendingHubPickRegion);
   const tailColor = useGameStore(selectTailColor);
+  const hubs = useGameStore(selectHubs);
   const pickHub = useGameStore((s) => s.pickHub);
   const dismiss = useGameStore((s) => s.dismissHubPick);
+  const chooseStartingRegion = useGameStore((s) => s.chooseStartingRegion);
   const state = useGameStore((s) => s.state);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const isFirstEverHub = hubs.length === 0;
 
   const regionDef = pending !== null ? getRegion(pending) : null;
   const airports = useMemo(() => {
@@ -48,6 +53,14 @@ export function HubPicker() {
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [airports]);
 
+  const toggleCountry = (iso: string): void => {
+    setExpanded((cur) => {
+      const next = new Set(cur);
+      if (next.has(iso)) next.delete(iso); else next.add(iso);
+      return next;
+    });
+  };
+
   const handlePick = (iata: string): void => {
     const res = pickHub(iata);
     if (res.ok) {
@@ -64,6 +77,14 @@ export function HubPicker() {
     const ap = airports.find((a) => a.iata === h.iata);
     return ap && ap.region === pending;
   });
+
+  const onChangeStarter = (e: React.ChangeEvent<HTMLSelectElement>): void => {
+    const id = Number(e.target.value);
+    if (!Number.isFinite(id)) return;
+    const res = chooseStartingRegion(id);
+    if (res.ok) { setExpanded(new Set()); setError(null); }
+    else setError(res.message);
+  };
 
   return (
     <AnimatePresence>
@@ -94,44 +115,71 @@ export function HubPicker() {
                 : 'Pick an additional hub — extra hubs grow your network reach.'}
             </p>
 
+            {isFirstEverHub && (
+              <div style={starterRow}>
+                <label style={starterLabel}>Starting region</label>
+                <select
+                  value={pending ?? ''}
+                  onChange={onChangeStarter}
+                  style={starterSelect}
+                >
+                  {REGIONS.map((r) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div style={listScroller}>
-              {airportsByCountry.map((group) => (
-                <section key={group.iso} style={countrySection}>
-                  <div style={countryHeader}>{group.label}</div>
-                  <ul style={list}>
-                    {group.airports.map((a) => {
-                      const cost = hubPickCost(state, a.iata);
-                      const owned = state.hubs.some((h) => h.iata === a.iata);
-                      return (
-                        <li key={a.iata} style={item}>
-                          <button
-                            onClick={(): void => handlePick(a.iata)}
-                            disabled={owned || (state.cash < cost)}
-                            style={{
-                              ...itemBtn,
-                              opacity: owned ? 0.4 : state.cash < cost ? 0.55 : 1,
-                            }}
-                          >
-                            <div style={itemLeft}>
-                              <div style={iata}>{a.iata}</div>
-                              <div style={cityRow}>
-                                <span style={city}>{a.city || group.label}</span>
-                              </div>
-                            </div>
-                            <div style={itemRight}>
-                              {owned
-                                ? <span style={ownedPill}>Hub</span>
-                                : cost === 0
-                                  ? <span style={freePill}>Free</span>
-                                  : <span style={costText}>${formatCash(cost, 1)}</span>}
-                            </div>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
-              ))}
+              {airportsByCountry.map((group) => {
+                const open = expanded.has(group.iso);
+                return (
+                  <section key={group.iso} style={countrySection}>
+                    <button
+                      onClick={(): void => toggleCountry(group.iso)}
+                      style={countryHeaderBtn}
+                      aria-expanded={open}
+                    >
+                      <span>{group.label}</span>
+                      <span style={countryChev}>{open ? '▾' : '▸'} {group.airports.length}</span>
+                    </button>
+                    {open && (
+                      <ul style={list}>
+                        {group.airports.map((a) => {
+                          const cost = hubPickCost(state, a.iata);
+                          const owned = state.hubs.some((h) => h.iata === a.iata);
+                          return (
+                            <li key={a.iata} style={item}>
+                              <button
+                                onClick={(): void => handlePick(a.iata)}
+                                disabled={owned || (state.cash < cost)}
+                                style={{
+                                  ...itemBtn,
+                                  opacity: owned ? 0.4 : state.cash < cost ? 0.55 : 1,
+                                }}
+                              >
+                                <div style={itemLeft}>
+                                  <div style={iata}>{a.iata}</div>
+                                  <div style={cityRow}>
+                                    <span style={city}>{a.city || group.label}</span>
+                                  </div>
+                                </div>
+                                <div style={itemRight}>
+                                  {owned
+                                    ? <span style={ownedPill}>Hub</span>
+                                    : cost === 0
+                                      ? <span style={freePill}>Free</span>
+                                      : <span style={costText}>${formatCash(cost, 1)}</span>}
+                                </div>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </section>
+                );
+              })}
             </div>
 
             {error && <div style={errorText}>{error}</div>}
@@ -205,11 +253,37 @@ const listScroller: React.CSSProperties = {
 const countrySection: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', gap: 4,
 };
-const countryHeader: React.CSSProperties = {
-  fontSize: 10, letterSpacing: '0.18em', textTransform: 'uppercase',
+const countryHeaderBtn: React.CSSProperties = {
+  width: '100%',
+  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+  fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase',
   color: '#5AC8FA', fontWeight: 700,
-  padding: '4px 4px 4px 4px',
-  borderBottom: '1px solid rgba(90,200,250,0.18)',
+  padding: '8px 10px',
+  background: 'rgba(90,200,250,0.06)',
+  border: '1px solid rgba(90,200,250,0.18)',
+  borderRadius: 8,
+  cursor: 'pointer', fontFamily: 'inherit',
+  minHeight: 40,
+};
+const countryChev: React.CSSProperties = {
+  fontSize: 11, color: '#94A3B8', letterSpacing: '0.02em',
+};
+const starterRow: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', gap: 6,
+  marginBottom: 12, padding: '10px 12px',
+  background: 'rgba(244,199,91,0.08)',
+  border: '1px solid rgba(244,199,91,0.32)',
+  borderRadius: 10,
+};
+const starterLabel: React.CSSProperties = {
+  fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase',
+  color: '#F4C75B', fontWeight: 700,
+};
+const starterSelect: React.CSSProperties = {
+  width: '100%', background: 'rgba(11,17,32,0.7)', color: '#F8FAFC',
+  border: '1px solid rgba(244,199,91,0.4)', borderRadius: 8,
+  padding: '10px', fontSize: 14, fontFamily: 'inherit',
+  minHeight: 40,
 };
 const item: React.CSSProperties = { margin: 0 };
 const itemBtn: React.CSSProperties = {

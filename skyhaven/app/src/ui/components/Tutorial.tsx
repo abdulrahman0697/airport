@@ -72,17 +72,17 @@ const STEPS: readonly Step[] = [
   },
   {
     kind: 'wait-state',
-    title: 'Open a new route',
-    body: 'Tap "+ New route", then pick an origin, a destination, and confirm.',
+    title: 'Open your first route',
+    body: 'Tap "+ New route", then pick an origin (your hub), a destination, and confirm.',
     targetFor: (panel) => panel === 'routes'
       ? ['routes-confirm-button', 'routes-dest-select', 'routes-origin-select', 'routes-new-button']
       : 'routes-tab',
-    check: (s) => s.routes.length >= 2,
+    check: (s) => s.routes.length >= 1,
   },
   {
     kind: 'wait-time',
     title: 'Watch it earn',
-    body: 'Your second route is flying. Cash counts up automatically — no taps needed.',
+    body: 'Your route is flying. Cash counts up automatically — no taps needed.',
     durationMs: 6_000,
   },
   {
@@ -187,41 +187,62 @@ function useTargetRect(target: TargetSpec | null): DOMRect | null {
 }
 
 // ─── Spotlight ring + soft dim ───────────────────────────────────────
+/**
+ * Renders a glowing ring around the tutorial target *and* four
+ * click-absorbing panels that cover the rest of the screen. The rect
+ * is "cut out" by leaving a hole in the centre — taps inside the hole
+ * fall through to the underlying control, while taps outside are
+ * swallowed and gently rejected so the player can only progress by
+ * doing the suggested action.
+ */
 function Spotlight({ rect }: { rect: DOMRect }) {
   const padding = 8;
+  const x = rect.left - padding;
+  const y = rect.top - padding;
+  const w = rect.width + padding * 2;
+  const h = rect.height + padding * 2;
   return (
-    <motion.div
-      key={`${rect.left}-${rect.top}-${rect.width}`}
-      initial={{ opacity: 0 }}
-      animate={{
-        opacity: 1,
-        scale: [1, 1.06, 1],
-      }}
-      transition={{
-        opacity: { duration: 0.22 },
-        scale: { duration: 1.6, repeat: Infinity, ease: 'easeInOut' },
-      }}
-      style={{
-        position: 'fixed',
-        left: rect.left - padding,
-        top: rect.top - padding,
-        width: rect.width + padding * 2,
-        height: rect.height + padding * 2,
-        borderRadius: 14,
-        border: '2px solid #5AC8FA',
-        // Outer dim is lighter than before so panel contents stay readable
-        // when the player taps through to (say) the FuelPanel.
-        boxShadow:
-          '0 0 0 9999px rgba(0,0,0,0.45), 0 0 32px rgba(90,200,250,0.7), inset 0 0 18px rgba(90,200,250,0.18)',
-        pointerEvents: 'none',
-        // Above the new-route modal (z-index 100) so the ring shows
-        // through the modal backdrop when the highlighted control is
-        // inside the modal.
-        zIndex: 200,
-      }}
-    />
+    <>
+      {/* Click-blocking panels: top / bottom / left / right of the hole */}
+      <div style={{ ...blocker, top: 0, left: 0, right: 0, height: Math.max(0, y) }} />
+      <div style={{ ...blocker, top: y + h, left: 0, right: 0, bottom: 0 }} />
+      <div style={{ ...blocker, top: y, left: 0, width: Math.max(0, x), height: h }} />
+      <div style={{ ...blocker, top: y, left: x + w, right: 0, height: h }} />
+      <motion.div
+        key={`${rect.left}-${rect.top}-${rect.width}`}
+        initial={{ opacity: 0 }}
+        animate={{
+          opacity: 1,
+          scale: [1, 1.06, 1],
+        }}
+        transition={{
+          opacity: { duration: 0.22 },
+          scale: { duration: 1.6, repeat: Infinity, ease: 'easeInOut' },
+        }}
+        style={{
+          position: 'fixed',
+          left: x,
+          top: y,
+          width: w,
+          height: h,
+          borderRadius: 14,
+          border: '2px solid #5AC8FA',
+          boxShadow:
+            '0 0 32px rgba(90,200,250,0.7), inset 0 0 18px rgba(90,200,250,0.18)',
+          pointerEvents: 'none',
+          zIndex: 201,
+        }}
+      />
+    </>
   );
 }
+
+const blocker: React.CSSProperties = {
+  position: 'fixed',
+  background: 'rgba(0,0,0,0.55)',
+  pointerEvents: 'auto',
+  zIndex: 200,
+};
 
 // ─── The tutorial card ───────────────────────────────────────────────
 function TutorialCard({
@@ -368,16 +389,18 @@ const shellBottom: React.CSSProperties = {
 const card: React.CSSProperties = {
   width: '100%',
   maxWidth: 380,
-  background: 'linear-gradient(160deg, #1A2244, #0B1120)',
+  background: 'linear-gradient(160deg, #2C3A6A, #1B2547)',
   borderRadius: 16,
   padding: '16px 18px 18px',
-  border: '1px solid rgba(90,200,250,0.45)',
-  boxShadow: '0 18px 60px rgba(0,0,0,0.55), 0 0 36px rgba(90,200,250,0.20)',
+  border: '1px solid rgba(90,200,250,0.6)',
+  boxShadow: '0 18px 60px rgba(0,0,0,0.55), 0 0 36px rgba(90,200,250,0.32)',
   pointerEvents: 'auto',
+  zIndex: 203,
+  position: 'relative',
 };
 const kicker: React.CSSProperties = {
   fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase',
-  color: '#94A3B8',
+  color: '#CBD5E1',
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',

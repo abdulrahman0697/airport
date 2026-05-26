@@ -112,19 +112,20 @@ export class Camera {
   }
 
   private clamp(): void {
+    // Vertical is bounded — the player can't scroll off the top of the
+    // North Pole. Horizontal wraps infinitely (BRD §9.1 globe feel).
     const minScale = Math.max(
       this.cfg.minScale,
-      this.cfg.viewportWidth / WORLD_WIDTH,
       this.cfg.viewportHeight / WORLD_HEIGHT,
     );
     if (this.state.scale < minScale) this.state.scale = minScale;
-    const viewWorldW = this.cfg.viewportWidth / this.state.scale;
     const viewWorldH = this.cfg.viewportHeight / this.state.scale;
-    const maxTx = WORLD_WIDTH - viewWorldW;
     const maxTy = WORLD_HEIGHT - viewWorldH;
-    if (this.state.tx < 0) this.state.tx = 0;
     if (this.state.ty < 0) this.state.ty = 0;
-    if (this.state.tx > maxTx) this.state.tx = maxTx;
     if (this.state.ty > maxTy) this.state.ty = maxTy;
+    // Wrap tx into [0, WORLD_WIDTH) so coordinates stay bounded while
+    // the player perceives unlimited horizontal panning. The basemap +
+    // countries layers tile by ±WORLD_WIDTH so the wrap is invisible.
+    this.state.tx = ((this.state.tx % WORLD_WIDTH) + WORLD_WIDTH) % WORLD_WIDTH;
   }
 }

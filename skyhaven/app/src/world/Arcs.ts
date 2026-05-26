@@ -14,15 +14,19 @@ import { Container, Graphics } from 'pixi.js';
 import type { Airport } from '../data/airports';
 import type { Route } from '../engine/types';
 import { greatCirclePath, pointAlongPath } from './geo';
+import { WORLD_WIDTH } from './projection';
 
 const PULSE_COUNT = 3;
 const PULSE_CYCLE_MS = 4_200;
 const PLANE_TAP_RADIUS = 18;
+// Mirror arc / plane / pulses into the ±WORLD_WIDTH wraparound tiles so
+// the infinite horizontal pan stays continuous across the dateline.
+const TILE_OFFSETS = [-WORLD_WIDTH, 0, WORLD_WIDTH] as const;
 
 interface ArcEntry {
   routeId: string;
   pathContainer: Graphics;
-  plane: Graphics;
+  planes: Graphics[];
   pulses: Graphics[];
   path: ReturnType<typeof greatCirclePath>;
   legProgress: number;
@@ -50,7 +54,7 @@ export class ArcsLayer {
     this.tailColor = n;
     for (const e of this.entries.values()) {
       this.drawPath(e);
-      this.drawPlane(e);
+      for (const p of e.planes) this.drawPlane(p);
       this.updatePulsesNow(e);
     }
   }
@@ -78,7 +82,7 @@ export class ArcsLayer {
     for (const [id, entry] of this.entries) {
       if (seen.has(id)) continue;
       entry.pathContainer.destroy();
-      entry.plane.destroy();
+      for (const p of entry.planes) p.destroy();
       for (const p of entry.pulses) p.destroy();
       this.entries.delete(id);
     }
@@ -95,19 +99,33 @@ export class ArcsLayer {
     if (!o || !d) return;
     const path = greatCirclePath(o.lat, o.lon, d.lat, d.lon, 48);
     const pathContainer = new Graphics();
-    const plane = new Graphics();
+    const planes: Graphics[] = [];
     const pulses: Graphics[] = [];
     this.container.addChild(pathContainer);
-    for (let i = 0; i < PULSE_COUNT; i++) {
+    for (let i = 0; i < PULSE_COUNT * TILE_OFFSETS.length; i++) {
       const g = new Graphics();
       this.container.addChild(g);
       pulses.push(g);
     }
-    this.container.addChild(plane);
+    for (let i = 0; i < TILE_OFFSETS.length; i++) {
+      const plane = new Graphics();
+      this.container.addChild(plane);
+      plane.eventMode = 'static';
+      plane.cursor = 'pointer';
+      plane.hitArea = {
+        contains: (px: number, py: number): boolean =>
+          px * px + py * py <= PLANE_TAP_RADIUS * PLANE_TAP_RADIUS,
+      };
+      plane.on('pointertap', (event) => {
+        const g = event.global;
+        this.onTap(r.id, { x: g.x, y: g.y });
+      });
+      planes.push(plane);
+    }
     const entry: ArcEntry = {
       routeId: r.id,
       pathContainer,
-      plane,
+      planes,
       pulses,
       path,
       legProgress: r.legProgress,
@@ -115,21 +133,9 @@ export class ArcsLayer {
     };
     this.entries.set(r.id, entry);
     this.drawPath(entry);
-    this.drawPlane(entry);
+    for (const p of planes) this.drawPlane(p);
     this.positionPlane(entry);
     this.updatePulsesNow(entry);
-
-    // Plane is tappable.
-    plane.eventMode = 'static';
-    plane.cursor = 'pointer';
-    plane.hitArea = {
-      contains: (px: number, py: number): boolean =>
-        px * px + py * py <= PLANE_TAP_RADIUS * PLANE_TAP_RADIUS,
-    };
-    plane.on('pointertap', (event) => {
-      const g = event.global;
-      this.onTap(r.id, { x: g.x, y: g.y });
-    });
   }
 
   private drawPath(entry: ArcEntry): void {
@@ -137,48 +143,43 @@ export class ArcsLayer {
     g.clear();
     const { path } = entry;
     if (path.length < 2) return;
-    g.moveTo(path[0]!.x, path[0]!.y);
-    for (let i = 1; i < path.length; i++) g.lineTo(path[i]!.x, path[i]!.y);
-    g.stroke({ color: this.tailColor, alpha: 0.18, width: 5, cap: 'round', join: 'round' });
-    g.moveTo(path[0]!.x, path[0]!.y);
-    for (let i = 1; i < path.length; i++) g.lineTo(path[i]!.x, path[i]!.y);
-    g.stroke({ color: this.tailColor, alpha: 0.85, width: 1.6, cap: 'round', join: 'round' });
+    // Tile the stroke at ±WORLD_WIDTH so paths stay continuous across
+    // the dateline wraparound.
+    for (const off of TILE_OFFSETS) {
+      g.moveTo(path[0]!.x + off, path[0]!.y);
+      for (let i = 1; i < path.length; i++) g.lineTo(path[i]!.x + off, path[i]!.y);
+      g.stroke({ color: this.tailColor, alpha: 0.18, width: 5, cap: 'round', join: 'round' });
+      g.moveTo(path[0]!.x + off, path[0]!.y);
+      for (let i = 1; i < path.length; i++) g.lineTo(path[i]!.x + off, path[i]!.y);
+      g.stroke({ color: this.tailColor, alpha: 0.85, width: 1.6, cap: 'round', join: 'round' });
+    }
   }
 
-  /**
-   * Draw the plane glyph centred at (0, 0) pointing right (+x). Per-
-   * frame `positionPlane` sets sprite-space position + rotation; the
-   * glyph itself is drawn once.
-   */
-  private drawPlane(entry: ArcEntry): void {
-    const g = entry.plane;
+  private drawPlane(g: Graphics): void {
     g.clear();
-    // Soft halo behind the plane.
-    g.circle(0, 0, 8).fill({ color: this.tailColor, alpha: 0.18 });
-    // Fuselage — slim triangle pointing right with a wider centre.
-    g.moveTo(8, 0)
-      .lineTo(-5, 2.5)
-      .lineTo(-5, -2.5)
+    // Slightly smaller plane than before — reads cleaner on the world.
+    g.circle(0, 0, 6).fill({ color: this.tailColor, alpha: 0.18 });
+    g.moveTo(6, 0)
+      .lineTo(-3.5, 1.8)
+      .lineTo(-3.5, -1.8)
       .closePath()
       .fill({ color: 0xffffff, alpha: 0.97 });
-    // Wings — swept back.
     g.moveTo(1, 0)
-      .lineTo(-2.5, -6)
-      .lineTo(-4, -6)
-      .lineTo(-3, 0)
-      .lineTo(-4, 6)
-      .lineTo(-2.5, 6)
+      .lineTo(-2, -4.5)
+      .lineTo(-3, -4.5)
+      .lineTo(-2.5, 0)
+      .lineTo(-3, 4.5)
+      .lineTo(-2, 4.5)
       .closePath()
       .fill({ color: this.tailColor, alpha: 0.95 });
-    // Tail fin.
-    g.moveTo(-5, 0)
-      .lineTo(-7, -3)
-      .lineTo(-7, 0)
+    g.moveTo(-3.5, 0)
+      .lineTo(-5, -2.2)
+      .lineTo(-5, 0)
       .closePath()
       .fill({ color: this.tailColor, alpha: 0.95 });
-    g.moveTo(-5, 0)
-      .lineTo(-7, 3)
-      .lineTo(-7, 0)
+    g.moveTo(-3.5, 0)
+      .lineTo(-5, 2.2)
+      .lineTo(-5, 0)
       .closePath()
       .fill({ color: this.tailColor, alpha: 0.6 });
   }
@@ -186,39 +187,50 @@ export class ArcsLayer {
   private positionPlane(entry: ArcEntry): void {
     const t = entry.legDirection === 'outbound' ? entry.legProgress : 1 - entry.legProgress;
     const p = pointAlongPath(entry.path, t);
-    entry.plane.position.set(p.x, p.y);
-    // Compute tangent at t using a forward neighbour.
+    // Heading is the direction the plane is actually flying *now* —
+    // on the inbound leg, that's back toward the origin, so we sample
+    // the path going the opposite way.
     const eps = 0.01;
-    const tForward = entry.legDirection === 'outbound'
+    const tProbe = entry.legDirection === 'outbound'
       ? Math.min(0.999, t + eps)
-      : Math.max(0.001, t + eps);
-    const next = pointAlongPath(entry.path, tForward);
-    const dx = next.x - p.x;
-    const dy = next.y - p.y;
-    if (dx !== 0 || dy !== 0) {
-      entry.plane.rotation = Math.atan2(dy, dx);
+      : Math.max(0.001, t - eps);
+    const probe = pointAlongPath(entry.path, tProbe);
+    const dx = probe.x - p.x;
+    const dy = probe.y - p.y;
+    const heading = (dx !== 0 || dy !== 0) ? Math.atan2(dy, dx) : 0;
+    for (let i = 0; i < entry.planes.length; i++) {
+      const off = TILE_OFFSETS[i]!;
+      const plane = entry.planes[i]!;
+      plane.position.set(p.x + off, p.y);
+      if (dx !== 0 || dy !== 0) plane.rotation = heading;
     }
   }
 
   private updatePulsesNow(entry: ArcEntry): void {
     const basePhase = (this.now % PULSE_CYCLE_MS) / PULSE_CYCLE_MS;
+    // Pulses are laid out as [tile0,pulse0, tile0,pulse1, tile0,pulse2,
+    // tile1,pulse0, ...] — wrap-tile index changes every PULSE_COUNT.
     for (let i = 0; i < entry.pulses.length; i++) {
       const g = entry.pulses[i]!;
-      const t = (basePhase + i / entry.pulses.length) % 1;
+      const pulseIdx = i % PULSE_COUNT;
+      const tileIdx = Math.floor(i / PULSE_COUNT);
+      const off = TILE_OFFSETS[tileIdx]!;
+      let t = (basePhase + pulseIdx / PULSE_COUNT) % 1;
+      if (entry.legDirection === 'inbound') t = 1 - t;
       const fade = Math.min(1, Math.min(t, 1 - t) * 6);
       const alpha = 0.85 * fade;
       g.clear();
       if (alpha <= 0.01) continue;
       const p = pointAlongPath(entry.path, t);
-      g.circle(p.x, p.y, 3.5).fill({ color: this.tailColor, alpha: alpha * 0.35 });
-      g.circle(p.x, p.y, 1.4).fill({ color: this.tailColor, alpha });
+      g.circle(p.x + off, p.y, 3.5).fill({ color: this.tailColor, alpha: alpha * 0.35 });
+      g.circle(p.x + off, p.y, 1.4).fill({ color: this.tailColor, alpha });
     }
   }
 
   destroy(): void {
     for (const e of this.entries.values()) {
       e.pathContainer.destroy();
-      e.plane.destroy();
+      for (const p of e.planes) p.destroy();
       for (const p of e.pulses) p.destroy();
     }
     this.entries.clear();

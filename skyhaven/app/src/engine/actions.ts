@@ -424,6 +424,26 @@ export function hubPickCost(state: SaveState, iata: string): number {
   return inRegion === 0 ? 0 : hubCreationCost(iata);
 }
 
+/**
+ * Switch the player's starting region before they've placed any hub.
+ * Only valid when `hubs.length === 0` — used by the first-launch hub
+ * picker so the player isn't locked into the timezone-detected default.
+ * Replaces `unlockedRegions` with `[regionId]` and re-points the
+ * pending hub-pick prompt at the chosen region.
+ */
+export function chooseStartingRegion(state: SaveState, regionId: number): SaveState {
+  if (state.hubs.length > 0) {
+    throw new ActionError('HAS_HUBS', 'Starting region locked in once you have a hub');
+  }
+  const region = getRegion(regionId);
+  if (!region) throw new ActionError('UNKNOWN_REGION', `No region ${regionId}`);
+  return {
+    ...state,
+    unlockedRegions: [regionId],
+    pendingHubPickRegion: regionId,
+  };
+}
+
 /** Dismiss the pending hub-pick prompt without picking (UI Skip button). */
 export function dismissHubPick(state: SaveState): SaveState {
   if (state.pendingHubPickRegion === null) return state;
