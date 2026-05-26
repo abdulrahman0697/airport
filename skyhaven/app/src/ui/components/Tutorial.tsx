@@ -1,6 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useState } from 'react';
-import { selectTailColor, selectTutorial, useGameStore } from '../../state/store';
+import {
+  selectTailColor,
+  selectTutorialCompleted,
+  selectTutorialStep,
+  useGameStore,
+} from '../../state/store';
 
 /**
  * Playable tutorial (BRD §5.2).
@@ -68,7 +73,8 @@ const STEPS: readonly StepShape[] = [
 ];
 
 export function Tutorial() {
-  const { completed, step } = useGameStore(selectTutorial);
+  const completed = useGameStore(selectTutorialCompleted);
+  const step = useGameStore(selectTutorialStep);
   const tailColor = useGameStore(selectTailColor);
   const airlineName = useGameStore((s) => s.state?.airlineName ?? '');
   const advance = useGameStore((s) => s.advanceTutorial);

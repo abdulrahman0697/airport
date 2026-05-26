@@ -177,10 +177,12 @@ export const selectCollectibles = (s: GameStore) => s.state?.collectibles ?? EMP
 export const selectVintage = (s: GameStore) => s.state?.vintage ?? EMPTY_STRINGS;
 export const selectEcoRating = (s: GameStore) => s.state?.ecoRating ?? 0;
 export const selectPendingVintageDrop = (s: GameStore) => s.state?.pendingVintageDrop ?? null;
-export const selectTutorial = (s: GameStore) => ({
-  completed: s.state?.tutorialCompleted ?? true,
-  step: s.state?.tutorialStep ?? 0,
-});
+// NB: do NOT return composite objects from selectors —
+// useSyncExternalStore compares snapshots by reference and a fresh
+// `{ completed, step }` literal each call drives the render loop until
+// it trips React #185.
+export const selectTutorialCompleted = (s: GameStore) => s.state?.tutorialCompleted ?? true;
+export const selectTutorialStep = (s: GameStore) => s.state?.tutorialStep ?? 0;
 export const selectGoalChainStep = (s: GameStore) => s.state?.goalChainStep ?? 0;
 export const selectPendingOfflineSummary = (s: GameStore) => s.state?.pendingOfflineSummary ?? null;
 export const selectPendingDailyReward = (s: GameStore) => s.state?.pendingDailyReward ?? null;

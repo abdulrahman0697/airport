@@ -1,7 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { GOAL_CHAIN, GOAL_COUNT } from '../../engine/goalChain';
-import { selectGoalChainStep, selectTutorial, useGameStore } from '../../state/store';
+import {
+  selectGoalChainStep,
+  selectTutorialCompleted,
+  useGameStore,
+} from '../../state/store';
 import { formatCash } from '../format';
 
 /**
@@ -14,7 +18,7 @@ import { formatCash } from '../format';
 const FLIP_DURATION_MS = 1800;
 
 export function GoalChainCard() {
-  const tutorial = useGameStore(selectTutorial);
+  const tutorialCompleted = useGameStore(selectTutorialCompleted);
   const step = useGameStore(selectGoalChainStep);
   const previousStepRef = useRef<number>(step);
   const [flip, setFlip] = useState<{ rewardedStep: number; reward: number } | null>(null);
@@ -34,7 +38,7 @@ export function GoalChainCard() {
     return undefined;
   }, [step]);
 
-  if (!tutorial.completed) return null;
+  if (!tutorialCompleted) return null;
   if (step >= GOAL_COUNT && !flip) return null;
 
   const current = step < GOAL_COUNT ? GOAL_CHAIN[step] : null;
