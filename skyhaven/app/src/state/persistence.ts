@@ -21,19 +21,38 @@ import type { SaveState } from '../engine/types';
 const KEY_MAIN = 'skyhaven.savegame';
 const KEY_BAK = 'skyhaven.savegame.bak';
 
-export async function loadSave(): Promise<SaveState | null> {
+export async function loadSave(nowMs: number): Promise<SaveState | null> {
   for (const key of [KEY_MAIN, KEY_BAK] as const) {
     try {
       const { value } = await Preferences.get({ key });
       if (!value) continue;
       const parsed = JSON.parse(value);
-      return migrate(parsed);
+      const migrated = migrate(parsed, nowMs);
+      return rebaseSchedulerFields(migrated, nowMs);
     } catch (err) {
       // eslint-disable-next-line no-console
       console.warn(`[skyhaven] failed to load save from ${key}:`, err);
     }
   }
   return null;
+}
+
+/**
+ * After loading, if any scheduler timestamps are absurdly far in the
+ * past (e.g. a save migrated with a buggy v1→v2 that defaulted them
+ * to 0), bump them forward so the next tick doesn't iterate billions
+ * of catch-up rolls.
+ */
+function rebaseSchedulerFields(state: SaveState, nowMs: number): SaveState {
+  const stale = (ts: number): boolean => ts < nowMs - 24 * 3600 * 1000;
+  if (!stale(state.nextEventCheckMs) && !stale(state.nextCollectibleSpawnMs)) {
+    return state;
+  }
+  return {
+    ...state,
+    nextEventCheckMs: stale(state.nextEventCheckMs) ? nowMs + 60_000 : state.nextEventCheckMs,
+    nextCollectibleSpawnMs: stale(state.nextCollectibleSpawnMs) ? nowMs + 90_000 : state.nextCollectibleSpawnMs,
+  };
 }
 
 export async function writeSave(state: SaveState): Promise<void> {

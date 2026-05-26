@@ -53,12 +53,21 @@ function tickEvents(state: SaveState, ctx: TickContext): {
   const remaining = expireEvents(state.activeEvents, ctx.nowMs);
   let seed = state.seed;
   let nextCheckMs = state.nextEventCheckMs;
+  // Defensive: if a save migrated or loaded with a far-past scheduler
+  // timestamp slips past `rebaseSchedulerFields`, the catch-up loop
+  // would burn billions of iterations. Cap at a sane horizon.
+  const MAX_CATCHUP_ROLLS = 16;
+  if (nextCheckMs < ctx.nowMs - MAX_CATCHUP_ROLLS * EVENT_CHECK_INTERVAL_MS) {
+    nextCheckMs = ctx.nowMs - MAX_CATCHUP_ROLLS * EVENT_CHECK_INTERVAL_MS;
+  }
   let events = remaining;
-  while (ctx.nowMs >= nextCheckMs) {
+  let iterations = 0;
+  while (ctx.nowMs >= nextCheckMs && iterations < MAX_CATCHUP_ROLLS) {
     const { newSeed, event } = rollEvent(seed, state.unlockedRegions, nextCheckMs);
     seed = newSeed;
     if (event) events = [...events, event];
     nextCheckMs += EVENT_CHECK_INTERVAL_MS;
+    iterations++;
   }
   return { events, seed, nextCheckMs };
 }
@@ -71,8 +80,15 @@ function tickCollectibles(state: SaveState, ctx: TickContext, seed: number): {
   const remaining = state.collectibles.filter((c) => ctx.nowMs < c.expiresAt);
   let s = seed;
   let nextSpawnMs = state.nextCollectibleSpawnMs;
+  // Same defensive clamp as `tickEvents`: keep the catch-up window
+  // bounded if the persisted timestamp slips past `rebaseSchedulerFields`.
+  const MAX_CATCHUP_SPAWNS = 16;
+  if (nextSpawnMs < ctx.nowMs - MAX_CATCHUP_SPAWNS * COLLECTIBLE_INTERVAL_MS) {
+    nextSpawnMs = ctx.nowMs - MAX_CATCHUP_SPAWNS * COLLECTIBLE_INTERVAL_MS;
+  }
   let collectibles = remaining;
-  while (ctx.nowMs >= nextSpawnMs) {
+  let iterations = 0;
+  while (ctx.nowMs >= nextSpawnMs && iterations < MAX_CATCHUP_SPAWNS) {
     s = nextSeed(s);
     if (uniform(s) < COLLECTIBLE_SPAWN_PROBABILITY && collectibles.length < 3) {
       s = nextSeed(s);
@@ -100,6 +116,7 @@ function tickCollectibles(state: SaveState, ctx: TickContext, seed: number): {
       }
     }
     nextSpawnMs += COLLECTIBLE_INTERVAL_MS;
+    iterations++;
   }
   return { collectibles, seed: s, nextSpawnMs };
 }

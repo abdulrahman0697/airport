@@ -5,31 +5,38 @@
  * `from + 1`. The runner walks the chain from the persisted version up
  * to `CURRENT_SCHEMA_VERSION`. Forward-only — we never downgrade a save.
  *
+ * Migrations are passed `nowMs` so they can seed timestamp fields (next
+ * event check, next collectible spawn, etc.) relative to wall-clock
+ * time. Setting these to `0` is a bug: the v6 tick rolls events in a
+ * `while (ctx.nowMs >= nextCheckMs)` loop and overshoots by billions
+ * of iterations.
+ *
  * Every breaking change to `SaveState` adds:
  *   1) A migration here.
  *   2) A bump of `CURRENT_SCHEMA_VERSION` in `types.ts`.
- *   3) A test case below pinning the migration's input → output shape.
- *
- * The Phase 2 baseline is v1 (no prior schema).
+ *   3) A test case in `migrations.test.ts`.
  */
 
 import { CURRENT_SCHEMA_VERSION } from './types';
 import type { SaveState } from './types';
 
-type Migration = (input: Record<string, unknown>) => Record<string, unknown>;
+type Migration = (
+  input: Record<string, unknown>,
+  nowMs: number,
+) => Record<string, unknown>;
 
 const MIGRATIONS: Record<number, Migration> = {
   // v1 → v2 (Phase 6): introduce live events + roaming collectibles.
-  // Each pre-Phase-6 save just needs the new arrays defaulted to empty
-  // and the next-spawn timers reset to 0 so the tick rolls them on its
-  // first pass after upgrade.
-  1: (s) => ({
+  // Seed next-check / next-spawn timestamps in the near future so the
+  // first post-migration tick doesn't try to catch up the schedule
+  // from the Unix epoch.
+  1: (s, nowMs) => ({
     ...s,
     schemaVersion: 2,
     activeEvents: [],
     collectibles: [],
-    nextEventCheckMs: 0,
-    nextCollectibleSpawnMs: 0,
+    nextEventCheckMs: nowMs + 60_000,
+    nextCollectibleSpawnMs: nowMs + 90_000,
   }),
 };
 
@@ -37,7 +44,7 @@ const MIGRATIONS: Record<number, Migration> = {
  * Bring a persisted save up to the current schema. Throws if the save
  * is from a newer version than the running app supports.
  */
-export function migrate(raw: unknown): SaveState {
+export function migrate(raw: unknown, nowMs: number): SaveState {
   if (raw === null || typeof raw !== 'object') {
     throw new Error('migrate: input is not an object');
   }
@@ -52,7 +59,7 @@ export function migrate(raw: unknown): SaveState {
   for (let v = startVersion; v < CURRENT_SCHEMA_VERSION; v++) {
     const step = MIGRATIONS[v];
     if (!step) throw new Error(`Missing migration ${v} → ${v + 1}`);
-    cur = step(cur);
+    cur = step(cur, nowMs);
   }
   return cur as unknown as SaveState;
 }

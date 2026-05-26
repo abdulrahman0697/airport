@@ -56,7 +56,7 @@ export function createGameLoop(deps: GameLoopDeps = { now: () => Date.now() }): 
     async start(): Promise<void> {
       if (intervalId) return;
 
-      const restored = await loadSave();
+      const restored = await loadSave(deps.now());
       const initial = restored ?? createInitialState(deps.now());
       useGameStore.getState().setState(initial);
 

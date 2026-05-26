@@ -28,7 +28,7 @@ describe('writeSave / loadSave', () => {
     const s = createInitialState(123);
     s.cash = 999_999;
     await writeSave(s);
-    const back = await loadSave();
+    const back = await loadSave(Date.now());
     expect(back?.cash).toBe(999_999);
   });
 
@@ -37,12 +37,12 @@ describe('writeSave / loadSave', () => {
     s.cash = 42;
     await writeSave(s);
     prefsStore.set('skyhaven.savegame', '{not valid json');
-    const back = await loadSave();
+    const back = await loadSave(Date.now());
     expect(back?.cash).toBe(42);
   });
 
   it('returns null when no save exists', async () => {
-    expect(await loadSave()).toBeNull();
+    expect(await loadSave(Date.now())).toBeNull();
   });
 });
 
@@ -77,7 +77,7 @@ describe('createSaveScheduler — the bug the user hit', () => {
     cash = 75_000;
     await scheduler.flushNow();
 
-    const back = await loadSave();
+    const back = await loadSave(Date.now());
     expect(back?.cash).toBe(75_000);
     scheduler.dispose();
     vi.useRealTimers();
