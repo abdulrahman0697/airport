@@ -213,6 +213,7 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
     if (!REDUCED_MOTION) {
       camera.tick(dtMs);
       clouds.tick(dtMs);
+      arcsLayer.tick(dtMs);
     }
     collectiblesLayer.tick(dtMs);
     applyCamera();

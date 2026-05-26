@@ -22,6 +22,7 @@ import {
   useGameStore,
 } from '../../state/store';
 import { formatCash, formatRate } from '../format';
+import { haptics } from '../juice/haptics';
 
 export function RoutesPanel() {
   const [tab, setTab] = useState<'routes' | 'hubs' | 'regions'>('routes');
@@ -340,8 +341,8 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
   const onConfirm = (): void => {
     if (!selectedAc) return;
     const res = openRoute(originIata, destIata, selectedAc.uid);
-    if (res.ok) onClose();
-    else setError(res.message);
+    if (res.ok) { haptics.heavy(); onClose(); }
+    else { haptics.warning(); setError(res.message); }
   };
 
   return (

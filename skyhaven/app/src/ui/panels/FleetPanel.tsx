@@ -19,6 +19,7 @@ import {
   useGameStore,
 } from '../../state/store';
 import { formatCash } from '../format';
+import { haptics } from '../juice/haptics';
 import { VintageHangar } from './VintageHangar';
 
 type BuyCategoryFilter = 'passenger' | 'cargo';
@@ -98,10 +99,14 @@ function FleetRow({ aircraft }: { aircraft: OwnedAircraft }) {
 
   const tryUpgrade = (kind: UpgradeKind): void => {
     const res = applyUpgrade(aircraft.uid, kind);
+    if (res.ok) haptics.light();
+    else haptics.warning();
     setErrorMsg(res.ok ? null : res.message);
   };
   const tryRepair = (): void => {
     const res = repair(aircraft.uid);
+    if (res.ok) haptics.medium();
+    else haptics.warning();
     setErrorMsg(res.ok ? null : res.message);
   };
 
@@ -234,6 +239,8 @@ function BuyRow({ def, unlocked }: { def: AircraftDef; unlocked: boolean }) {
 
   const tryBuy = (): void => {
     const res = buy(def.id);
+    if (res.ok) haptics.medium();
+    else haptics.warning();
     setError(res.ok ? null : res.message);
   };
 

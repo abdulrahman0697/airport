@@ -43,6 +43,7 @@ export function PanelHost() {
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
           transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+          className="glass-shimmer"
           style={panelShell as Record<string, unknown>}
         >
           <button onClick={close} style={closeBtn} aria-label="Close panel">×</button>

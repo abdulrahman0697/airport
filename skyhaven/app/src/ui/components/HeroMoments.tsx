@@ -1,0 +1,193 @@
+import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
+import { aircraftByTier } from '../../data/aircraft';
+import { getRegion } from '../../data/regions';
+import {
+  selectTailColor,
+  selectTier,
+  selectUnlockedRegions,
+  useGameStore,
+} from '../../state/store';
+import { haptics } from '../juice/haptics';
+
+/**
+ * Hero moments (BRD §9.4).
+ *
+ * Phase 10 ships the screen-wide celebration for two big events:
+ *   - tier unlocks  (Tier N becomes buyable)
+ *   - region unlocks (a new region opens up)
+ *
+ * Each shows a full-screen bloom + headline card. Both watch state
+ * via useRef snapshots so they fire only on the upward transition,
+ * never on initial mount or load.
+ */
+
+interface QueuedMoment {
+  id: string;
+  kind: 'tier' | 'region';
+  primary: string;     // big headline
+  secondary: string;   // subtitle
+  accent: string;      // accent color (defaults to tail)
+  bodyLines: string[]; // bullet/explanatory lines
+}
+
+export function HeroMoments() {
+  const tier = useGameStore(selectTier);
+  const regions = useGameStore(selectUnlockedRegions);
+  const tailColor = useGameStore(selectTailColor);
+
+  const prevTier = useRef(tier);
+  const prevRegions = useRef(regions);
+  const [queue, setQueue] = useState<QueuedMoment[]>([]);
+
+  useEffect(() => {
+    if (tier > prevTier.current) {
+      const newTier = tier;
+      const examples = aircraftByTier(newTier).slice(0, 3).map((a) => a.displayName);
+      setQueue((q) => [...q, {
+        id: `tier-${newTier}-${Date.now()}`,
+        kind: 'tier',
+        primary: `Tier ${newTier} unlocked`,
+        secondary: tierLabel(newTier),
+        accent: tailColor,
+        bodyLines: examples.length ? [`New aircraft available:`, examples.join(' · ')] : [],
+      }]);
+      haptics.success();
+    }
+    prevTier.current = tier;
+  }, [tier, tailColor]);
+
+  useEffect(() => {
+    // Detect any new region that wasn't there before.
+    const prev = new Set(prevRegions.current);
+    const additions: number[] = [];
+    for (const r of regions) if (!prev.has(r)) additions.push(r);
+    if (additions.length > 0) {
+      const newOnes = additions.map((id) => {
+        const def = getRegion(id);
+        return {
+          id: `region-${id}-${Date.now()}`,
+          kind: 'region' as const,
+          primary: def?.name ?? `Region ${id}`,
+          secondary: 'Region unlocked',
+          accent: tailColor,
+          bodyLines: ['New airports available in this region — open routes to anywhere here.'],
+        };
+      });
+      setQueue((q) => [...q, ...newOnes]);
+      haptics.success();
+    }
+    prevRegions.current = regions;
+  }, [regions, tailColor]);
+
+  const top = queue[0] ?? null;
+  const dismiss = (): void => setQueue((q) => q.slice(1));
+
+  return (
+    <AnimatePresence>
+      {top && (
+        <motion.div
+          key={top.id}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.25 }}
+          style={backdrop(top.accent) as Record<string, unknown>}
+          onClick={dismiss}
+        >
+          <motion.div
+            initial={{ scale: 0.7, y: 30, opacity: 0, rotate: -2 }}
+            animate={{ scale: 1, y: 0, opacity: 1, rotate: 0 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 360, damping: 22 }}
+            onClick={(e): void => e.stopPropagation()}
+            style={card(top.accent) as Record<string, unknown>}
+          >
+            <div style={{ ...accentBar, background: top.accent }} />
+            <div style={inner}>
+              <div style={{ ...kicker, color: top.accent }}>{top.secondary}</div>
+              <h1 style={{ ...primary, textShadow: `0 0 32px ${top.accent}55` }}>{top.primary}</h1>
+              {top.bodyLines.length > 0 && (
+                <div style={body}>
+                  {top.bodyLines.map((line, i) => (
+                    <p key={i} style={{ margin: i === 0 ? '0 0 4px' : '0' }}>{line}</p>
+                  ))}
+                </div>
+              )}
+              <button onClick={dismiss} style={{ ...btn, background: top.accent }}>
+                Onwards
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function tierLabel(t: number): string {
+  switch (t) {
+    case 2: return 'Regional Jets are yours';
+    case 3: return 'Narrow-body fleet unlocked';
+    case 4: return 'Modern narrow-bodies online';
+    case 5: return 'Wide-bodies + the Cargo lane';
+    case 6: return 'Modern wide-bodies online';
+    case 7: return 'Heavy / flagship aircraft';
+    case 8: return 'Mega-Liner class unlocked';
+    default: return `Tier ${t}`;
+  }
+}
+
+// ─── Styles ──────────────────────────────────────────────────────────
+const backdrop = (accent: string): React.CSSProperties => ({
+  position: 'fixed',
+  inset: 0,
+  display: 'grid',
+  placeItems: 'center',
+  background: `radial-gradient(ellipse at center, ${accent}22, rgba(0,0,0,0.78) 60%)`,
+  backdropFilter: 'blur(4px)',
+  zIndex: 70,
+  padding: 16,
+});
+const card = (accent: string): React.CSSProperties => ({
+  width: '100%',
+  maxWidth: 380,
+  background: 'linear-gradient(160deg, #182143, #0B1120)',
+  borderRadius: 18,
+  overflow: 'hidden',
+  border: `1px solid ${accent}66`,
+  boxShadow: `0 24px 70px rgba(0,0,0,0.6), 0 0 80px ${accent}33`,
+});
+const accentBar: React.CSSProperties = { height: 5 };
+const inner: React.CSSProperties = { padding: '24px 24px 20px', textAlign: 'center' };
+const kicker: React.CSSProperties = {
+  fontSize: 11,
+  letterSpacing: '0.22em',
+  textTransform: 'uppercase',
+  fontWeight: 700,
+};
+const primary: React.CSSProperties = {
+  margin: '8px 0 6px',
+  fontSize: 30,
+  color: '#F8FAFC',
+  fontWeight: 800,
+  lineHeight: 1.2,
+};
+const body: React.CSSProperties = {
+  margin: '12px 0 16px',
+  color: '#94A3B8',
+  fontSize: 13,
+  lineHeight: 1.5,
+};
+const btn: React.CSSProperties = {
+  width: '100%',
+  padding: '12px 14px',
+  borderRadius: 10,
+  border: 0,
+  color: '#0B1120',
+  fontWeight: 800,
+  fontSize: 14,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  minHeight: 44,
+};

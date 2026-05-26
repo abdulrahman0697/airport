@@ -3,6 +3,7 @@ import { MANAGER_DEFS, managerCost } from '../../data/managers';
 import type { Hub } from '../../engine/types';
 import { selectCash, selectHubs, useGameStore } from '../../state/store';
 import { formatCash } from '../format';
+import { haptics } from '../juice/haptics';
 
 export function CrewPanel() {
   const hubs = useGameStore(selectHubs);
@@ -61,6 +62,8 @@ function HubBlock({ hub }: { hub: Hub }) {
                 <button
                   onClick={(): void => {
                     const res = hire(hub.iata, m.kind);
+                    if (res.ok) haptics.success();
+                    else haptics.warning();
                     setError(res.ok ? null : res.message);
                   }}
                   disabled={!afford}
