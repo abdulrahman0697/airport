@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "354002953206-5p0np28bt9d422uum25066j3vg3mhhjf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.skyhaven.tycoon",
+            "certificate_hash": "069efd1e9c82ddea1e386ceac11051bf36e2bde9"
+          }
+        },
+        {
           "client_id": "354002953206-eltdcikvbuq1u4fonf3c5ggknp87niu4.apps.googleusercontent.com",
           "client_type": 3
         }
