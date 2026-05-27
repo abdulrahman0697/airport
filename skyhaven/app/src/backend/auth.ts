@@ -95,6 +95,10 @@ export async function ensureAnonymous(): Promise<AuthUser | null> {
   }
 }
 
+export type GoogleSignInResult =
+  | { ok: true; user: AuthUser | null }
+  | { ok: false; code: string; message: string };
+
 /**
  * Sign in with Google.
  *
@@ -106,32 +110,42 @@ export async function ensureAnonymous(): Promise<AuthUser | null> {
  * On the web (developer-only path) we use `signInWithPopup`, falling
  * back to `signInWithRedirect` if the popup is blocked.
  *
- * Returns the new auth user, or null if the player cancelled / no
- * network / popup-fallback redirected away.
+ * Returns `{ ok: true, user }` on success (user may be null when the
+ * web path falls back to a redirect), or `{ ok: false, code, message }`
+ * with the actual error so the UI can surface a useful diagnostic.
  */
-export async function signInWithGoogle(): Promise<AuthUser | null> {
+export async function signInWithGoogle(): Promise<GoogleSignInResult> {
   const auth = getFirebaseAuth();
   try {
     if (Capacitor.isNativePlatform()) {
       const result = await FirebaseAuthentication.signInWithGoogle();
       const idToken = result.credential?.idToken;
-      if (!idToken) return null;
+      if (!idToken) {
+        return {
+          ok: false,
+          code: 'no-id-token',
+          message: 'No ID token returned from Google. Check the SHA-1 fingerprint and that Google sign-in is enabled in Firebase Console.',
+        };
+      }
       const credential = GoogleAuthProvider.credential(idToken);
       const out = await signInWithCredential(auth, credential);
-      return toAuthUser(out.user);
+      return { ok: true, user: toAuthUser(out.user) };
     }
     const provider = new GoogleAuthProvider();
     try {
       const out = await signInWithPopup(auth, provider);
-      return toAuthUser(out.user);
+      return { ok: true, user: toAuthUser(out.user) };
     } catch {
       await signInWithRedirect(auth, provider);
-      return null;
+      return { ok: true, user: null };
     }
   } catch (err) {
+    const e = err as { code?: string; message?: string };
+    const code = e?.code ?? 'unknown';
+    const message = e?.message ?? String(err);
     // eslint-disable-next-line no-console
-    console.warn('[skyhaven] Google sign-in failed', err);
-    return null;
+    console.warn('[skyhaven] Google sign-in failed', { code, message, err });
+    return { ok: false, code, message };
   }
 }
 

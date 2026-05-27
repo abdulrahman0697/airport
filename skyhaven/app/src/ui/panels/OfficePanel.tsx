@@ -233,9 +233,15 @@ function CloudAccountCard() {
 
   const onSignIn = async (): Promise<void> => {
     setBusy(true); setError(null);
-    const next = await signInWithGoogle();
+    const res = await signInWithGoogle();
     setBusy(false);
-    if (!next) setError("Couldn't sign in. Check connection or try again.");
+    if (!res.ok) {
+      // Surface the real failure (code + message) so misconfig like a
+      // missing SHA-1 or a disabled Google provider in the Firebase
+      // Console is diagnosable from the device instead of a vague
+      // "check connection" string.
+      setError(`${res.code}: ${res.message}`);
+    }
   };
   const onSignOut = async (): Promise<void> => {
     setBusy(true); setError(null);
