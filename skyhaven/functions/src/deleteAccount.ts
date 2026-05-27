@@ -29,6 +29,12 @@ export const deleteAccount = onCall(
 
     batch.delete(db.collection('players').doc(uid));
 
+    // Profile + reverse-indexed friend code (Phase 12.2).
+    const profileSnap = await db.collection('profiles').doc(uid).get();
+    const friendCode = profileSnap.data()?.friendCode as string | undefined;
+    batch.delete(db.collection('profiles').doc(uid));
+    if (friendCode) batch.delete(db.collection('friendCodes').doc(friendCode));
+
     for (const board of BOARD_IDS) {
       batch.delete(db.collection('leaderboards').doc(board).collection('entries').doc(uid));
     }

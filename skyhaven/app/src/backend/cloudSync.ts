@@ -18,6 +18,7 @@ import {
   pushSave,
 } from './cloudSave';
 import { submitAllBoards } from './leaderboards';
+import { pushProfile } from './profiles';
 import { cashPerSecond } from '../engine/economy';
 import { getAircraftDef } from '../data/aircraft';
 import { BOARDS } from '../data/leaderboards';
@@ -81,6 +82,10 @@ export function startCloudSync(): CloudSync {
           photoUrl: currentUser?.photoUrl ?? null,
         };
         void submitAllBoards(entriesFromState(state), meta);
+        // Public profile mirror rides the same throttle window so
+        // friends see fresh airline name / tier / lifetime without
+        // hitting Firestore on every tick.
+        void pushProfile(state);
       };
       if (since >= LEADERBOARD_INTERVAL_MS) fire();
       else if (!leaderboardTimer) {

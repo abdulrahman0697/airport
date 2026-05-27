@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { signInWithGoogle, signOut } from '../../backend/auth';
 import { useAuth } from '../../backend/useAuth';
+import { FriendsCard } from '../components/FriendsCard';
 import { AIRCRAFT_DEFS, getAircraftDef } from '../../data/aircraft';
 import { CLASSIC_DEFS } from '../../data/classics';
 import { getRegion, REGIONS } from '../../data/regions';
@@ -101,6 +102,8 @@ export function OfficePanel() {
         </section>
 
         <CloudAccountCard />
+
+        <FriendsCard />
 
         {/* Tier progress */}
         <section style={card}>

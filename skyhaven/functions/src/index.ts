@@ -12,6 +12,11 @@ initializeApp();
 
 export { submitLeaderboardScore } from './leaderboards';
 export { deleteAccount } from './deleteAccount';
+export {
+  claimFriendCode,
+  sendFriendRequest,
+  expireOldFriendRequests,
+} from './friends';
 
 /** Liveness probe — useful from the Firebase emulator + cold-start
  *  warm-up. Returns the deployment phase so we can confirm what's

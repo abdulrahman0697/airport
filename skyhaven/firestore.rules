@@ -10,13 +10,36 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
-    // Friend graph (Phase 12).
+    // Public profile (Phase 12). Anyone authed can read to look up
+    // friend codes / display names; only the owner can write.
+    match /profiles/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Friend code reverse index (Phase 12). Cloud Functions only —
+    // ensuring atomic claim-or-reject for uniqueness.
+    match /friendCodes/{code} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Friend graph (Phase 12). Cloud Functions own creation so doc IDs
+    // stay canonical and statuses can't be forged. Participants can
+    // update (accept) or delete (decline / unfriend) directly.
     match /friendships/{docId} {
       allow read: if request.auth != null
         && (request.auth.uid == resource.data.aUid || request.auth.uid == resource.data.bUid);
-      allow create: if request.auth != null
-        && (request.auth.uid == request.resource.data.aUid || request.auth.uid == request.resource.data.bUid);
-      allow update, delete: if request.auth != null
+      allow create: if false;
+      allow update: if request.auth != null
+        && (request.auth.uid == resource.data.aUid || request.auth.uid == resource.data.bUid)
+        // Only the recipient may flip status to accepted.
+        && (
+          request.resource.data.status == resource.data.status
+          || (request.resource.data.status == 'accepted'
+              && request.auth.uid != resource.data.requestedByUid)
+        );
+      allow delete: if request.auth != null
         && (request.auth.uid == resource.data.aUid || request.auth.uid == resource.data.bUid);
     }
 
