@@ -18,6 +18,8 @@ export {
   expireOldFriendRequests,
 } from './friends';
 export { sendGift, claimGift } from './gifts';
+export { publishScheduledEvents } from './scheduledEvents';
+export { sendComebackPush } from './comebackPush';
 
 /** Liveness probe — useful from the Firebase emulator + cold-start
  *  warm-up. Returns the deployment phase so we can confirm what's

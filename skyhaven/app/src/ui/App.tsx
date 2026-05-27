@@ -31,6 +31,11 @@ export function App() {
       const mod = await import('../backend/cloudSync');
       const cloud = mod.startCloudSync();
       stopCloud = (): void => cloud.stop();
+      // Push notifications (Phase 13.2). Lazy too — adds ~3 KB on the
+      // critical path otherwise and is irrelevant on web. The init
+      // function is idempotent + silent on the web target.
+      const push = await import('../backend/push');
+      void push.initPushNotifications();
     })();
     return () => {
       void loop.stop();

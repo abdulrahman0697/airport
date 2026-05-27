@@ -16,6 +16,7 @@ import {
   acknowledgeVintageDrop as acknowledgeVintageDropAction,
   ActionError,
   advanceTutorial as advanceTutorialAction,
+  applyServerEvents as applyServerEventsAction,
   applyUpgrade as applyUpgradeAction,
   buyAircraft as buyAircraftAction,
   chooseStartingRegion as chooseStartingRegionAction,
@@ -79,6 +80,8 @@ interface GameStore {
   claimDailyReward: () => ActionResult;
   /** Credit a claimed friend gift to the local state (Phase 12.3). */
   creditGift: (kind: 'cash' | 'fuel', amount: number) => ActionResult;
+  /** Merge server-published events into local activeEvents (Phase 13.1). */
+  applyServerEvents: (events: readonly import('../engine/types').ActiveEvent[]) => void;
   setOfflineSummary: (s: { elapsedMs: number; earnings: number } | null) => void;
   /** Apply daily-login streak using the current wall clock. */
   applyDailyLoginNow: () => void;
@@ -163,6 +166,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     runAction(set, get, (s) => acknowledgeOfflineSummaryAction(s)),
   claimDailyReward: () => runAction(set, get, (s) => claimDailyRewardAction(s)),
   creditGift: (kind, amount) => runAction(set, get, (s) => creditGiftAction(s, kind, amount)),
+  applyServerEvents: (events): void => {
+    const cur = get().state;
+    if (!cur) return;
+    set({ state: applyServerEventsAction(cur, events, Date.now()) });
+  },
   setOfflineSummary: (summary): void => {
     const cur = get().state;
     if (!cur) return;

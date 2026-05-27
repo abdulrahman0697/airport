@@ -19,6 +19,7 @@ import {
 } from './cloudSave';
 import { submitAllBoards } from './leaderboards';
 import { pushProfile } from './profiles';
+import { subscribeServerEvents } from './serverEvents';
 import { cashPerSecond } from '../engine/economy';
 import { getAircraftDef } from '../data/aircraft';
 import { BOARDS } from '../data/leaderboards';
@@ -127,12 +128,20 @@ export function startCloudSync(): CloudSync {
       scheduleLeaderboard();
     });
 
+    // Server-driven event stream (Phase 13.1). Doesn't depend on
+    // sign-in: the Firestore rules allow auth-read on events/, and
+    // the events themselves are publicly visible to every player.
+    const serverEvents = subscribeServerEvents((events) => {
+      useGameStore.getState().applyServerEvents(events);
+    });
+
     void ensureAnonymous();
 
     return {
       stop(): void {
         unsubAuth();
         unsubStore();
+        serverEvents.stop();
         if (leaderboardTimer) { clearTimeout(leaderboardTimer); leaderboardTimer = null; }
         void throttle.flush();
       },

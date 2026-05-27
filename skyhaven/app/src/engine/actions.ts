@@ -562,6 +562,37 @@ export function setOfflineSummary(
 }
 
 // ─── Claim collectible ───────────────────────────────────────────────
+// ─── Apply server-driven events (Phase 13.1) ────────────────────────
+/**
+ * Merge an array of server-published events into local activeEvents.
+ *
+ * - Dedup by event id: an event already present (whether from the
+ *   client xorshift roller or a previous server materialisation) is
+ *   left untouched.
+ * - Skip events whose effects have already ended (`startedAt +
+ *   durationMs < nowMs`) — they have nothing to render.
+ * - Otherwise insert with the server-provided announcedAt /
+ *   startedAt / durationMs so the existing UI banner + popup logic
+ *   in EventBanner.tsx / EventPopup.tsx handles them identically to
+ *   client-rolled events.
+ */
+export function applyServerEvents(
+  state: SaveState,
+  serverEvents: readonly import('./types').ActiveEvent[],
+  nowMs: number,
+): SaveState {
+  if (serverEvents.length === 0) return state;
+  const known = new Set(state.activeEvents.map((e) => e.id));
+  const toAdd: import('./types').ActiveEvent[] = [];
+  for (const e of serverEvents) {
+    if (known.has(e.id)) continue;
+    if (e.startedAt + e.durationMs <= nowMs) continue;
+    toAdd.push(e);
+  }
+  if (toAdd.length === 0) return state;
+  return { ...state, activeEvents: [...state.activeEvents, ...toAdd] };
+}
+
 export function claimCollectible(state: SaveState, id: string): SaveState {
   const idx = state.collectibles.findIndex((c) => c.id === id);
   if (idx < 0) throw new ActionError('NO_COLLECTIBLE', `No collectible ${id}`);

@@ -55,7 +55,12 @@
     "feature_flag_cargo": { "defaultValue": { "value": "true" }, "valueType": "BOOLEAN" },
     "feature_flag_leaderboards": { "defaultValue": { "value": "false" }, "valueType": "BOOLEAN" },
     "feature_flag_social": { "defaultValue": { "value": "false" }, "valueType": "BOOLEAN" },
-    "feature_flag_events": { "defaultValue": { "value": "false" }, "valueType": "BOOLEAN" }
+    "feature_flag_events": { "defaultValue": { "value": "false" }, "valueType": "BOOLEAN" },
+    "event_schedule": {
+      "defaultValue": { "value": "[]" },
+      "valueType": "STRING",
+      "description": "JSON array of {id, kind, regionId, startsAtMs, endsAtMs, announceLeadMs} scheduled events. Phase 13 lets us launch events without an app update."
+    }
   },
   "version": {
     "description": "Phase 0 defaults — economy live-tuning lands as phases come online."
