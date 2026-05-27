@@ -21,6 +21,7 @@ import {
   buyAircraft as buyAircraftAction,
   chooseStartingRegion as chooseStartingRegionAction,
   claimCollectible as claimCollectibleAction,
+  claimDailyMission as claimDailyMissionAction,
   claimDailyReward as claimDailyRewardAction,
   closeRoute as closeRouteAction,
   completeTutorial as completeTutorialAction,
@@ -78,6 +79,7 @@ interface GameStore {
   resetTutorial: () => ActionResult;
   acknowledgeOfflineSummary: () => ActionResult;
   claimDailyReward: () => ActionResult;
+  claimDailyMission: (missionId: string) => ActionResult;
   /** Credit a claimed friend gift to the local state (Phase 12.3). */
   creditGift: (kind: 'cash' | 'fuel', amount: number) => ActionResult;
   /** Merge server-published events into local activeEvents (Phase 13.1). */
@@ -165,6 +167,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   acknowledgeOfflineSummary: () =>
     runAction(set, get, (s) => acknowledgeOfflineSummaryAction(s)),
   claimDailyReward: () => runAction(set, get, (s) => claimDailyRewardAction(s)),
+  claimDailyMission: (missionId) => runAction(set, get, (s) => claimDailyMissionAction(s, missionId)),
   creditGift: (kind, amount) => runAction(set, get, (s) => creditGiftAction(s, kind, amount)),
   applyServerEvents: (events): void => {
     const cur = get().state;
@@ -211,6 +214,7 @@ export const selectActiveEvents = (s: GameStore) => s.state?.activeEvents ?? EMP
 export const selectCollectibles = (s: GameStore) => s.state?.collectibles ?? EMPTY_COLLECTIBLES;
 export const selectVintage = (s: GameStore) => s.state?.vintage ?? EMPTY_STRINGS;
 export const selectAchievements = (s: GameStore) => s.state?.achievements ?? EMPTY_STRINGS;
+export const selectDailyMissions = (s: GameStore) => s.state?.dailyMissions ?? null;
 export const selectEcoRating = (s: GameStore) => s.state?.ecoRating ?? 0;
 export const selectPendingVintageDrop = (s: GameStore) => s.state?.pendingVintageDrop ?? null;
 // NB: do NOT return composite objects from selectors —

@@ -8,7 +8,7 @@
  * `migrations.ts` and bumps `CURRENT_SCHEMA_VERSION`.
  */
 
-export const CURRENT_SCHEMA_VERSION = 7;
+export const CURRENT_SCHEMA_VERSION = 8;
 
 export type AircraftCategory = 'passenger' | 'cargo' | 'classic';
 export type RoutePricing = 'economy' | 'balanced' | 'premium';
@@ -178,4 +178,42 @@ export interface SaveState {
    * Null when no pick is outstanding.
    */
   pendingHubPickRegion: number | null;
+
+  // ── Retention (Phase 14) ─────────────────────────────────────────
+  /** Today's missions (BRD §14). `null` until first roll of the day. */
+  dailyMissions: DailyMissionState | null;
+  /**
+   * Snapshot of SaveState fields needed for mission progress at the
+   * moment the day rolled over. Allows missions like "earn $X today"
+   * to compute deltas without piling per-mission counters into the
+   * tick.
+   */
+  dailyMissionSnapshot: DailyMissionSnapshot | null;
+}
+
+export interface DailyMission {
+  readonly id: string;
+  readonly templateId: import('../data/dailyMissions').MissionTemplateId;
+  readonly target: number;
+  readonly reward: number;
+  /** Latest computed progress; the tick updates this opportunistically. */
+  progress: number;
+  /** Whether the player has claimed the reward. */
+  claimed: boolean;
+}
+
+export interface DailyMissionState {
+  /** Local ISO date `yyyy-mm-dd` of the roll. Mission set resets when this changes. */
+  date: string;
+  missions: DailyMission[];
+}
+
+export interface DailyMissionSnapshot {
+  date: string;
+  routesCount: number;
+  lifetimeEarnings: number;
+  managersCount: number;
+  upgradeLevels: number;
+  collectiblesCount: number;
+  conditionByUid: Record<string, number>;
 }

@@ -19,6 +19,7 @@
 import { getAircraftDef } from '../data/aircraft';
 import { loadTopAirports } from '../data/airports';
 import { evaluateAchievements } from './achievements';
+import { recomputeProgress, rollIfNeeded } from './dailyMissions';
 import { repairCost } from './condition';
 import { computeEcoScore, ecoRevenueBonus } from './eco';
 import { TIME_COMPRESSION, legDurationMs, legRevenue } from './economy';
@@ -343,7 +344,11 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
   // any reward-credited achievement (e.g. lifetime-earnings milestone)
   // contributes to the goal-chain's cash check this same tick.
   const withAchievements = evaluateAchievements(withVintage).state;
+  // Daily missions: roll new set on date change, recompute progress
+  // every tick. Cheap (K=3 templates).
+  const withDailyRoll = rollIfNeeded(withAchievements, ctx.nowMs);
+  const withDailyProgress = recomputeProgress(withDailyRoll);
   // Goal-chain auto-detection runs last so it sees the freshly-credited
   // cash + any vintage drops in the same tick.
-  return processGoalChain(withAchievements);
+  return processGoalChain(withDailyProgress);
 }

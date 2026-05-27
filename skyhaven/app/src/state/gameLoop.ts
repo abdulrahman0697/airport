@@ -20,6 +20,12 @@ import { createSaveScheduler, loadSave } from './persistence';
 import { useGameStore } from './store';
 
 const OFFLINE_SUMMARY_THRESHOLD_MS = 60_000;
+const COMEBACK_BONUS_THRESHOLD_MS = 24 * 60 * 60 * 1000;
+/** "We missed you" bonus multiplier — credited on top of the natural
+ *  offline catchup earnings when the player has been away ≥24h.
+ *  Generous enough to feel like a homecoming, not so generous that it
+ *  trivialises the day-to-day curve. */
+const COMEBACK_BONUS_MULTIPLIER = 0.5;
 
 export interface GameLoopDeps {
   now: () => number;
@@ -58,8 +64,22 @@ export function createGameLoop(deps: GameLoopDeps = { now: () => Date.now() }): 
       const after = useGameStore.getState().state;
       if (after) {
         const earnings = Math.max(0, after.cash - cashBefore);
-        if (earnings > 0) {
-          useGameStore.getState().setOfflineSummary({ elapsedMs, earnings });
+        // Comeback bonus (BRD §14): roll the welcome-back payout
+        // into the same offline-summary surface so the player sees
+        // it in one card. The bonus is computed on top of the
+        // natural offline earnings to avoid penalising newer
+        // players whose offline rate is low.
+        const comebackBonus =
+          elapsedMs >= COMEBACK_BONUS_THRESHOLD_MS
+            ? Math.round(earnings * COMEBACK_BONUS_MULTIPLIER)
+            : 0;
+        if (comebackBonus > 0) {
+          const next = { ...after, cash: after.cash + comebackBonus, lifetimeEarnings: after.lifetimeEarnings + comebackBonus };
+          useGameStore.getState().setState(next);
+        }
+        const totalEarnings = earnings + comebackBonus;
+        if (totalEarnings > 0) {
+          useGameStore.getState().setOfflineSummary({ elapsedMs, earnings: totalEarnings });
         }
       }
     }

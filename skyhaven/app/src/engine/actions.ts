@@ -85,6 +85,26 @@ export function buyAircraft(state: SaveState, defId: string): SaveState {
   return { ...state, cash: state.cash - def.basePurchaseCost, fleet: [...state.fleet, aircraft] };
 }
 
+// ─── Claim a completed daily mission (Phase 14.2) ───────────────────
+export function claimDailyMission(state: SaveState, missionId: string): SaveState {
+  if (!state.dailyMissions) {
+    throw new ActionError('NO_MISSIONS', 'No daily missions rolled yet');
+  }
+  const idx = state.dailyMissions.missions.findIndex((m) => m.id === missionId);
+  if (idx < 0) throw new ActionError('UNKNOWN_MISSION', `No mission ${missionId}`);
+  const m = state.dailyMissions.missions[idx]!;
+  if (m.claimed) throw new ActionError('ALREADY_CLAIMED', 'Already claimed');
+  if (m.progress < m.target) throw new ActionError('NOT_COMPLETE', 'Mission not yet complete');
+  const nextMissions = state.dailyMissions.missions.slice();
+  nextMissions[idx] = { ...m, claimed: true };
+  return {
+    ...state,
+    cash: state.cash + m.reward,
+    lifetimeEarnings: state.lifetimeEarnings + m.reward,
+    dailyMissions: { ...state.dailyMissions, missions: nextMissions },
+  };
+}
+
 // ─── Credit a claimed gift (Phase 12.3) ─────────────────────────────
 /**
  * Apply a friend gift to the local save state. The server-side

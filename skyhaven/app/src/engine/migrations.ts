@@ -118,6 +118,15 @@ const MIGRATIONS: Record<number, Migration> = {
       ? (s as Record<string, unknown>).createdAtMs
       : nowMs - 365 * 24 * 60 * 60 * 1000,
   }),
+  // v7 → v8 (Phase 14): daily-mission tracking. Default both fields
+  // to null so the next tick on the player's day will roll a fresh
+  // set against the live state.
+  7: (s) => ({
+    ...s,
+    schemaVersion: 8,
+    dailyMissions: null,
+    dailyMissionSnapshot: null,
+  }),
 };
 
 /**

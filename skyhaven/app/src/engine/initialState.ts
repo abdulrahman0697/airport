@@ -82,5 +82,7 @@ export function createInitialState(nowMs: number, homeRegion = 3): SaveState {
     // Home airport pick is the very first interactive tutorial step —
     // pre-set the home region so the picker knows what to offer.
     pendingHubPickRegion: homeRegion,
+    dailyMissions: null,
+    dailyMissionSnapshot: null,
   };
 }

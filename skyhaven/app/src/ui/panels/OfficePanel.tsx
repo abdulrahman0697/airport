@@ -3,6 +3,7 @@ import { signInWithGoogle, signOut } from '../../backend/auth';
 import { useAuth } from '../../backend/useAuth';
 import { ACHIEVEMENT_COUNT, frameTier, FRAME_COLORS } from '../../data/achievements';
 import { FrameBadge } from '../components/AchievementFrame';
+import { DailyMissionsCard } from '../components/DailyMissionsCard';
 import { FriendsCard } from '../components/FriendsCard';
 import { usePanelStore } from '../components/PanelHost';
 import { AIRCRAFT_DEFS, getAircraftDef } from '../../data/aircraft';
@@ -111,6 +112,8 @@ export function OfficePanel() {
         </section>
 
         <CloudAccountCard />
+
+        <DailyMissionsCard />
 
         <FriendsCard />
 
