@@ -210,6 +210,7 @@ export const selectUnlockedRegions = (s: GameStore) => s.state?.unlockedRegions 
 export const selectActiveEvents = (s: GameStore) => s.state?.activeEvents ?? EMPTY_EVENTS;
 export const selectCollectibles = (s: GameStore) => s.state?.collectibles ?? EMPTY_COLLECTIBLES;
 export const selectVintage = (s: GameStore) => s.state?.vintage ?? EMPTY_STRINGS;
+export const selectAchievements = (s: GameStore) => s.state?.achievements ?? EMPTY_STRINGS;
 export const selectEcoRating = (s: GameStore) => s.state?.ecoRating ?? 0;
 export const selectPendingVintageDrop = (s: GameStore) => s.state?.pendingVintageDrop ?? null;
 // NB: do NOT return composite objects from selectors —

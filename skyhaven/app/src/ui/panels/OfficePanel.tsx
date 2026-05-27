@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react';
 import { signInWithGoogle, signOut } from '../../backend/auth';
 import { useAuth } from '../../backend/useAuth';
+import { ACHIEVEMENT_COUNT, frameTier, FRAME_COLORS } from '../../data/achievements';
+import { FrameBadge } from '../components/AchievementFrame';
 import { FriendsCard } from '../components/FriendsCard';
+import { usePanelStore } from '../components/PanelHost';
 import { AIRCRAFT_DEFS, getAircraftDef } from '../../data/aircraft';
 import { CLASSIC_DEFS } from '../../data/classics';
 import { getRegion, REGIONS } from '../../data/regions';
@@ -9,6 +12,7 @@ import { conditionBand } from '../../engine/condition';
 import { ecoTier, ecoTierMeta } from '../../engine/eco';
 import { MAX_TIER, TIER_UNLOCK_THRESHOLDS } from '../../engine/tierUnlocks';
 import {
+  selectAchievements,
   selectActiveEvents,
   selectAirlineName,
   selectCash,
@@ -46,7 +50,9 @@ export function OfficePanel() {
   const unlocked = useGameStore(selectUnlockedRegions);
   const ecoScore = useGameStore(selectEcoRating);
   const vintage = useGameStore(selectVintage);
+  const achievements = useGameStore(selectAchievements);
   const activeEvents = useGameStore(selectActiveEvents);
+  const openPanel = usePanelStore((s) => s.open);
 
   const perMin = useMemo(() => {
     const fleetById = new Map(fleet.map((a) => [a.uid, a]));
@@ -91,12 +97,15 @@ export function OfficePanel() {
       </div>
       <div style={body}>
         {/* Airline identity card */}
-        <section style={identityCard(tailColor)}>
+        <section style={identityCard(tailColor, frameTier(achievements.length))}>
           <div style={identityRow}>
             <div style={identityChip(tailColor)} />
-            <div>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={airlineLabel}>{airlineName.toUpperCase()}</div>
-              <div style={airlineSub}>Tier {tier} of {MAX_TIER}</div>
+              <div style={airlineSubRow}>
+                <span style={airlineSub}>Tier {tier} of {MAX_TIER}</span>
+                <FrameBadge unlockedCount={achievements.length} />
+              </div>
             </div>
           </div>
         </section>
@@ -207,6 +216,33 @@ export function OfficePanel() {
               </div>
               <div style={subStat}>+{vintage.length}% global yield</div>
             </div>
+          </div>
+        </section>
+
+        {/* Achievements */}
+        <section style={card}>
+          <div style={sectionHead}>Achievements</div>
+          <div style={achievementsRow}>
+            <div>
+              <div style={achievementsCount}>
+                {achievements.length} / {ACHIEVEMENT_COUNT}
+              </div>
+              <div style={achievementsSub}>
+                {(() => {
+                  const tier = frameTier(achievements.length);
+                  const frame = FRAME_COLORS[tier];
+                  return tier === 'none'
+                    ? 'Unlock 5 to earn your first frame'
+                    : `${frame.label} frame earned`;
+                })()}
+              </div>
+            </div>
+            <button
+              onClick={(): void => openPanel('achievements')}
+              style={viewAllBtn}
+            >
+              View all →
+            </button>
           </div>
         </section>
 
@@ -356,12 +392,21 @@ const card: React.CSSProperties = {
   borderRadius: 12, padding: '12px 14px',
   border: '1px solid rgba(255,255,255,0.06)',
 };
-const identityCard = (color: string): React.CSSProperties => ({
-  background: `linear-gradient(135deg, ${color}22, rgba(11,17,32,0.6))`,
-  borderRadius: 14, padding: '14px 16px',
-  border: `1px solid ${color}55`,
-  boxShadow: `0 0 24px ${color}33 inset`,
-});
+const identityCard = (color: string, tier: import('../../data/achievements').FrameTier): React.CSSProperties => {
+  const frame = FRAME_COLORS[tier];
+  return {
+    background: `linear-gradient(135deg, ${color}22, rgba(11,17,32,0.6))`,
+    borderRadius: 14,
+    padding: '14px 16px',
+    // Frame thickness + colour scales with achievement tier.
+    border: tier === 'none'
+      ? `1px solid ${color}55`
+      : `2px solid ${frame.primary}`,
+    boxShadow: tier === 'none'
+      ? `0 0 24px ${color}33 inset`
+      : `0 0 24px ${color}33 inset, 0 0 18px ${frame.primary}55`,
+  };
+};
 const identityRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 12 };
 const identityChip = (color: string): React.CSSProperties => ({
   width: 32, height: 32, borderRadius: 8,
@@ -371,7 +416,26 @@ const identityChip = (color: string): React.CSSProperties => ({
 const airlineLabel: React.CSSProperties = {
   fontSize: 18, fontWeight: 700, color: '#F8FAFC', letterSpacing: '0.14em',
 };
-const airlineSub: React.CSSProperties = { fontSize: 11, color: '#94A3B8', marginTop: 2 };
+const airlineSubRow: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 8, marginTop: 4,
+};
+const airlineSub: React.CSSProperties = { fontSize: 11, color: '#94A3B8' };
+const achievementsRow: React.CSSProperties = {
+  display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
+};
+const achievementsCount: React.CSSProperties = {
+  fontSize: 18, fontWeight: 700, color: '#F8FAFC',
+  fontFeatureSettings: '"tnum" 1',
+};
+const achievementsSub: React.CSSProperties = {
+  fontSize: 11, color: '#94A3B8', marginTop: 2,
+};
+const viewAllBtn: React.CSSProperties = {
+  background: 'transparent', color: '#5AC8FA',
+  border: '1px solid rgba(90,200,250,0.4)',
+  borderRadius: 8, padding: '8px 14px', minHeight: 36,
+  cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
+};
 const sectionHead: React.CSSProperties = {
   fontSize: 10, letterSpacing: '0.18em', textTransform: 'uppercase',
   color: '#94A3B8', fontWeight: 700, marginBottom: 8,

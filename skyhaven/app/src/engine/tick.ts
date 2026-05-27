@@ -18,6 +18,7 @@
 
 import { getAircraftDef } from '../data/aircraft';
 import { loadTopAirports } from '../data/airports';
+import { evaluateAchievements } from './achievements';
 import { repairCost } from './condition';
 import { computeEcoScore, ecoRevenueBonus } from './eco';
 import { TIME_COMPRESSION, legDurationMs, legRevenue } from './economy';
@@ -338,7 +339,11 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
   // The helper queues a `pendingVintageDrop` for the UI popup; ack via
   // the `acknowledgeVintageDrop` action clears it.
   const withVintage = processVintageMilestones(next);
+  // Achievement evaluation runs after vintage + before goal-chain so
+  // any reward-credited achievement (e.g. lifetime-earnings milestone)
+  // contributes to the goal-chain's cash check this same tick.
+  const withAchievements = evaluateAchievements(withVintage).state;
   // Goal-chain auto-detection runs last so it sees the freshly-credited
   // cash + any vintage drops in the same tick.
-  return processGoalChain(withVintage);
+  return processGoalChain(withAchievements);
 }

@@ -7,6 +7,7 @@ import {
   signFuelContract,
   upgradeFuelCapacity,
 } from './actions';
+import { ACHIEVEMENT_DEFS } from '../data/achievements';
 import { createInitialState } from './initialState';
 import { aircraftBurnRate, hasFuelHeadroom, totalDemand, withRecomputedDemand } from './fuel';
 import { loadedTestState } from './test-fixtures';
@@ -115,11 +116,14 @@ describe('reserve evolution in tick', () => {
 
   it('grounds the fleet when reserve hits 0 with demand > supply', () => {
     // Force a deficit and an empty reserve. Revenue should be zero.
-    let s = createInitialState(0);
-    s = {
-      ...s,
+    // Pre-mark achievements so the tick's evaluator can't credit any
+    // bonus cash and confuse the "cash unchanged" assertion.
+    const initial = createInitialState(0);
+    const s = {
+      ...initial,
+      achievements: ACHIEVEMENT_DEFS.map((a) => a.id),
       fuel: {
-        ...s.fuel,
+        ...initial.fuel,
         reserve: 0,
         supplyRate: 1,
         demandRate: 100,

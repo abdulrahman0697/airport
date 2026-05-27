@@ -7,6 +7,7 @@
  * which adds a hub at LHR and a starter LHR → CDG route. Keeps the
  * pre-rework assumptions valid without touching every test file.
  */
+import { ACHIEVEMENT_DEFS } from '../data/achievements';
 import { haversineKm } from './distance';
 import { withRecomputedDemand } from './fuel';
 import { emptyHubManagers } from './hubs';
@@ -54,6 +55,10 @@ export function loadedTestState(): SaveState {
     // first call and confuse cash-related assertions.
     goalChainStep: 8,
     vintageMilestonesConsumed: 1000,
+    // Same reasoning for Phase-14 achievements: pre-fill so the tick
+    // doesn't credit retroactive rewards on the first call and skew
+    // cash-related assertions.
+    achievements: ACHIEVEMENT_DEFS.map((a) => a.id),
   };
   return withRecomputedDemand(s);
 }
