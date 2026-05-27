@@ -24,6 +24,7 @@ import {
   closeRoute as closeRouteAction,
   completeTutorial as completeTutorialAction,
   createHub as createHubAction,
+  creditGift as creditGiftAction,
   dismissHubPick as dismissHubPickAction,
   pickHub as pickHubAction,
   hireManager as hireManagerAction,
@@ -76,6 +77,8 @@ interface GameStore {
   resetTutorial: () => ActionResult;
   acknowledgeOfflineSummary: () => ActionResult;
   claimDailyReward: () => ActionResult;
+  /** Credit a claimed friend gift to the local state (Phase 12.3). */
+  creditGift: (kind: 'cash' | 'fuel', amount: number) => ActionResult;
   setOfflineSummary: (s: { elapsedMs: number; earnings: number } | null) => void;
   /** Apply daily-login streak using the current wall clock. */
   applyDailyLoginNow: () => void;
@@ -159,6 +162,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   acknowledgeOfflineSummary: () =>
     runAction(set, get, (s) => acknowledgeOfflineSummaryAction(s)),
   claimDailyReward: () => runAction(set, get, (s) => claimDailyRewardAction(s)),
+  creditGift: (kind, amount) => runAction(set, get, (s) => creditGiftAction(s, kind, amount)),
   setOfflineSummary: (summary): void => {
     const cur = get().state;
     if (!cur) return;

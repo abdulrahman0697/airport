@@ -49,6 +49,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Gifts (Phase 12.3) — sender + recipient may read; writes are
+    // exclusively through the sendGift / claimGift Cloud Functions so
+    // rate limits + friendship gates can't be bypassed.
+    match /gifts/{giftId} {
+      allow read: if request.auth != null
+        && (request.auth.uid == resource.data.fromUid || request.auth.uid == resource.data.toUid);
+      allow write: if false;
+    }
+
     // Live-events defined by Remote Config / admin tooling (Phase 13).
     match /events/{eventId} {
       allow read: if request.auth != null;

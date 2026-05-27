@@ -85,6 +85,28 @@ export function buyAircraft(state: SaveState, defId: string): SaveState {
   return { ...state, cash: state.cash - def.basePurchaseCost, fleet: [...state.fleet, aircraft] };
 }
 
+// ─── Credit a claimed gift (Phase 12.3) ─────────────────────────────
+/**
+ * Apply a friend gift to the local save state. The server-side
+ * `claimGift` Cloud Function has already marked the gift as claimed
+ * atomically; this is purely the local-state update for the reward.
+ *
+ * Fuel credits are clamped to the fuel reserve capacity so a generous
+ * gift can't overflow the tank — the surplus is simply discarded.
+ */
+export function creditGift(
+  state: SaveState,
+  kind: 'cash' | 'fuel',
+  amount: number,
+): SaveState {
+  if (!Number.isFinite(amount) || amount <= 0) return state;
+  if (kind === 'cash') {
+    return { ...state, cash: state.cash + amount, lifetimeEarnings: state.lifetimeEarnings + amount };
+  }
+  const nextReserve = Math.min(state.fuel.capacity, state.fuel.reserve + amount);
+  return { ...state, fuel: { ...state.fuel, reserve: nextReserve } };
+}
+
 // ─── Sell aircraft ───────────────────────────────────────────────────
 export function sellAircraft(state: SaveState, uid: string): SaveState {
   const idx = state.fleet.findIndex((a) => a.uid === uid);

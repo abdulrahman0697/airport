@@ -12,10 +12,12 @@
  */
 import {
   collection,
+  documentId,
   getDocs,
   limit,
   orderBy,
   query,
+  where,
   type Firestore,
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -67,6 +69,52 @@ export async function fetchBoard(board: BoardId): Promise<readonly LeaderboardEn
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn('[skyhaven] fetchBoard failed', { board, err });
+    return [];
+  }
+}
+
+/**
+ * Friends-scoped fetch: only entries for the supplied uid set, ordered
+ * by score desc. Firestore `in` queries support up to 30 values, so a
+ * friends list >29 gets the first 29 + self.
+ */
+export async function fetchBoardForUids(
+  board: BoardId,
+  uids: readonly string[],
+): Promise<readonly LeaderboardEntry[]> {
+  if (uids.length === 0) return [];
+  const chunk = uids.slice(0, 30);
+  try {
+    const ref = collection(db(), 'leaderboards', board, 'entries');
+    const q = query(ref, where(documentId(), 'in', chunk));
+    const snap = await getDocs(q);
+    return snap.docs
+      .map((d) => {
+        const v = d.data() as {
+          uid?: string;
+          displayName?: string | null;
+          photoUrl?: string | null;
+          score?: number;
+          submittedAt?: { toMillis?: () => number } | number | null;
+        };
+        const submittedAt =
+          typeof v.submittedAt === 'object' && v.submittedAt && typeof v.submittedAt.toMillis === 'function'
+            ? v.submittedAt.toMillis()
+            : typeof v.submittedAt === 'number'
+              ? v.submittedAt
+              : null;
+        return {
+          uid: v.uid ?? d.id,
+          displayName: v.displayName ?? null,
+          photoUrl: v.photoUrl ?? null,
+          score: v.score ?? 0,
+          submittedAt,
+        } satisfies LeaderboardEntry;
+      })
+      .sort((a, b) => b.score - a.score);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[skyhaven] fetchBoardForUids failed', { board, err });
     return [];
   }
 }

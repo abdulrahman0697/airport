@@ -9,7 +9,7 @@
  * The list is driven by a Firestore snapshot subscription so it
  * updates in real time as friends accept / decline.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../backend/useAuth';
 import {
   acceptFriendRequest,
@@ -20,8 +20,17 @@ import {
   unfriend,
   type Friendship,
 } from '../../backend/friends';
+import {
+  claimGift,
+  sendGift,
+  subscribeInbox,
+  type Gift,
+  type GiftKind,
+} from '../../backend/gifts';
 import { fetchProfile, type PublicProfile } from '../../backend/profiles';
+import { useGameStore } from '../../state/store';
 import { formatCash } from '../format';
+import { haptics } from '../juice/haptics';
 
 export function FriendsCard() {
   const user = useAuth();
@@ -32,6 +41,9 @@ export function FriendsCard() {
   const [sendNote, setSendNote] = useState<string | null>(null);
   const [friendships, setFriendships] = useState<readonly Friendship[]>([]);
   const [profiles, setProfiles] = useState<Record<string, PublicProfile | null>>({});
+  const [inbox, setInbox] = useState<readonly Gift[]>([]);
+  const [giftFor, setGiftFor] = useState<{ uid: string; name: string } | null>(null);
+  const credit = useGameStore((s) => s.creditGift);
 
   // First open: claim a code so the player has something to share.
   useEffect(() => {
@@ -55,12 +67,33 @@ export function FriendsCard() {
     return () => { unsub?.(); };
   }, [user]);
 
-  // Lazy-fetch the public profile for each "other" uid in the list,
-  // so the row can show the friend's airline name.
+  // Live gift inbox.
   useEffect(() => {
-    const toFetch = friendships
-      .map((f) => f.otherUid)
-      .filter((u) => !(u in profiles));
+    if (!user) { setInbox([]); return; }
+    const unsub = subscribeInbox(setInbox);
+    return () => { unsub?.(); };
+  }, [user]);
+
+  const onClaimGift = async (gift: Gift): Promise<void> => {
+    const res = await claimGift(gift.id);
+    if (res.ok) {
+      credit(res.kind, res.amount);
+      haptics.success();
+    } else {
+      haptics.warning();
+    }
+  };
+
+  // Lazy-fetch the public profile for each "other" uid (friendships
+  // list + inbox senders) so rows can show airline names.
+  const profileTargets = useMemo(() => {
+    const set = new Set<string>();
+    for (const f of friendships) set.add(f.otherUid);
+    for (const g of inbox) set.add(g.fromUid);
+    return Array.from(set);
+  }, [friendships, inbox]);
+  useEffect(() => {
+    const toFetch = profileTargets.filter((u) => !(u in profiles));
     if (toFetch.length === 0) return;
     void (async () => {
       const fetched = await Promise.all(toFetch.map((u) => fetchProfile(u).then((p) => [u, p] as const)));
@@ -70,7 +103,7 @@ export function FriendsCard() {
         return next;
       });
     })();
-  }, [friendships, profiles]);
+  }, [profileTargets, profiles]);
 
   const incoming = friendships.filter(
     (f) => f.status === 'pending' && user && f.requestedByUid !== user.uid,
@@ -160,19 +193,57 @@ export function FriendsCard() {
           ))}
         </Group>
       )}
-      {accepted.length > 0 && (
-        <Group label={`Friends (${accepted.length})`}>
-          {accepted.map((f) => (
-            <Row
-              key={f.id}
-              friendship={f}
-              profile={profiles[f.otherUid] ?? null}
-              actions={
-                <button onClick={(): void => { void unfriend(f.id); }} style={smallSecondaryBtn}>Unfriend</button>
-              }
-            />
+      {inbox.length > 0 && (
+        <Group label={`Gifts in your inbox (${inbox.length})`}>
+          {inbox.map((g) => (
+            <li key={g.id} style={row}>
+              <span style={chip(g.kind === 'cash' ? '#F4C75B' : '#5AC8FA')} aria-hidden />
+              <div style={rowMain}>
+                <div style={rowName}>
+                  {g.kind === 'cash' ? `+$${formatCash(g.amount)}` : `+${g.amount} fuel`}
+                </div>
+                <div style={rowMetaDim}>
+                  from {profiles[g.fromUid]?.airlineName ?? g.fromUid.slice(0, 8)}
+                </div>
+              </div>
+              <div style={rowActions}>
+                <button onClick={(): void => { void onClaimGift(g); }} style={acceptBtn}>Claim</button>
+              </div>
+            </li>
           ))}
         </Group>
+      )}
+      {accepted.length > 0 && (
+        <Group label={`Friends (${accepted.length})`}>
+          {accepted.map((f) => {
+            const name = profiles[f.otherUid]?.airlineName ?? f.otherUid.slice(0, 8);
+            return (
+              <Row
+                key={f.id}
+                friendship={f}
+                profile={profiles[f.otherUid] ?? null}
+                actions={
+                  <>
+                    <button
+                      onClick={(): void => setGiftFor({ uid: f.otherUid, name })}
+                      style={giftBtn}
+                    >
+                      Gift
+                    </button>
+                    <button onClick={(): void => { void unfriend(f.id); }} style={smallSecondaryBtn}>Unfriend</button>
+                  </>
+                }
+              />
+            );
+          })}
+        </Group>
+      )}
+      {giftFor && (
+        <SendGiftModal
+          toUid={giftFor.uid}
+          toName={giftFor.name}
+          onClose={(): void => setGiftFor(null)}
+        />
       )}
       {accepted.length === 0 && incoming.length === 0 && outgoing.length === 0 && (
         <div style={empty}>
@@ -181,6 +252,94 @@ export function FriendsCard() {
         </div>
       )}
     </section>
+  );
+}
+
+function SendGiftModal({
+  toUid, toName, onClose,
+}: {
+  toUid: string;
+  toName: string;
+  onClose: () => void;
+}) {
+  const [kind, setKind] = useState<GiftKind>('cash');
+  const [amount, setAmount] = useState<number>(2_500);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  const presets = kind === 'cash'
+    ? [1_000, 2_500, 5_000, 10_000]
+    : [100, 250, 500];
+  // Ensure the picked amount stays in-range when the kind changes.
+  useEffect(() => {
+    if (kind === 'cash' && amount < 1_000) setAmount(1_000);
+    if (kind === 'cash' && amount > 10_000) setAmount(10_000);
+    if (kind === 'fuel' && amount < 100) setAmount(100);
+    if (kind === 'fuel' && amount > 500) setAmount(500);
+  }, [kind, amount]);
+
+  const onSend = async (): Promise<void> => {
+    setBusy(true);
+    setNote(null);
+    const res = await sendGift(toUid, kind, amount);
+    setBusy(false);
+    if ('ok' in res && res.ok) {
+      if (res.status === 'sent') {
+        haptics.success();
+        onClose();
+      } else {
+        setNote('Already a pending gift to this friend.');
+      }
+    } else if (!('ok' in res) || !res.ok) {
+      const err = res as { code: string; message: string };
+      setNote(`${err.code}: ${err.message}`);
+      haptics.warning();
+    }
+  };
+
+  return (
+    <div style={modalBackdrop} onClick={onClose}>
+      <div style={modalShell} onClick={(e): void => e.stopPropagation()}>
+        <h3 style={modalTitle}>Send a gift to {toName}</h3>
+        <p style={modalBody}>One gift per friend at a time, max 10 sends per day.</p>
+
+        <div style={kindRow}>
+          <button
+            onClick={(): void => setKind('cash')}
+            style={{ ...kindBtn, ...(kind === 'cash' ? kindBtnActive : {}) }}
+          >
+            Cash
+          </button>
+          <button
+            onClick={(): void => setKind('fuel')}
+            style={{ ...kindBtn, ...(kind === 'fuel' ? kindBtnActive : {}) }}
+          >
+            Fuel
+          </button>
+        </div>
+
+        <div style={presetRow}>
+          {presets.map((p) => (
+            <button
+              key={p}
+              onClick={(): void => setAmount(p)}
+              style={{ ...presetBtn, ...(amount === p ? presetBtnActive : {}) }}
+            >
+              {kind === 'cash' ? `$${formatCash(p)}` : `${p}`}
+            </button>
+          ))}
+        </div>
+
+        {note && <div style={modalNote}>{note}</div>}
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+          <button onClick={onClose} style={cancelBtn}>Cancel</button>
+          <button onClick={(): void => { void onSend(); }} disabled={busy} style={confirmBtn}>
+            {busy ? '…' : `Send ${kind === 'cash' ? `$${formatCash(amount)}` : `${amount} fuel`}`}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -311,4 +470,67 @@ const smallSecondaryBtn: React.CSSProperties = {
 };
 const empty: React.CSSProperties = {
   padding: '12px 4px', textAlign: 'center', color: '#64748B', fontSize: 12,
+};
+const giftBtn: React.CSSProperties = {
+  background: 'rgba(244,199,91,0.18)', color: '#F4C75B',
+  border: '1px solid rgba(244,199,91,0.5)',
+  borderRadius: 6, padding: '6px 12px', minHeight: 32,
+  cursor: 'pointer', fontFamily: 'inherit', fontSize: 11, fontWeight: 700,
+};
+const modalBackdrop: React.CSSProperties = {
+  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+  display: 'grid', placeItems: 'center', padding: 16, zIndex: 100,
+};
+const modalShell: React.CSSProperties = {
+  background: '#111A2E', borderRadius: 14, padding: 18,
+  width: '100%', maxWidth: 360,
+  border: '1px solid rgba(255,255,255,0.08)',
+  boxShadow: '0 18px 60px rgba(0,0,0,0.55)',
+};
+const modalTitle: React.CSSProperties = {
+  margin: '0 0 8px', color: '#F8FAFC', fontSize: 16,
+};
+const modalBody: React.CSSProperties = {
+  margin: 0, color: '#94A3B8', fontSize: 12, lineHeight: 1.5,
+};
+const kindRow: React.CSSProperties = {
+  display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginTop: 14,
+};
+const kindBtn: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.04)', color: '#94A3B8',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: 8, padding: '10px', minHeight: 40,
+  cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
+};
+const kindBtnActive: React.CSSProperties = {
+  background: 'rgba(90,200,250,0.18)', color: '#5AC8FA',
+  borderColor: 'rgba(90,200,250,0.5)',
+};
+const presetRow: React.CSSProperties = {
+  display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginTop: 10,
+};
+const presetBtn: React.CSSProperties = {
+  background: 'rgba(11,17,32,0.6)', color: '#94A3B8',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 6, padding: '8px 4px', minHeight: 36,
+  cursor: 'pointer', fontFamily: 'inherit', fontSize: 11,
+  fontFeatureSettings: '"tnum" 1',
+};
+const presetBtnActive: React.CSSProperties = {
+  background: 'rgba(244,199,91,0.18)', color: '#F4C75B',
+  borderColor: 'rgba(244,199,91,0.45)',
+};
+const modalNote: React.CSSProperties = {
+  marginTop: 10, padding: '6px 10px', fontSize: 11,
+  color: '#F87171', background: 'rgba(248,113,113,0.08)', borderRadius: 6,
+};
+const cancelBtn: React.CSSProperties = {
+  flex: 1, padding: 10, background: 'transparent', color: '#94A3B8',
+  border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8,
+  cursor: 'pointer', minHeight: 40, fontFamily: 'inherit',
+};
+const confirmBtn: React.CSSProperties = {
+  flex: 1, padding: 10, background: '#F4C75B', color: '#0B1120',
+  border: 0, borderRadius: 8, cursor: 'pointer', fontWeight: 700,
+  minHeight: 40, fontFamily: 'inherit',
 };

@@ -9,7 +9,8 @@
  * Friends-scoped views land in Phase 12.3 alongside the friend graph.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { fetchBoard, type LeaderboardEntry } from '../../backend/leaderboards';
+import { fetchBoard, fetchBoardForUids, type LeaderboardEntry } from '../../backend/leaderboards';
+import { subscribeFriendships, type Friendship } from '../../backend/friends';
 import { useAuth } from '../../backend/useAuth';
 import { getAircraftDef } from '../../data/aircraft';
 import { BOARDS, getBoard, type BoardId } from '../../data/leaderboards';
@@ -24,8 +25,11 @@ import {
 } from '../../state/store';
 import type { SaveState } from '../../engine/types';
 
+type Scope = 'global' | 'friends';
+
 export function LeaderboardsPanel() {
   const [tab, setTab] = useState<BoardId>('lifetime');
+  const [scope, setScope] = useState<Scope>('global');
   const board = getBoard(tab);
   const user = useAuth();
   const state = useGameStore((s) => s.state);
@@ -34,6 +38,19 @@ export function LeaderboardsPanel() {
   const hubs = useGameStore(selectHubs);
   const activeEvents = useGameStore(selectActiveEvents);
   const airlineName = useGameStore(selectAirlineName);
+
+  // Live friend uids — only accepted, plus self for the friends view.
+  const [friendships, setFriendships] = useState<readonly Friendship[]>([]);
+  useEffect(() => {
+    if (!user) { setFriendships([]); return; }
+    const unsub = subscribeFriendships(setFriendships);
+    return () => { unsub?.(); };
+  }, [user]);
+  const friendUids = useMemo(() => {
+    const out = friendships.filter((f) => f.status === 'accepted').map((f) => f.otherUid);
+    if (user) out.push(user.uid);
+    return out;
+  }, [friendships, user]);
 
   const perMin = useMemo(() => {
     const byUid = new Map(fleet.map((a) => [a.uid, a]));
@@ -58,16 +75,20 @@ export function LeaderboardsPanel() {
     setLoading(true);
     setError(null);
     void (async () => {
-      const data = await fetchBoard(tab);
+      const data = scope === 'global'
+        ? await fetchBoard(tab)
+        : await fetchBoardForUids(tab, friendUids);
       if (cancelled) return;
       setRows(data);
       setLoading(false);
       if (data.length === 0) {
-        setError('No entries yet. Be the first — keep playing!');
+        setError(scope === 'friends'
+          ? 'No friends have a score on this board yet. Add a few from Office → Friends.'
+          : 'No entries yet. Be the first — keep playing!');
       }
     })();
     return () => { cancelled = true; };
-  }, [tab, reloadKey]);
+  }, [tab, scope, reloadKey, friendUids]);
 
   if (!board) return null;
 
@@ -75,6 +96,20 @@ export function LeaderboardsPanel() {
     <div style={shell}>
       <div style={header}>
         <h2 style={title}>Leaderboards</h2>
+        <div style={scopeRow}>
+          <button
+            onClick={(): void => setScope('global')}
+            style={{ ...scopeBtn, ...(scope === 'global' ? scopeActive : {}) }}
+          >
+            Global
+          </button>
+          <button
+            onClick={(): void => setScope('friends')}
+            style={{ ...scopeBtn, ...(scope === 'friends' ? scopeActive : {}) }}
+          >
+            Friends
+          </button>
+        </div>
         <div role="tablist" style={tabsRow}>
           {BOARDS.map((b) => (
             <button
@@ -96,7 +131,9 @@ export function LeaderboardsPanel() {
           displayName={user?.displayName ?? airlineName}
         />
         <div style={listHead}>
-          <div style={listHeadLabel}>Global Top {rows.length || ''}</div>
+          <div style={listHeadLabel}>
+            {scope === 'global' ? 'Global Top' : 'Friends'} {rows.length || ''}
+          </div>
           <button onClick={(): void => setReloadKey((k) => k + 1)} style={refreshBtn}>
             ⟳ Refresh
           </button>
@@ -158,6 +195,20 @@ function YourCard({
 const shell: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100%' };
 const header: React.CSSProperties = { padding: '20px 16px 8px', borderBottom: '1px solid rgba(255,255,255,0.06)' };
 const title: React.CSSProperties = { margin: 0, fontSize: 22, color: '#F8FAFC' };
+const scopeRow: React.CSSProperties = {
+  display: 'flex', gap: 6, marginTop: 12,
+  background: 'rgba(255,255,255,0.04)', padding: 4, borderRadius: 10,
+  width: 'fit-content',
+};
+const scopeBtn: React.CSSProperties = {
+  background: 'transparent', color: '#94A3B8', border: 0,
+  padding: '8px 16px', borderRadius: 6, cursor: 'pointer',
+  fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+  letterSpacing: '0.06em',
+};
+const scopeActive: React.CSSProperties = {
+  background: '#5AC8FA', color: '#0B1120',
+};
 const tabsRow: React.CSSProperties = {
   display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12,
 };
