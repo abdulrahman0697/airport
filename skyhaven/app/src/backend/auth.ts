@@ -21,14 +21,12 @@
  * Network failures never throw to callers — sign-in is best-effort
  * and the local game keeps running on the local save.
  */
-import { Capacitor } from '@capacitor/core';
-import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
   signInAnonymously,
-  signInWithCredential,
   signInWithPopup,
+  signInWithRedirect,
   signOut as fbSignOut,
   type User,
 } from 'firebase/auth';
@@ -95,43 +93,41 @@ export async function ensureAnonymous(): Promise<AuthUser | null> {
 }
 
 /**
- * Sign in with Google. On native Android this goes through the
- * Capacitor plugin so the player gets the system Google chooser;
- * on web we use the Firebase popup for developer convenience.
+ * Sign in with Google via the Firebase JS SDK.
  *
- * Returns the new auth user, or null if the player cancelled / no
- * network. Caller is responsible for handling the cloud-save merge.
+ * On the Android WebView `signInWithPopup` can't open a window, so we
+ * fall back to `signInWithRedirect`. After redirect Firebase Auth
+ * persists the result and re-emits the user via `onAuthStateChanged`
+ * on next launch.
+ *
+ * Returns the new auth user (popup path) or null (redirect path —
+ * resolution happens on the next launch).
  */
 export async function signInWithGoogle(): Promise<AuthUser | null> {
   const auth = getFirebaseAuth();
+  const provider = new GoogleAuthProvider();
   try {
-    if (Capacitor.isNativePlatform()) {
-      const result = await FirebaseAuthentication.signInWithGoogle();
-      const idToken = result.credential?.idToken;
-      if (!idToken) return null;
-      const credential = GoogleAuthProvider.credential(idToken);
-      const out = await signInWithCredential(auth, credential);
-      return toAuthUser(out.user);
-    }
-    const provider = new GoogleAuthProvider();
     const out = await signInWithPopup(auth, provider);
     return toAuthUser(out.user);
   } catch (err) {
-    // eslint-disable-next-line no-console
-    console.warn('[skyhaven] Google sign-in failed', err);
-    return null;
+    // Popup not supported (WebView) — fall back to redirect.
+    try {
+      await signInWithRedirect(auth, provider);
+      return null;
+    } catch (err2) {
+      // eslint-disable-next-line no-console
+      console.warn('[skyhaven] Google sign-in failed', err, err2);
+      return null;
+    }
   }
 }
 
 /**
- * Sign out of the current account (Google) and immediately re-sign in
+ * Sign out of the current account and immediately re-sign in
  * anonymously so cloud save keeps working under a fresh device uid.
  */
 export async function signOut(): Promise<void> {
   try {
-    if (Capacitor.isNativePlatform()) {
-      await FirebaseAuthentication.signOut();
-    }
     await fbSignOut(getFirebaseAuth());
   } catch (err) {
     // eslint-disable-next-line no-console

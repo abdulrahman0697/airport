@@ -26,52 +26,58 @@ export interface CloudSync {
 }
 
 export function startCloudSync(): CloudSync {
-  // Throttled push channel. Schedule on every store mutation; the
-  // throttle collapses bursts into one Firestore write per window.
-  const throttle = createCloudPushThrottle(pushSave, PUSH_INTERVAL_MS);
-  let lastUid: string | null = null;
-  let lastPushedAt = Date.now();
+  // Belt-and-braces try/catch around the entire init — if Firebase
+  // can't even initialise (e.g. native side missing google-services
+  // config, network unavailable at boot), we return a no-op so the
+  // local game is never blocked by a backend failure (BRD §11.3).
+  try {
+    const throttle = createCloudPushThrottle(pushSave, PUSH_INTERVAL_MS);
+    let lastUid: string | null = null;
+    let lastPushedAt = Date.now();
 
-  const unsubAuth = subscribeAuth((user) => {
-    if (!user) { lastUid = null; return; }
-    if (user.uid === lastUid) return;
-    lastUid = user.uid;
-    // New identity: try to pull cloud and reconcile.
-    void (async () => {
-      const cloud = await pullSave();
-      const local = useGameStore.getState().state;
-      if (!local) return;
-      const decision = chooseWinner(local, lastPushedAt, cloud);
-      // eslint-disable-next-line no-console
-      console.info('[skyhaven] cloud sync', { uid: user.uid, reason: decision.reason });
-      if (decision.applyLocal) {
-        useGameStore.getState().setState(decision.state);
-      }
-      if (decision.push) {
-        const s = useGameStore.getState().state;
-        if (s) throttle.schedule(s);
-      }
-    })();
-  });
+    const unsubAuth = subscribeAuth((user) => {
+      if (!user) { lastUid = null; return; }
+      if (user.uid === lastUid) return;
+      lastUid = user.uid;
+      void (async () => {
+        try {
+          const cloud = await pullSave();
+          const local = useGameStore.getState().state;
+          if (!local) return;
+          const decision = chooseWinner(local, lastPushedAt, cloud);
+          // eslint-disable-next-line no-console
+          console.info('[skyhaven] cloud sync', { uid: user.uid, reason: decision.reason });
+          if (decision.applyLocal) useGameStore.getState().setState(decision.state);
+          if (decision.push) {
+            const s = useGameStore.getState().state;
+            if (s) throttle.schedule(s);
+          }
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn('[skyhaven] cloud reconcile failed', err);
+        }
+      })();
+    });
 
-  // Mirror every store mutation up to the cloud. The throttle keeps
-  // this safe even during fast-tick gameplay.
-  const unsubStore = useGameStore.subscribe((s) => {
-    if (!s.state) return;
-    if (!lastUid) return;
-    lastPushedAt = Date.now();
-    throttle.schedule(s.state);
-  });
+    const unsubStore = useGameStore.subscribe((s) => {
+      if (!s.state) return;
+      if (!lastUid) return;
+      lastPushedAt = Date.now();
+      throttle.schedule(s.state);
+    });
 
-  // Kick off anonymous sign-in so cloud save works without the player
-  // ever touching a sign-in screen. Best effort — we ignore failures.
-  void ensureAnonymous();
+    void ensureAnonymous();
 
-  return {
-    stop(): void {
-      unsubAuth();
-      unsubStore();
-      void throttle.flush();
-    },
-  };
+    return {
+      stop(): void {
+        unsubAuth();
+        unsubStore();
+        void throttle.flush();
+      },
+    };
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[skyhaven] cloud sync init failed; running local-only', err);
+    return { stop: () => undefined };
+  }
 }
