@@ -12,6 +12,7 @@ import {
   selectTier,
   useGameStore,
 } from '../../state/store';
+import { TierRing } from '../design/TierRing';
 import { formatRate } from '../format';
 import { EcoBadge } from './EcoBadge';
 import { usePanelStore } from './PanelHost';
@@ -52,19 +53,11 @@ export function TopBar() {
   return (
     <header style={shell} aria-label="airline header">
       <button onClick={(): void => open('office')} style={brandBtn} aria-label="Open office dashboard">
-        <span style={chip(tailColor)} aria-hidden />
+        <TierRing pct={pct} tier={tier} color={tailColor} size={42} />
         <div style={brandCol}>
           <div style={brandText}>{airlineName.toUpperCase()}</div>
-          <div style={tierLine}>
-            <span style={tierTag}>T{tier}</span>
-            <div style={tierBar}>
-              <div style={{
-                ...tierFill,
-                width: `${pct * 100}%`,
-                background: `linear-gradient(90deg, ${tailColor}, #F4C75B)`,
-              }} />
-            </div>
-            {tier < MAX_TIER && <span style={tierNext}>T{tier + 1}</span>}
+          <div style={brandSub}>
+            {tier >= MAX_TIER ? 'Max tier reached' : `${Math.round(pct * 100)}% to T${tier + 1}`}
           </div>
           <EcoBadge />
         </div>
@@ -117,14 +110,6 @@ const brandCol: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
 };
 
-const chip = (color: string): React.CSSProperties => ({
-  width: 10,
-  height: 10,
-  borderRadius: 3,
-  background: color,
-  boxShadow: `0 0 8px ${color}AA`,
-});
-
 const brandText: React.CSSProperties = {
   fontSize: 14,
   letterSpacing: '0.18em',
@@ -132,36 +117,12 @@ const brandText: React.CSSProperties = {
   fontWeight: 700,
 };
 
-const tierLine: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 5,
-  marginTop: 4,
-  width: 130,
-};
-const tierTag: React.CSSProperties = {
-  fontSize: 9,
-  letterSpacing: '0.06em',
-  color: '#5AC8FA',
-  fontWeight: 700,
-  minWidth: 16,
-};
-const tierBar: React.CSSProperties = {
-  flex: 1,
-  height: 4,
-  background: 'rgba(255,255,255,0.08)',
-  borderRadius: 2,
-  overflow: 'hidden',
-};
-const tierFill: React.CSSProperties = {
-  height: '100%',
-  transition: 'width 400ms ease',
-};
-const tierNext: React.CSSProperties = {
-  fontSize: 9,
+const brandSub: React.CSSProperties = {
+  fontSize: 10,
+  letterSpacing: '0.04em',
   color: '#94A3B8',
-  letterSpacing: '0.06em',
-  minWidth: 16,
+  marginTop: 2,
+  fontFeatureSettings: '"tnum" 1',
 };
 
 const cashCol: React.CSSProperties = {

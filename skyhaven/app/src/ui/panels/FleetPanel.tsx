@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { AIRCRAFT_DEFS, getAircraftDef } from '../../data/aircraft';
 import { conditionBand, repairCost } from '../../engine/condition';
 import { MAX_TIER } from '../../engine/tierUnlocks';
+import { AircraftDetailModal } from '../components/AircraftDetailModal';
 import {
   UPGRADE_LABELS,
   UPGRADE_SPECS,
@@ -74,15 +75,21 @@ export function FleetPanel() {
 // ──── Owned tab ──────────────────────────────────────────────────────
 function OwnedList() {
   const fleet = useGameStore(selectFleet);
+  const [detail, setDetail] = useState<OwnedAircraft | null>(null);
   if (fleet.length === 0) return <div style={empty}>No aircraft. Switch to "Buy aircraft" to start your fleet.</div>;
   return (
-    <ul style={list}>
-      {fleet.map((a) => <FleetRow key={a.uid} aircraft={a} />)}
-    </ul>
+    <>
+      <ul style={list}>
+        {fleet.map((a) => (
+          <FleetRow key={a.uid} aircraft={a} onOpenDetail={(): void => setDetail(a)} />
+        ))}
+      </ul>
+      <AircraftDetailModal aircraft={detail} onClose={(): void => setDetail(null)} />
+    </>
   );
 }
 
-function FleetRow({ aircraft }: { aircraft: OwnedAircraft }) {
+function FleetRow({ aircraft, onOpenDetail }: { aircraft: OwnedAircraft; onOpenDetail: () => void }) {
   const def = getAircraftDef(aircraft.defId);
   const cash = useGameStore(selectCash);
   const applyUpgrade = useGameStore((s) => s.applyUpgrade);
@@ -113,16 +120,21 @@ function FleetRow({ aircraft }: { aircraft: OwnedAircraft }) {
   return (
     <li style={card}>
       <div style={cardHeader}>
-        <div>
+        <button
+          onClick={onOpenDetail}
+          style={cardTitleBtn}
+          aria-label={`Open details for ${def.displayName}`}
+        >
           <div style={cardTitle}>
             {def.displayName}
             {isCargo && <span style={cargoBadge}>CARGO</span>}
+            <span style={detailArrow}>→</span>
           </div>
           <div style={cardSubtitle}>
             {tierLabel} · {capLabel} · {def.rangeKm.toLocaleString()} km
             {aircraft.routeId ? ' · in service' : ' · in hangar'}
           </div>
-        </div>
+        </button>
         <div style={{ textAlign: 'right' }}>
           <div style={{ color: condColor, fontSize: 13, fontWeight: 600 }}>
             {aircraft.condition.toFixed(0)}%
@@ -309,6 +321,24 @@ const card: React.CSSProperties = {
   border: '1px solid rgba(255,255,255,0.06)',
 };
 const cardHeader: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 };
+const cardTitleBtn: React.CSSProperties = {
+  display: 'block',
+  textAlign: 'left',
+  background: 'transparent',
+  border: 0,
+  padding: 0,
+  cursor: 'pointer',
+  color: 'inherit',
+  fontFamily: 'inherit',
+  flex: 1,
+  minWidth: 0,
+};
+const detailArrow: React.CSSProperties = {
+  marginLeft: 6,
+  fontSize: 12,
+  color: '#5AC8FA',
+  opacity: 0.7,
+};
 const cardTitle: React.CSSProperties = {
   color: '#F8FAFC', fontSize: 15, fontWeight: 600,
   display: 'inline-flex', alignItems: 'center', gap: 8,
