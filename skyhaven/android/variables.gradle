@@ -13,4 +13,10 @@ ext {
     androidxJunitVersion = '1.2.1'
     androidxEspressoCoreVersion = '3.6.1'
     cordovaAndroidVersion = '10.1.1'
+    // @capacitor-firebase/authentication: opt in to Google Sign-in.
+    // Without this flag the plugin treats play-services-auth +
+    // credentials as compileOnly, so Capacitor's bridge crashes with
+    // NoClassDefFoundError when it instantiates the plugin at app
+    // startup.
+    rgcfaIncludeGoogle = true
 }

@@ -24,6 +24,10 @@ const config: CapacitorConfig = {
     Keyboard: {
       resize: 'native',
     },
+    FirebaseAuthentication: {
+      skipNativeAuth: false,
+      providers: ['google.com'],
+    },
   },
 };
 
