@@ -37,7 +37,14 @@ jobs:
       - name: Deploy Firestore rules + Remote Config + Functions
         if: env.GOOGLE_APPLICATION_CREDENTIALS != ''
         run: |
+          # --force auto-accepts the Cloud Build artifact cleanup policy
+          # prompt that the Firebase CLI added in 13.x. Without it the
+          # CLI deploys functions successfully but exits non-zero
+          # waiting for interactive input. The policy itself just
+          # garbage-collects old container images so we don't pay for
+          # storing every historical build.
           npx firebase-tools deploy \
             --only firestore:rules,remoteconfig,functions \
+            --force \
             --non-interactive \
             --project "${{ secrets.FIREBASE_PROJECT_ID }}"
