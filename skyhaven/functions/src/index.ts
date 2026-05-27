@@ -1,12 +1,21 @@
 /**
- * SkyHaven Tycoon — Cloud Functions (v2).
- * Phase 0: placeholder. Real functions land in:
- *  - Phase 11: deleteAccount (callable) — wipes player Firestore data.
- *  - Phase 12: submitLeaderboardScore (callable, plausibility-checked).
- *  - Phase 13: scheduleLiveEvent (scheduled), sendComebackPush (triggered).
+ * SkyHaven Tycoon — Cloud Functions entry (v2 only per CLAUDE.md).
+ *
+ * Functions are split into per-feature files; this index just wires up
+ * Firebase Admin once and re-exports them at the deployment names
+ * Firebase reads from the build output (`lib/index.js`).
  */
+import { initializeApp } from 'firebase-admin/app';
 import { onCall } from 'firebase-functions/v2/https';
 
+initializeApp();
+
+export { submitLeaderboardScore } from './leaderboards';
+export { deleteAccount } from './deleteAccount';
+
+/** Liveness probe — useful from the Firebase emulator + cold-start
+ *  warm-up. Returns the deployment phase so we can confirm what's
+ *  running without parsing release notes. */
 export const healthcheck = onCall({ region: 'us-central1' }, () => {
-  return { ok: true, phase: 0, ts: Date.now() };
+  return { ok: true, phase: 12, ts: Date.now() };
 });

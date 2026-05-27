@@ -44,6 +44,7 @@ export function createInitialState(nowMs: number, homeRegion = 3): SaveState {
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
     lastSeenTimestamp: nowMs,
+    createdAtMs: nowMs,
     seed: 0xC0FFEE,
     airlineName: STARTER_AIRLINE_NAME,
     tailColor: STARTER_TAIL_COLOR,

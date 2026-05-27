@@ -8,7 +8,7 @@
  * `migrations.ts` and bumps `CURRENT_SCHEMA_VERSION`.
  */
 
-export const CURRENT_SCHEMA_VERSION = 6;
+export const CURRENT_SCHEMA_VERSION = 7;
 
 export type AircraftCategory = 'passenger' | 'cargo' | 'classic';
 export type RoutePricing = 'economy' | 'balanced' | 'premium';
@@ -109,6 +109,10 @@ export interface SaveState {
   schemaVersion: number;
   /** Epoch ms of last engine integration. Drives offline catch-up. */
   lastSeenTimestamp: number;
+  /** Epoch ms when this save was first created. Drives leaderboard
+   *  plausibility (BRD §12.4) — lifetime earnings can be capped by
+   *  session length × max yield per second. */
+  createdAtMs: number;
   /** Deterministic PRNG seed for random events. */
   seed: number;
 

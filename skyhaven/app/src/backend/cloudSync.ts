@@ -10,16 +10,42 @@
  *    and Firestore's offline queue takes care of the rest (BRD §11.3
  *    airplane-mode acceptance).
  */
-import { ensureAnonymous, subscribeAuth } from './auth';
+import { ensureAnonymous, subscribeAuth, type AuthUser } from './auth';
 import {
   chooseWinner,
   createCloudPushThrottle,
   pullSave,
   pushSave,
 } from './cloudSave';
+import { submitAllBoards } from './leaderboards';
+import { cashPerSecond } from '../engine/economy';
+import { getAircraftDef } from '../data/aircraft';
+import { BOARDS } from '../data/leaderboards';
 import { useGameStore } from '../state/store';
+import type { SaveState } from '../engine/types';
 
 const PUSH_INTERVAL_MS = 15_000;
+const LEADERBOARD_INTERVAL_MS = 60_000;
+
+function computePerMin(s: SaveState): number {
+  const byUid = new Map(s.fleet.map((a) => [a.uid, a]));
+  let totalPerSec = 0;
+  for (const r of s.routes) {
+    const ac = byUid.get(r.aircraftUid);
+    if (!ac || !getAircraftDef(ac.defId)) continue;
+    totalPerSec += cashPerSecond(r, ac, s.hubs, s.activeEvents);
+  }
+  return totalPerSec * 60;
+}
+
+function sessionTimeSec(s: SaveState): number {
+  return Math.max(0, Math.floor((Date.now() - s.createdAtMs) / 1000));
+}
+
+function entriesFromState(s: SaveState): { board: 'lifetime' | 'perMinute' | 'eco' | 'vintage'; score: number }[] {
+  const perMin = computePerMin(s);
+  return BOARDS.map((b) => ({ board: b.id, score: b.selector(s, perMin) }));
+}
 
 export interface CloudSync {
   stop(): void;
@@ -34,8 +60,36 @@ export function startCloudSync(): CloudSync {
     const throttle = createCloudPushThrottle(pushSave, PUSH_INTERVAL_MS);
     let lastUid: string | null = null;
     let lastPushedAt = Date.now();
+    let currentUser: AuthUser | null = null;
+
+    // Throttle leaderboard submissions independently from the save
+    // mirror so scoring updates ride at a calmer cadence (and we
+    // don't hit Cloud Functions on every tick).
+    let lastLeaderboardAt = 0;
+    let leaderboardTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleLeaderboard = (): void => {
+      if (!lastUid) return;
+      const state = useGameStore.getState().state;
+      if (!state) return;
+      const since = Date.now() - lastLeaderboardAt;
+      const fire = (): void => {
+        lastLeaderboardAt = Date.now();
+        leaderboardTimer = null;
+        const meta = {
+          sessionTimeSec: sessionTimeSec(state),
+          displayName: currentUser?.displayName ?? state.airlineName,
+          photoUrl: currentUser?.photoUrl ?? null,
+        };
+        void submitAllBoards(entriesFromState(state), meta);
+      };
+      if (since >= LEADERBOARD_INTERVAL_MS) fire();
+      else if (!leaderboardTimer) {
+        leaderboardTimer = setTimeout(fire, LEADERBOARD_INTERVAL_MS - since);
+      }
+    };
 
     const unsubAuth = subscribeAuth((user) => {
+      currentUser = user;
       if (!user) { lastUid = null; return; }
       if (user.uid === lastUid) return;
       lastUid = user.uid;
@@ -52,6 +106,7 @@ export function startCloudSync(): CloudSync {
             const s = useGameStore.getState().state;
             if (s) throttle.schedule(s);
           }
+          scheduleLeaderboard();
         } catch (err) {
           // eslint-disable-next-line no-console
           console.warn('[skyhaven] cloud reconcile failed', err);
@@ -64,6 +119,7 @@ export function startCloudSync(): CloudSync {
       if (!lastUid) return;
       lastPushedAt = Date.now();
       throttle.schedule(s.state);
+      scheduleLeaderboard();
     });
 
     void ensureAnonymous();
@@ -72,6 +128,7 @@ export function startCloudSync(): CloudSync {
       stop(): void {
         unsubAuth();
         unsubStore();
+        if (leaderboardTimer) { clearTimeout(leaderboardTimer); leaderboardTimer = null; }
         void throttle.flush();
       },
     };

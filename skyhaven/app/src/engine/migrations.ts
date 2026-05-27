@@ -105,6 +105,19 @@ const MIGRATIONS: Record<number, Migration> = {
     }
     return { ...s, schemaVersion: 6, hubs, pendingHubPickRegion: null };
   },
+  // v6 → v7 (Phase 12): adds createdAtMs for leaderboard plausibility
+  // (BRD §12.4). Existing players have no recorded start time; we'd
+  // rather over-credit session time (looser cap) than under-credit
+  // (false-flag legit players), so we default to a year ago. That
+  // makes the per-second cap effectively non-binding for old saves
+  // while the absolute caps still hold.
+  6: (s, nowMs) => ({
+    ...s,
+    schemaVersion: 7,
+    createdAtMs: typeof (s as Record<string, unknown>).createdAtMs === 'number'
+      ? (s as Record<string, unknown>).createdAtMs
+      : nowMs - 365 * 24 * 60 * 60 * 1000,
+  }),
 };
 
 /**

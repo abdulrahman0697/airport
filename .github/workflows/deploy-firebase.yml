@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - 'v*'
+  # Manual trigger from the GitHub Actions UI for in-development phase
+  # iteration (Phase 12+). Tag-based deploys remain the canonical
+  # release flow.
+  workflow_dispatch:
 
 jobs:
   deploy:

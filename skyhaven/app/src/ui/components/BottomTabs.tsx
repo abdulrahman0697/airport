@@ -13,6 +13,7 @@ const TABS: readonly TabSpec[] = [
   { id: 'routes', label: 'Routes', icon: '↗' },
   { id: 'fleet', label: 'Fleet', icon: '✈' },
   { id: 'crew', label: 'Crew', icon: '◆' },
+  { id: 'leaders', label: 'Leaders', icon: '🏆' },
   { id: 'store', label: 'Store', icon: '$' },
 ];
 
@@ -59,7 +60,7 @@ const shell: React.CSSProperties = {
   left: 0,
   right: 0,
   display: 'grid',
-  gridTemplateColumns: 'repeat(5, 1fr)',
+  gridTemplateColumns: 'repeat(6, 1fr)',
   background: 'rgba(11,17,32,0.92)',
   backdropFilter: 'blur(12px)',
   borderTop: '1px solid rgba(255,255,255,0.06)',

@@ -40,4 +40,22 @@ describe('migrate', () => {
     expect(out.nextEventCheckMs).toBe(now + 60_000);
     expect(out.nextCollectibleSpawnMs).toBe(now + 90_000);
   });
+
+  it('seeds createdAtMs on a v6 save by backdating one year', () => {
+    const v6 = { ...createInitialState(0), schemaVersion: 6 };
+    delete (v6 as Record<string, unknown>).createdAtMs;
+    const now = 1_700_000_000_000;
+    const out = migrate(v6, now) as unknown as Record<string, unknown>;
+    expect(out.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    // Default backdate makes the per-second leaderboard cap effectively
+    // non-binding for legacy saves while the absolute caps still hold.
+    expect(out.createdAtMs).toBe(now - 365 * 24 * 60 * 60 * 1000);
+  });
+
+  it('preserves an explicit createdAtMs in the v6 input', () => {
+    const explicit = 1_500_000_000_000;
+    const v6 = { ...createInitialState(0), schemaVersion: 6, createdAtMs: explicit };
+    const out = migrate(v6, 1_700_000_000_000) as unknown as Record<string, unknown>;
+    expect(out.createdAtMs).toBe(explicit);
+  });
 });
