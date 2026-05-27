@@ -24,7 +24,6 @@ export class ErrorBoundary extends Component<Props, State> {
       // eslint-disable-next-line no-console
       console.error('[skyhaven] error stack:', error.stack);
     }
-    // Phase 11+: forward to Crashlytics via @capacitor-firebase/crashlytics.
   }
 
   private reload = (): void => {
