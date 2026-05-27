@@ -44,7 +44,7 @@ jobs:
           # garbage-collects old container images so we don't pay for
           # storing every historical build.
           npx firebase-tools deploy \
-            --only firestore:rules,remoteconfig,functions \
+            --only firestore:rules,firestore:indexes,remoteconfig,functions \
             --force \
             --non-interactive \
             --project "${{ secrets.FIREBASE_PROJECT_ID }}"

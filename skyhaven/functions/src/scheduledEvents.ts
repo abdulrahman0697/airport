@@ -22,6 +22,7 @@
  * }
  */
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { logger } from 'firebase-functions/v2';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { getRemoteConfig } from 'firebase-admin/remote-config';
 
@@ -68,13 +69,20 @@ function parseSchedule(raw: string): ScheduledEntry[] {
 
 async function readSchedule(): Promise<ScheduledEntry[]> {
   try {
-    const tmpl = await getRemoteConfig().getServerTemplate();
-    const cfg = tmpl.evaluate();
-    const raw = cfg.getString('event_schedule') || '[]';
-    return parseSchedule(raw);
+    // Use the classic management API rather than getServerTemplate() —
+    // the latter needs the Server-Side Remote Config preview API which
+    // isn't auto-enabled, so the read silently returns an empty
+    // template and no events ever materialise.
+    const tmpl = await getRemoteConfig().getTemplate();
+    const param = tmpl.parameters?.event_schedule;
+    const raw = (param?.defaultValue as { value?: string } | undefined)?.value;
+    logger.info('[scheduledEvents] schedule raw', {
+      hasParam: !!param,
+      rawPrefix: typeof raw === 'string' ? raw.slice(0, 60) : null,
+    });
+    return parseSchedule(raw ?? '[]');
   } catch (err) {
-    // eslint-disable-next-line no-console
-    console.warn('[scheduledEvents] failed to read Remote Config', err);
+    logger.warn('[scheduledEvents] failed to read Remote Config', err);
     return [];
   }
 }
@@ -90,6 +98,11 @@ export const publishScheduledEvents = onSchedule(
     const upcoming = entries.filter((e) =>
       e.endsAtMs > now && e.startsAtMs <= now + LOOKAHEAD_MS
     );
+    logger.info('[scheduledEvents] cycle', {
+      parsedEntries: entries.length,
+      upcomingEntries: upcoming.length,
+      ids: upcoming.map((e) => e.id),
+    });
     for (const e of upcoming) {
       const ref = db.collection('events').doc(e.id);
       await ref.set({

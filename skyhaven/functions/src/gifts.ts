@@ -14,7 +14,8 @@
  *
  * Friendship must be accepted before either side can send.
  */
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onCall, HttpsError, type CallableRequest } from 'firebase-functions/v2/https';
+import { logger } from 'firebase-functions/v2';
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 const GIFT_KINDS = ['cash', 'fuel'] as const;
@@ -41,6 +42,23 @@ function clampAmount(kind: GiftKind, raw: number): number {
 export const sendGift = onCall(
   { region: 'us-central1' },
   async (req) => {
+    try {
+      return await sendGiftImpl(req);
+    } catch (err) {
+      // Surface anything we didn't categorise as a real HttpsError so
+      // the client sees a useful message instead of "internal". This
+      // most commonly catches Firestore "failed-precondition: missing
+      // index" errors which would otherwise look opaque from the
+      // device.
+      if (err instanceof HttpsError) throw err;
+      const e = err as { code?: string; message?: string };
+      logger.error('[sendGift] unexpected', { code: e?.code, message: e?.message, err });
+      throw new HttpsError('internal', e?.message ?? 'Unknown error');
+    }
+  },
+);
+
+async function sendGiftImpl(req: CallableRequest) {
     const uid = req.auth?.uid;
     if (!uid) throw new HttpsError('unauthenticated', 'Sign in required');
     const data = req.data as { toUid?: unknown; kind?: unknown; amount?: unknown } | undefined;
@@ -109,8 +127,7 @@ export const sendGift = onCall(
       claimedAt: null,
     });
     return { ok: true, status: 'sent' as const, giftId: ref.id, amount: clamped };
-  },
-);
+}
 
 export const claimGift = onCall(
   { region: 'us-central1' },
