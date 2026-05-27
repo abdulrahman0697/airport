@@ -21,10 +21,13 @@
  * Network failures never throw to callers — sign-in is best-effort
  * and the local game keeps running on the local save.
  */
+import { Capacitor } from '@capacitor/core';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
   signInAnonymously,
+  signInWithCredential,
   signInWithPopup,
   signInWithRedirect,
   signOut as fbSignOut,
@@ -93,32 +96,42 @@ export async function ensureAnonymous(): Promise<AuthUser | null> {
 }
 
 /**
- * Sign in with Google via the Firebase JS SDK.
+ * Sign in with Google.
  *
- * On the Android WebView `signInWithPopup` can't open a window, so we
- * fall back to `signInWithRedirect`. After redirect Firebase Auth
- * persists the result and re-emits the user via `onAuthStateChanged`
- * on next launch.
+ * On native Android the Capacitor plugin opens the system Google
+ * account chooser and returns an idToken; we feed that to the JS SDK
+ * so the resulting user shows up on `onAuthStateChanged` and cloud
+ * sync reconciles automatically.
  *
- * Returns the new auth user (popup path) or null (redirect path —
- * resolution happens on the next launch).
+ * On the web (developer-only path) we use `signInWithPopup`, falling
+ * back to `signInWithRedirect` if the popup is blocked.
+ *
+ * Returns the new auth user, or null if the player cancelled / no
+ * network / popup-fallback redirected away.
  */
 export async function signInWithGoogle(): Promise<AuthUser | null> {
   const auth = getFirebaseAuth();
-  const provider = new GoogleAuthProvider();
   try {
-    const out = await signInWithPopup(auth, provider);
-    return toAuthUser(out.user);
-  } catch (err) {
-    // Popup not supported (WebView) — fall back to redirect.
+    if (Capacitor.isNativePlatform()) {
+      const result = await FirebaseAuthentication.signInWithGoogle();
+      const idToken = result.credential?.idToken;
+      if (!idToken) return null;
+      const credential = GoogleAuthProvider.credential(idToken);
+      const out = await signInWithCredential(auth, credential);
+      return toAuthUser(out.user);
+    }
+    const provider = new GoogleAuthProvider();
     try {
+      const out = await signInWithPopup(auth, provider);
+      return toAuthUser(out.user);
+    } catch {
       await signInWithRedirect(auth, provider);
       return null;
-    } catch (err2) {
-      // eslint-disable-next-line no-console
-      console.warn('[skyhaven] Google sign-in failed', err, err2);
-      return null;
     }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[skyhaven] Google sign-in failed', err);
+    return null;
   }
 }
 
@@ -128,6 +141,9 @@ export async function signInWithGoogle(): Promise<AuthUser | null> {
  */
 export async function signOut(): Promise<void> {
   try {
+    if (Capacitor.isNativePlatform()) {
+      await FirebaseAuthentication.signOut();
+    }
     await fbSignOut(getFirebaseAuth());
   } catch (err) {
     // eslint-disable-next-line no-console

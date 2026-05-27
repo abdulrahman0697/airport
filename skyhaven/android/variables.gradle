@@ -13,4 +13,13 @@ ext {
     androidxJunitVersion = '1.2.1'
     androidxEspressoCoreVersion = '3.6.1'
     cordovaAndroidVersion = '10.1.1'
+    // @capacitor-firebase/authentication: promote the Google Sign-in
+    // libs (play-services-auth, androidx.credentials, googleid) from
+    // compileOnly to implementation so the plugin can actually run at
+    // runtime. Capacitor's bridge would otherwise crash on plugin
+    // load with NoClassDefFoundError. Note that the auth plugin
+    // brings firebase-auth only — *not* firebase-crashlytics — so
+    // adding it back does not regress the launch crash we fixed by
+    // dropping the unused @capacitor-firebase/crashlytics stub.
+    rgcfaIncludeGoogle = true
 }
