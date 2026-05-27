@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "description": "SkyHaven Tycoon — Capacitor monorepo root",
-  "workspaces": ["app"],
+  "workspaces": [
+    "app"
+  ],
   "scripts": {
     "dev": "npm run dev -w app",
     "build": "npm run build -w app",
@@ -15,7 +17,6 @@
   },
   "dependencies": {
     "@capacitor-firebase/analytics": "^7.0.0",
-    "@capacitor-firebase/crashlytics": "^7.0.0",
     "@capacitor/android": "^7.0.0",
     "@capacitor/app": "^7.0.0",
     "@capacitor/core": "^7.0.0",
