@@ -9,6 +9,7 @@ import {
   selectUnlockedRegions,
   useGameStore,
 } from '../../state/store';
+import { growthFor } from '../../data/tierGrowth';
 import { Button } from '../design/Button';
 import { ConfettiBurst } from '../design/ConfettiBurst';
 import { AircraftIllustration } from '../design/SvgAircraft';
@@ -36,6 +37,8 @@ interface QueuedMoment {
   bodyLines: string[]; // bullet/explanatory lines
   /** For tier unlocks: a representative aircraft def id for the hero. */
   heroDefId?: string;
+  /** For tier unlocks: numeric tier the player just reached. */
+  tierJustReached?: number;
 }
 
 export function HeroMoments() {
@@ -59,13 +62,18 @@ export function HeroMoments() {
       const planes = aircraftByTier(newTier);
       const examples = planes.slice(0, 3).map((a) => a.displayName);
       const heroDefId = planes[0]?.id;
+      const growth = growthFor(newTier);
+      const lines: string[] = [];
+      if (examples.length) lines.push(`New aircraft: ${examples.join(' · ')}`);
+      if (growth) lines.push(`Your airport now features: ${growth.label}`);
       const moment: QueuedMoment = {
         id: `tier-${newTier}-${Date.now()}`,
         kind: 'tier',
-        primary: `Tier ${newTier} unlocked`,
-        secondary: tierLabel(newTier),
+        primary: growth ? `${growth.era} unlocked` : `Tier ${newTier} unlocked`,
+        secondary: `TIER ${newTier} · ${tierLabel(newTier)}`,
         accent: tailColor,
-        bodyLines: examples.length ? [`New aircraft available:`, examples.join(' · ')] : [],
+        bodyLines: lines,
+        tierJustReached: newTier,
         ...(heroDefId ? { heroDefId } : {}),
       };
       setQueue((q) => [...q, moment]);
@@ -136,6 +144,20 @@ export function HeroMoments() {
             style={card(top.accent) as Record<string, unknown>}
           >
             <div style={{ ...accentBar, background: top.accent }} />
+            {top.kind === 'tier' && top.tierJustReached !== undefined && (
+              <motion.div
+                initial={{ rotate: 12, opacity: 0, scale: 1.3 }}
+                animate={{ rotate: -8, opacity: 0.85, scale: 1 }}
+                transition={{ delay: 0.42, type: 'spring', stiffness: 200, damping: 14 }}
+                style={tierStamp(top.accent) as Record<string, unknown>}
+              >
+                <div style={tierStampInner(top.accent)}>
+                  <div style={tierStampTop}>TIER</div>
+                  <div style={tierStampBig}>{top.tierJustReached}</div>
+                  <div style={tierStampBottom}>UNLOCKED</div>
+                </div>
+              </motion.div>
+            )}
             {top.kind === 'tier' && top.heroDefId && (
               <motion.div
                 initial={{ x: -120, opacity: 0 }}
@@ -230,6 +252,39 @@ const body: React.CSSProperties = {
   color: '#94A3B8',
   fontSize: 13,
   lineHeight: 1.5,
+};
+const tierStamp = (accent: string): React.CSSProperties => ({
+  position: 'absolute',
+  top: 22, right: 18,
+  width: 92, height: 92,
+  zIndex: 4,
+  pointerEvents: 'none',
+  filter: `drop-shadow(0 4px 12px ${accent}88)`,
+});
+const tierStampInner = (accent: string): React.CSSProperties => ({
+  position: 'relative',
+  width: '100%', height: '100%',
+  borderRadius: '50%',
+  border: `3px solid ${accent}`,
+  background: `radial-gradient(circle at center, ${accent}33, transparent 70%)`,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: accent,
+  letterSpacing: '0.16em',
+  textTransform: 'uppercase',
+  fontWeight: 800,
+});
+const tierStampTop: React.CSSProperties = {
+  fontSize: 9, lineHeight: 1.0,
+};
+const tierStampBig: React.CSSProperties = {
+  fontSize: 34, lineHeight: 1.0, fontWeight: 900, marginTop: 2, marginBottom: 2,
+  fontFeatureSettings: '"tnum" 1',
+};
+const tierStampBottom: React.CSSProperties = {
+  fontSize: 8, lineHeight: 1.0, letterSpacing: '0.2em',
 };
 const heroIllustration: React.CSSProperties = {
   display: 'flex',

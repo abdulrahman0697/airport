@@ -28,28 +28,13 @@ import {
   selectTier,
   useGameStore,
 } from '../../state/store';
+import { AIRPORT_GROWTH } from '../../data/tierGrowth';
 import { AirportScene } from '../design/AirportScene';
 import { Chip } from '../design/Chip';
 import { HeroCard } from '../design/HeroCard';
 import { PanelHeader } from '../design/PanelHeader';
 import { COLOR, RADIUS, SPACE, TYPE } from '../design/tokens';
 import { formatCash } from '../format';
-
-interface TierGrowthRow {
-  tier: number;
-  label: string;
-}
-
-const GROWTH_ROADMAP: readonly TierGrowthRow[] = [
-  { tier: 1, label: 'One gate · one runway' },
-  { tier: 2, label: 'Cargo apron + second gate' },
-  { tier: 3, label: 'Control tower' },
-  { tier: 4, label: 'Parking + ground service vehicles' },
-  { tier: 5, label: 'Premium lounge wing' },
-  { tier: 6, label: 'Second runway + skybridge' },
-  { tier: 7, label: 'Metro / rail link' },
-  { tier: 8, label: 'Airport hotel tower' },
-];
 
 export function AirportPanel() {
   const tier = useGameStore(selectTier);
@@ -70,8 +55,8 @@ export function AirportPanel() {
     return { flightsToday, boardingNow, baggageInTransit, passengersServed };
   }, [routes.length, lifetime]);
 
-  const nextGrowth = GROWTH_ROADMAP[tier]; // tier is 1-indexed; array is 0-indexed → next tier
-  const currentGrowth = GROWTH_ROADMAP[tier - 1];
+  const nextGrowth = AIRPORT_GROWTH[tier]; // tier is 1-indexed; array is 0-indexed → next tier
+  const currentGrowth = AIRPORT_GROWTH[tier - 1];
   const nextThreshold = tier < MAX_TIER ? (TIER_UNLOCK_THRESHOLDS[tier + 1] ?? null) : null;
   const remainingToNext = nextThreshold !== null
     ? Math.max(0, nextThreshold - lifetime)
