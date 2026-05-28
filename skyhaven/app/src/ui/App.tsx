@@ -8,8 +8,8 @@ import { EmpireJourney } from './components/EmpireJourney';
 import { BottomTabs } from './components/BottomTabs';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { DailyReward } from './components/DailyReward';
+import { FirstFlightStory } from './components/FirstFlightStory';
 import { FirstRouteCeremony } from './components/FirstRouteCeremony';
-import { FirstTakeoffCinematic } from './components/FirstTakeoffCinematic';
 import { NextUnlockBadge } from './components/NextUnlockBadge';
 import { EventBanner } from './components/EventBanner';
 import { EventPopup } from './components/EventPopup';
@@ -95,7 +95,7 @@ export function App() {
       <HubPicker />
       <Tutorial />
       <FirstRouteCeremony />
-      <FirstTakeoffCinematic />
+      <FirstFlightStory />
       {/* LivingAirportSplash is the new opening surface — fully alive
           airport scene with route arcs overhead and ground motion.
           The legacy IntroSplash stays in the tree but no longer
