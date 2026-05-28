@@ -128,6 +128,18 @@ export function AirportScene({
           @keyframes plane-taxi { 0% { transform: translateX(0); } 50% { transform: translateX(40px); } 100% { transform: translateX(0); } }
           @keyframes runway-pulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
           @keyframes ghost-pulse { 0%,100% { opacity: 0.25; } 50% { opacity: 0.55; } }
+          /* Boarding ring + pax stream for gates (Design Review v4 — point 16). */
+          @keyframes gate-board {
+            0% { stroke-dashoffset: ${2 * Math.PI * 4}; }
+            70% { stroke-dashoffset: 0; }
+            85% { stroke-dashoffset: 0; opacity: 1 }
+            100% { stroke-dashoffset: 0; opacity: 0 }
+          }
+          @keyframes gate-pax {
+            0% { transform: translate(-6px, 8px); opacity: 0 }
+            12% { opacity: 1 }
+            100% { transform: translate(0px, 0px); opacity: 0 }
+          }
           @media (prefers-reduced-motion: reduce) {
             * { animation: none !important; }
           }
@@ -225,9 +237,9 @@ export function AirportScene({
 
       {/* Gates — clickable as 'gate' */}
       <g onClick={tap('gate')} style={{ cursor: onZoneTap ? 'pointer' : 'default' }}>
-        <Gate x={90} tail={tailColor} />
-        {tier >= 2 && <Gate x={130} tail={tailColor} />}
-        {tier >= 4 && <Gate x={170} tail={tailColor} />}
+        <Gate x={90} tail={tailColor} boardingPhase={0} />
+        {tier >= 2 && <Gate x={130} tail={tailColor} boardingPhase={1} />}
+        {tier >= 4 && <Gate x={170} tail={tailColor} boardingPhase={2} />}
       </g>
 
       {/* Control Tower — Tier ≥ 3 — clickable */}
@@ -342,11 +354,45 @@ export function AirportScene({
   );
 }
 
-function Gate({ x, tail }: { x: number; tail: string }) {
+function Gate({ x, tail, boardingPhase = 0 }: { x: number; tail: string; boardingPhase?: number }) {
+  // Each gate sports a tiny circular boarding-progress ring above it.
+  // Three phases stagger the gates so the player sees multiple aircraft
+  // boarding at once — the airport feels operational without a real
+  // boarding-state model (Design Review v4, point 16).
+  const C = 2 * Math.PI * 4;
+  const delay = boardingPhase * 1.6;
   return (
     <g>
       <rect x={x - 1} y="145" width="2" height="6" fill="#2A3556" />
       <rect x={x - 4} y="143" width="8" height="2.5" fill={tail} opacity="0.75" />
+      {/* Boarding ring */}
+      <g transform={`translate(${x}, 132)`}>
+        <circle cx="0" cy="0" r="4" fill="none" stroke={tail} strokeOpacity="0.2" strokeWidth="0.7" />
+        <circle
+          cx="0" cy="0" r="4"
+          fill="none"
+          stroke={tail}
+          strokeWidth="0.8"
+          strokeLinecap="round"
+          strokeDasharray={`${C}`}
+          strokeDashoffset={C}
+          style={{
+            transform: 'rotate(-90deg)',
+            animation: `gate-board 4.5s linear ${delay}s infinite`,
+            filter: `drop-shadow(0 0 2px ${tail})`,
+          }}
+        />
+        {/* Tiny passenger dots streaming into the gate */}
+        {[0, 1, 2].map((i) => (
+          <circle
+            key={i}
+            cx="0" cy="0" r="0.6"
+            fill={tail}
+            opacity="0.9"
+            style={{ animation: `gate-pax 2.2s linear ${delay + i * 0.6}s infinite` }}
+          />
+        ))}
+      </g>
     </g>
   );
 }

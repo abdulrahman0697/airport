@@ -171,6 +171,10 @@ function PricingConsequenceStrip({ mode, hubLevel }: { mode: 'economy' | 'balanc
   return (
     <div>
       <div style={pricingTagline}>{m.tagline}</div>
+      {/* Mini cabin graphic — Design Review v4, point 11. Each mode
+          shows a different seat density / passenger mix so the player
+          can see the strategy at a glance, not just read it. */}
+      <CabinPreview mode={mode} />
       <div style={consequenceRow}>
         {m.chips.map((c) => (
           <span key={c.label} style={{
@@ -184,6 +188,64 @@ function PricingConsequenceStrip({ mode, hubLevel }: { mode: 'economy' | 'balanc
       </div>
       <div style={paxStrip}>{m.pax}</div>
       {warn && <div style={paxWarn}>⚠ {warn}</div>}
+    </div>
+  );
+}
+
+/**
+ * Tiny SVG side-view of the cabin cross-section. Economy = dense rows
+ * of blue dots filling the cabin; Balanced = mixed economy + business;
+ * Premium = sparse rows with big gold + white VIP dots.
+ */
+function CabinPreview({ mode }: { mode: 'economy' | 'balanced' | 'premium' }) {
+  const seats: Array<{ x: number; y: number; color: string; size: number }> = [];
+  if (mode === 'economy') {
+    // Dense 4-row layout.
+    for (let row = 0; row < 4; row++) {
+      for (let col = 0; col < 12; col++) {
+        seats.push({ x: 14 + col * 12, y: 8 + row * 6, color: '#5AC8FA', size: 1.6 });
+      }
+    }
+  } else if (mode === 'balanced') {
+    // Two rows business up front, two rows economy behind.
+    for (let col = 0; col < 6; col++) {
+      seats.push({ x: 14 + col * 14, y: 8, color: '#F4C75B', size: 2 });
+      seats.push({ x: 14 + col * 14, y: 16, color: '#F4C75B', size: 2 });
+    }
+    for (let col = 0; col < 12; col++) {
+      seats.push({ x: 100 + col * 8, y: 8, color: '#5AC8FA', size: 1.4 });
+      seats.push({ x: 100 + col * 8, y: 14, color: '#5AC8FA', size: 1.4 });
+      seats.push({ x: 100 + col * 8, y: 20, color: '#5AC8FA', size: 1.4 });
+      seats.push({ x: 100 + col * 8, y: 26, color: '#5AC8FA', size: 1.4 });
+    }
+  } else {
+    // Premium: sparse pods with VIP and business dots.
+    for (let col = 0; col < 4; col++) {
+      seats.push({ x: 18 + col * 22, y: 10, color: '#F8FAFC', size: 2.5 });
+      seats.push({ x: 18 + col * 22, y: 22, color: '#F8FAFC', size: 2.5 });
+    }
+    for (let col = 0; col < 6; col++) {
+      seats.push({ x: 120 + col * 14, y: 10, color: '#F4C75B', size: 2 });
+      seats.push({ x: 120 + col * 14, y: 22, color: '#F4C75B', size: 2 });
+    }
+  }
+  return (
+    <div style={cabinWrap}>
+      <div style={cabinKicker}>CABIN MIX</div>
+      <svg width="100%" height="36" viewBox="0 0 220 36" preserveAspectRatio="xMidYMid meet">
+        {/* Fuselage outline */}
+        <path d="M 6 18 Q 12 4 30 4 L 200 4 Q 214 6 218 18 Q 214 30 200 32 L 30 32 Q 12 32 6 18 Z"
+          fill="rgba(11,17,32,0.6)" stroke="rgba(148,163,184,0.4)" strokeWidth="0.8" />
+        {/* Cockpit window */}
+        <path d="M 7 14 L 14 10 L 16 14 Z" fill="rgba(148,163,184,0.5)" />
+        {/* Seats */}
+        {seats.map((s, i) => (
+          <circle key={i} cx={s.x} cy={s.y} r={s.size}
+            fill={s.color}
+            opacity="0.92"
+            style={{ filter: `drop-shadow(0 0 ${s.size * 0.8}px ${s.color}88)` }} />
+        ))}
+      </svg>
     </div>
   );
 }
@@ -824,6 +886,23 @@ const PRICING_MODES: readonly PricingMode[] = [
     warn: ({ hubLevel }) => hubLevel < 1 ? 'Premium yield capped — build a Lounge to unlock full uplift.' : null,
   },
 ];
+// Cabin preview (Design Review v4 — point 11)
+const cabinWrap: React.CSSProperties = {
+  marginTop: 8,
+  marginBottom: 4,
+  background: 'rgba(11,17,32,0.45)',
+  border: '1px solid rgba(148,163,184,0.18)',
+  borderRadius: 8,
+  padding: '6px 10px 4px',
+};
+const cabinKicker: React.CSSProperties = {
+  fontSize: 8,
+  fontWeight: 800,
+  letterSpacing: '0.2em',
+  color: '#94A3B8',
+  marginBottom: 2,
+};
+
 const pricingTagline: React.CSSProperties = {
   fontSize: 11,
   color: '#CBD5E1',

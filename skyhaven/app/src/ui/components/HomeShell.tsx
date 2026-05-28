@@ -143,6 +143,23 @@ export function HomeShell() {
     return { economy: econ, business: biz, tourist: tour, vip };
   }, [routes]);
 
+  // Cargo apron heat — Design Review v4, point 19. When the player
+  // owns cargo aircraft / cargo routes, the apron animation shifts:
+  // more crates, a slow truck, and a "CARGO ACTIVE" tag in the
+  // diorama. Cargo becomes a visible parallel economy rather than a
+  // label on a card.
+  const cargoActive = useMemo(() => {
+    if (tier < 2) return false;
+    // Heuristic: at least one cargo aircraft OR an explicit "cargo"
+    // backlog signal once we add the engine state for it. For now,
+    // any cargo aircraft in the hangar lights the apron.
+    return fleet.some((a) => {
+      const def = a.defId.startsWith('c.') || a.defId.includes('cargo')
+        || ['b767f', 'a330f', 'md11f', 'b777f', 'a350f', 'b747f'].some((c) => a.defId.includes(c));
+      return def;
+    });
+  }, [fleet, tier]);
+
   // What grows next (for the Upgrade Airport card + ghost overlay).
   const nextGrowth = AIRPORT_GROWTH[tier];
   const currentGrowth = AIRPORT_GROWTH[tier - 1];
@@ -225,7 +242,7 @@ export function HomeShell() {
             passengerLoad={passengerLoad}
             paxMix={paxMix}
             premium={premiumPax}
-            cargoBacklog={false}
+            cargoBacklog={cargoActive}
             onZoneTap={onZoneTap}
             showNextGhost
           />
@@ -234,6 +251,12 @@ export function HomeShell() {
           <span style={liveDot(tailColor)} />
           LIVE  ·  {boardingNow} BOARDING  ·  {flightsToday} FLIGHTS TODAY
         </div>
+        {cargoActive && (
+          <div style={cargoActiveBadge}>
+            <span style={liveDot(COLOR.gold.base)} />
+            CARGO ACTIVE  ·  APRON SERVICING
+          </div>
+        )}
       </div>
 
       {/* Active ops strip — clickable stats */}
@@ -530,6 +553,17 @@ const dioramaInner: React.CSSProperties = {
   border: `1px solid ${COLOR.border.soft}`,
   background: 'linear-gradient(180deg, #0F1734, #050912)',
   boxShadow: SHADOW.card,
+};
+const cargoActiveBadge: React.CSSProperties = {
+  position: 'absolute',
+  bottom: 16, right: 20,
+  fontSize: 9, fontWeight: 800, letterSpacing: '0.16em',
+  color: COLOR.gold.base,
+  background: 'rgba(11,17,32,0.85)',
+  border: `1px solid ${COLOR.gold.base}55`,
+  padding: '4px 10px',
+  borderRadius: 999,
+  display: 'flex', alignItems: 'center', gap: 6,
 };
 const dioramaLive = (tail: string): React.CSSProperties => ({
   position: 'absolute',
