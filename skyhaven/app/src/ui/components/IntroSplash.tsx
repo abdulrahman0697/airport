@@ -105,9 +105,12 @@ export function IntroSplash() {
       haptics.success();
       sfx.confirm();
       setStage('departing');
-      // Let the takeoff animation play briefly, then hand off to the
-      // cinematic + tutorial.
-      window.setTimeout(() => dismissIntro(), 900);
+      // Micro-takeoff cinematic — Design Review v5 point 3. After the
+      // player taps Clear for Takeoff, the plane physically rolls
+      // forward, the runway lights streak past, and only then does
+      // the splash dismiss into the founder flow. The button promised
+      // a takeoff and we make sure the player actually sees one.
+      window.setTimeout(() => dismissIntro(), 1700);
     }
   };
 

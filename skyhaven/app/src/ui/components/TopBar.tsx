@@ -90,6 +90,12 @@ export function TopBar() {
       ? 'No active routes'
       : 'Spooling up…';
 
+  // Design Review v5 — point 8. The Beginner Top Bar shows only the
+  // three essentials in the very first session: Cash / Income / Next
+  // Goal. The tier ring, EcoBadge and CEO button only appear after
+  // the player has felt some value (first route opened).
+  const veryEarly = routes.length === 0 && lifetime === 0;
+
   return (
     <header style={shell} aria-label="airline header">
       <button
@@ -97,7 +103,7 @@ export function TopBar() {
         style={brandBtn}
         aria-label="Open Empire Journey"
       >
-        <TierRing pct={pct} tier={tier} color={tailColor} size={42} />
+        {!veryEarly && <TierRing pct={pct} tier={tier} color={tailColor} size={42} />}
         <div style={brandCol}>
           <div style={brandText}>{airlineName.toUpperCase()}</div>
           <div style={brandSub}>{nextGoalText}</div>
@@ -119,14 +125,14 @@ export function TopBar() {
           {rateText}
         </div>
       </div>
-      <button
+      {!veryEarly && <button
         onClick={(): void => open('office')}
         style={officeBtn(tailColor)}
         aria-label="Open CEO office"
         title="CEO office"
       >
         <span style={officeGlyph(tailColor)}>CEO</span>
-      </button>
+      </button>}
     </header>
   );
 }

@@ -210,8 +210,8 @@ function ConstructionPhases({ accent }: { accent: string }) {
   const [phase, setPhase] = useState<0 | 1 | 2 | 3>(0);
   useEffect(() => {
     const t1 = window.setTimeout(() => setPhase(1), 320);
-    const t2 = window.setTimeout(() => setPhase(2), 1200);
-    const t3 = window.setTimeout(() => setPhase(3), 2100);
+    const t2 = window.setTimeout(() => setPhase(2), 1400);
+    const t3 = window.setTimeout(() => setPhase(3), 2700);
     return () => {
       window.clearTimeout(t1);
       window.clearTimeout(t2);
@@ -224,20 +224,133 @@ function ConstructionPhases({ accent }: { accent: string }) {
     { icon: '✨', label: 'Opening' },
   ];
   return (
-    <div style={phaseStrip}>
-      {phases.map((p, i) => {
-        const reached = phase > i;
-        const current = phase === i + 1;
-        return (
-          <div key={p.label} style={phaseCell(reached || current, accent)}>
-            <span style={phaseIcon}>{p.icon}</span>
-            <span style={phaseLabel(reached || current, accent)}>{p.label}</span>
-            {current && <span style={phaseSpinner(accent)} />}
-            {reached && <span style={{ ...phaseCheck, color: accent }}>✓</span>}
-          </div>
-        );
-      })}
+    <div style={constructionWrap}>
+      {/* Visual construction scene — Design Review v5, point 14. The
+          ghost building outline appears during Planning, scaffolding
+          + cranes during Construction, lights + final building during
+          Opening. Replaces what used to be 3 label cells. */}
+      <ConstructionScene phase={phase} accent={accent} />
+      <div style={phaseStrip}>
+        {phases.map((p, i) => {
+          const reached = phase > i;
+          const current = phase === i + 1;
+          return (
+            <div key={p.label} style={phaseCell(reached || current, accent)}>
+              <span style={phaseIcon}>{p.icon}</span>
+              <span style={phaseLabel(reached || current, accent)}>{p.label}</span>
+              {current && <span style={phaseSpinner(accent)} />}
+              {reached && <span style={{ ...phaseCheck, color: accent }}>✓</span>}
+            </div>
+          );
+        })}
+      </div>
     </div>
+  );
+}
+
+function ConstructionScene({ phase, accent }: { phase: 0 | 1 | 2 | 3; accent: string }) {
+  return (
+    <svg width="100%" height="68" viewBox="0 0 200 70" preserveAspectRatio="xMidYMid meet"
+      style={{ display: 'block' }}>
+      {/* Ground line */}
+      <rect x="0" y="60" width="200" height="2" fill="rgba(148,163,184,0.25)" />
+
+      {/* Planning: dashed ghost building outline appears. */}
+      {phase >= 1 && (
+        <g>
+          <path
+            d="M 60 60 L 60 32 L 90 24 L 130 24 L 140 32 L 140 60 Z"
+            fill="none"
+            stroke={accent}
+            strokeOpacity="0.5"
+            strokeWidth="0.8"
+            strokeDasharray="3 2"
+          />
+        </g>
+      )}
+
+      {/* Construction: scaffolding + two cranes swinging. */}
+      {phase >= 2 && (
+        <g>
+          {/* Fenced barrier */}
+          {[55, 65, 75, 85, 95, 105, 115, 125, 135, 145].map((x) => (
+            <rect key={x} x={x} y="56" width="0.6" height="4" fill="rgba(148,163,184,0.6)" />
+          ))}
+          <rect x="55" y="59" width="91" height="0.6" fill="rgba(148,163,184,0.6)" />
+          {/* Scaffolding mesh */}
+          <g stroke="rgba(148,163,184,0.5)" strokeWidth="0.4" fill="none">
+            <path d="M 60 60 L 60 32 M 90 60 L 90 32 M 120 60 L 120 32 M 140 60 L 140 32" />
+            <path d="M 60 50 L 140 50 M 60 40 L 140 40 M 60 32 L 140 32" />
+          </g>
+          {/* Two cranes swinging */}
+          <g style={{ animation: 'crane-swing 2.4s ease-in-out infinite', transformOrigin: '50px 60px' }}>
+            <rect x="49" y="20" width="1.5" height="40" fill={accent} opacity="0.85" />
+            <rect x="38" y="18" width="22" height="0.8" fill={accent} opacity="0.85" />
+            <line x1="56" y1="19" x2="56" y2="30" stroke={accent} strokeWidth="0.5" />
+            <rect x="55" y="30" width="2" height="2" fill={accent} />
+          </g>
+          <g style={{ animation: 'crane-swing 2.8s ease-in-out -1.4s infinite', transformOrigin: '155px 60px' }}>
+            <rect x="154" y="22" width="1.5" height="38" fill={accent} opacity="0.85" />
+            <rect x="148" y="20" width="18" height="0.8" fill={accent} opacity="0.85" />
+            <line x1="151" y1="21" x2="151" y2="34" stroke={accent} strokeWidth="0.5" />
+            <rect x="150" y="34" width="2" height="2" fill={accent} />
+          </g>
+          {/* Worker dots */}
+          {[68, 78, 100, 118].map((x, i) => (
+            <circle key={i} cx={x} cy="58" r="0.8" fill="#F4C75B" opacity="0.8" />
+          ))}
+        </g>
+      )}
+
+      {/* Opening: solid building with lit windows, plus ribbon. */}
+      {phase >= 3 && (
+        <g style={{ animation: 'opening-pop 0.5s ease-out forwards' }}>
+          <path
+            d="M 60 60 L 60 32 L 90 24 L 130 24 L 140 32 L 140 60 Z"
+            fill="url(#construction-fill)"
+            stroke={accent}
+            strokeWidth="0.6"
+          />
+          {/* Lit windows in 3 rows */}
+          {[36, 42, 48].map((row) => (
+            [66, 72, 78, 84, 90, 96, 102, 108, 114, 120, 126, 132].map((col) => (
+              <rect key={`${row}-${col}`} x={col} y={row} width="2" height="2.5"
+                fill="#F4C75B" opacity="0.85" />
+            ))
+          ))}
+          {/* Ribbon cut */}
+          <path d="M 55 58 L 145 58" stroke={accent} strokeWidth="1" />
+        </g>
+      )}
+
+      {/* Twinkling new lights overlay */}
+      {phase >= 3 && Array.from({ length: 8 }).map((_, i) => (
+        <circle key={`spark-${i}`} cx={50 + (i * 14) % 100} cy={40 + ((i * 7) % 18)} r="0.7"
+          fill="#FCE9A5" opacity="0.85"
+          style={{ animation: `spark-twinkle ${1 + (i % 3) * 0.6}s ease-in-out ${i * 0.18}s infinite` }} />
+      ))}
+
+      <defs>
+        <linearGradient id="construction-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#3A4A75" />
+          <stop offset="1" stopColor="#1F2A4D" />
+        </linearGradient>
+        <style>{`
+          @keyframes crane-swing {
+            0%, 100% { transform: rotate(-3deg); }
+            50% { transform: rotate(3deg); }
+          }
+          @keyframes opening-pop {
+            0% { opacity: 0; transform: translateY(4px) scale(0.96); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+          }
+          @keyframes spark-twinkle {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+          }
+        `}</style>
+      </defs>
+    </svg>
   );
 }
 
@@ -328,7 +441,10 @@ const tierStampBig: React.CSSProperties = {
 const tierStampBottom: React.CSSProperties = {
   fontSize: 8, lineHeight: 1.0, letterSpacing: '0.2em',
 };
-// Construction phase strip (Design Review v4 — point 15)
+// Construction visuals + phase strip (Design Review v5 — point 14)
+const constructionWrap: React.CSSProperties = {
+  padding: '6px 12px 4px',
+};
 const phaseStrip: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(3, 1fr)',

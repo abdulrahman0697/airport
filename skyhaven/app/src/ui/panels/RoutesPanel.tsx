@@ -4,15 +4,17 @@ import { loadTopAirports, type Airport } from '../../data/airports';
 import { REGIONS } from '../../data/regions';
 import { conditionBand } from '../../engine/condition';
 import { haversineKm } from '../../engine/distance';
-import { cashPerSecond, legDurationMs } from '../../engine/economy';
+import { cashPerSecond } from '../../engine/economy';
 import { hubPickCost, routeOpenCost } from '../../engine/actions';
 import {
   hubUpgradeCost,
   MAX_HUB_LEVEL,
   routesAtAirport,
 } from '../../engine/hubs';
+import { aircraftNickname, routeFlightCode } from '../../engine/identity';
 import type { Route } from '../../engine/types';
 import {
+  selectAirlineCode,
   selectCash,
   selectFleet,
   selectHubs,
@@ -90,45 +92,91 @@ function RoutesList() {
 function RouteRow({ route }: { route: Route }) {
   const aircraft = useGameStore((s) => s.state?.fleet.find((a) => a.uid === route.aircraftUid));
   const hubs = useGameStore(selectHubs);
+  const airlineCode = useGameStore(selectAirlineCode);
   const setPricing = useGameStore((s) => s.setRoutePricing);
   const closeRoute = useGameStore((s) => s.closeRoute);
   const [error, setError] = useState<string | null>(null);
+  // Route Health System — Design Review v5 point 17. Advanced details
+  // (pricing toggles, cabin preview, consequence chips, close menu)
+  // live behind a single disclosure so the default card answers only
+  // the three questions a player actually asks: is it profitable,
+  // what's the bottleneck, what should I do next.
+  const [showAdvanced, setShowAdvanced] = useState(false);
   if (!aircraft) return null;
   const def = getAircraftDef(aircraft.defId);
   if (!def) return null;
 
   const cps = cashPerSecond(route, aircraft, hubs);
-  const leg = legDurationMs(route, aircraft) / 1000;
   const band = conditionBand(aircraft.condition);
   const condColor = band === 'normal' ? '#34D399' : band === 'degraded' ? '#F59E0B' : '#F87171';
   const touchesHub = hubs.some((h) => h.iata === route.originIata || h.iata === route.destIata);
   const isCargo = def.category === 'cargo';
 
+  // Route Health diagnostic — three chips + one recommended action.
+  const flightCode = routeFlightCode(route.id, airlineCode);
+  const nickname = aircraftNickname(aircraft.uid);
+  const hubLvl = hubLevelFor(route, hubs);
+  const demand: 'High' | 'Steady' | 'Low' = route.loadFactor >= 0.75 ? 'High'
+    : route.loadFactor >= 0.55 ? 'Steady' : 'Low';
+  const aircraftFit: 'Excellent' | 'Good' | 'Stretched' =
+    route.distanceKm <= def.rangeKm * 0.6 ? 'Excellent'
+    : route.distanceKm <= def.rangeKm * 0.9 ? 'Good' : 'Stretched';
+  const capacity: 'Open' | 'Tight' | 'Limited' = route.loadFactor >= 0.92 ? 'Limited'
+    : route.loadFactor >= 0.78 ? 'Tight' : 'Open';
+  const recommendation = computeRecommendation({
+    route, aircraft, def, capacity, aircraftFit, conditionBand: band, hubLevel: hubLvl,
+  });
+
   return (
     <li style={card}>
+      {/* Top line — origin/dest + rate. The two questions casual taps
+          want answered: where does this fly + how much it pays. */}
       <div style={cardHeader}>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <div style={cardTitle}>
             {route.originIata} ↔ {route.destIata}
+            {route.inaugural && <span style={inauguralBadge}>★ INAUGURAL</span>}
             {touchesHub && <span style={hubBadge}>HUB</span>}
             {isCargo && <span style={cargoBadge}>CARGO</span>}
           </div>
           <div style={cardSubtitle}>
-            {def.displayName} · {Math.round(route.distanceKm).toLocaleString()} km · leg {leg.toFixed(1)}s
+            ✈ {flightCode}  ·  {nickname}  ·  {def.displayName}
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={rateText}>{formatRate(cps)}</div>
           <div style={{ color: condColor, fontSize: 11, marginTop: 2 }}>
-            {aircraft.condition.toFixed(0)}%
-            {!isCargo && ` · ${(route.loadFactor * 100).toFixed(0)}% load`}
-            {isCargo && ' · full'}
+            {aircraft.condition.toFixed(0)}%  ·  {Math.round(route.distanceKm).toLocaleString()} km
           </div>
         </div>
       </div>
 
-      {!isCargo && (
-        <div>
+      {/* Route Health chips — three at-a-glance signals. */}
+      <div style={healthRow}>
+        <HealthChip label="Demand" value={demand}
+          tone={demand === 'High' ? 'pos' : demand === 'Steady' ? 'neutral' : 'neg'} />
+        <HealthChip label="Aircraft Fit" value={aircraftFit}
+          tone={aircraftFit === 'Excellent' ? 'pos' : aircraftFit === 'Good' ? 'neutral' : 'neg'} />
+        <HealthChip label="Capacity" value={capacity}
+          tone={capacity === 'Open' ? 'pos' : capacity === 'Tight' ? 'neutral' : 'neg'} />
+      </div>
+
+      {/* One recommended action. */}
+      <div style={recBox(recommendation.tone)}>
+        <div style={recKicker}>RECOMMENDED</div>
+        <div style={recText}>{recommendation.text}</div>
+      </div>
+
+      {/* Advanced disclosure. */}
+      <button
+        onClick={(): void => setShowAdvanced((v) => !v)}
+        style={advancedToggle(showAdvanced)}
+      >
+        {showAdvanced ? '▾ Hide advanced' : '▸ Strategy, cabin, close route'}
+      </button>
+
+      {showAdvanced && !isCargo && (
+        <div style={advancedBlock}>
           <div style={pricingRow}>
             {PRICING_MODES.map((m) => (
               <button key={m.id}
@@ -142,20 +190,72 @@ function RouteRow({ route }: { route: Route }) {
               </button>
             ))}
           </div>
-          <PricingConsequenceStrip mode={route.pricing} hubLevel={hubLevelFor(route, hubs)} />
+          <PricingConsequenceStrip mode={route.pricing} hubLevel={hubLvl} />
+          <RouteAdvancedMenu
+            onClose={(): void => {
+              const res = closeRoute(route.id);
+              setError(res.ok ? null : res.message);
+            }}
+          />
         </div>
       )}
-      {/* Design Review v3 — point 11. Destructive actions move into a
-          three-dot Advanced menu so the main card prompts growth, not
-          cancellation. */}
-      <RouteAdvancedMenu
-        onClose={(): void => {
-          const res = closeRoute(route.id);
-          setError(res.ok ? null : res.message);
-        }}
-      />
+      {showAdvanced && isCargo && (
+        <div style={advancedBlock}>
+          <div style={pricingTagline}>Cargo lanes always ship full at fixed yield — no pricing toggle.</div>
+          <RouteAdvancedMenu
+            onClose={(): void => {
+              const res = closeRoute(route.id);
+              setError(res.ok ? null : res.message);
+            }}
+          />
+        </div>
+      )}
       {error && <div style={errorText}>{error}</div>}
     </li>
+  );
+}
+
+interface RecomCtx {
+  route: Route;
+  aircraft: { condition: number; upgrades: { engine: number; cabin: number; fuelEff: number; marketing: number } };
+  def: { rangeKm: number; capacity: number };
+  capacity: 'Open' | 'Tight' | 'Limited';
+  aircraftFit: 'Excellent' | 'Good' | 'Stretched';
+  conditionBand: 'normal' | 'degraded' | 'critical';
+  hubLevel: number;
+}
+function computeRecommendation(ctx: RecomCtx): { text: string; tone: 'pos' | 'neutral' | 'warn' } {
+  if (ctx.conditionBand === 'critical') {
+    return { text: 'Service aircraft urgently — open Hangar → Maintenance Bay', tone: 'warn' };
+  }
+  if (ctx.conditionBand === 'degraded') {
+    return { text: 'Run a Quick Service — restores condition without grounding', tone: 'warn' };
+  }
+  if (ctx.aircraftFit === 'Stretched') {
+    return { text: 'Assign a longer-range aircraft — current is near max range', tone: 'warn' };
+  }
+  if (ctx.capacity === 'Limited') {
+    return { text: 'Upgrade Cabin or swap to a wide-body — leaving demand on the table', tone: 'neutral' };
+  }
+  if (ctx.route.pricing !== 'premium' && ctx.hubLevel >= 1 && ctx.capacity === 'Open') {
+    return { text: 'Try Premium pricing — lounge ready and load is open', tone: 'pos' };
+  }
+  if (ctx.aircraft.upgrades.marketing < 3) {
+    return { text: 'Upgrade Marketing — lifts load factor without buying a new plane', tone: 'pos' };
+  }
+  return { text: 'Healthy lane — keep the cash flowing', tone: 'pos' };
+}
+
+function HealthChip({ label, value, tone }: { label: string; value: string; tone: 'pos' | 'neutral' | 'neg' }) {
+  const color = tone === 'pos' ? '#34D399' : tone === 'neg' ? '#F87171' : '#94A3B8';
+  return (
+    <div style={{
+      ...healthChip,
+      borderColor: tone === 'pos' ? 'rgba(52,211,153,0.4)' : tone === 'neg' ? 'rgba(248,113,113,0.4)' : 'rgba(148,163,184,0.3)',
+    }}>
+      <div style={healthChipLabel}>{label}</div>
+      <div style={{ ...healthChipValue, color }}>{value}</div>
+    </div>
   );
 }
 
@@ -1119,6 +1219,75 @@ const routePreviewFoot: React.CSSProperties = {
   fontSize: 11,
   color: '#94A3B8',
   lineHeight: 1.5,
+};
+// Route Health styles (Design Review v5 — point 17)
+const inauguralBadge: React.CSSProperties = {
+  fontSize: 9, letterSpacing: '0.16em', fontWeight: 800,
+  color: '#0B1120',
+  background: 'linear-gradient(135deg, #F4C75B, #FCE9A5)',
+  padding: '2px 7px', borderRadius: 4,
+  marginLeft: 6,
+  boxShadow: '0 0 8px rgba(244,199,91,0.55)',
+};
+const healthRow: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, 1fr)',
+  gap: 6,
+  marginTop: 10,
+};
+const healthChip: React.CSSProperties = {
+  background: 'rgba(11,17,32,0.55)',
+  border: '1px solid',
+  borderRadius: 8,
+  padding: '6px 8px',
+  textAlign: 'center',
+};
+const healthChipLabel: React.CSSProperties = {
+  fontSize: 8, letterSpacing: '0.18em',
+  color: '#64748B', fontWeight: 800,
+  textTransform: 'uppercase',
+};
+const healthChipValue: React.CSSProperties = {
+  fontSize: 12, fontWeight: 800, marginTop: 1,
+};
+const recBox = (tone: 'pos' | 'neutral' | 'warn'): React.CSSProperties => {
+  const accent = tone === 'pos' ? '#34D399' : tone === 'warn' ? '#F4C75B' : '#5AC8FA';
+  return {
+    marginTop: 8,
+    background: `linear-gradient(140deg, ${accent}1c, rgba(11,17,32,0.55))`,
+    border: `1px solid ${accent}55`,
+    borderLeft: `3px solid ${accent}`,
+    borderRadius: 8,
+    padding: '8px 10px',
+  };
+};
+const recKicker: React.CSSProperties = {
+  fontSize: 8, fontWeight: 800, letterSpacing: '0.22em',
+  color: '#94A3B8',
+};
+const recText: React.CSSProperties = {
+  fontSize: 12, fontWeight: 700, marginTop: 2,
+  color: '#F8FAFC', lineHeight: 1.4,
+};
+const advancedToggle = (open: boolean): React.CSSProperties => ({
+  marginTop: 8,
+  width: '100%',
+  background: 'transparent',
+  border: '1px dashed rgba(148,163,184,0.3)',
+  borderRadius: 6,
+  padding: '6px 10px',
+  cursor: 'pointer',
+  color: open ? '#5AC8FA' : '#94A3B8',
+  fontFamily: 'inherit',
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: '0.06em',
+  textAlign: 'left',
+});
+const advancedBlock: React.CSSProperties = {
+  marginTop: 8,
+  paddingTop: 8,
+  borderTop: '1px solid rgba(148,163,184,0.1)',
 };
 const hubBadge: React.CSSProperties = {
   fontSize: 9, letterSpacing: '0.1em', fontWeight: 700,
