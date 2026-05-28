@@ -30,7 +30,7 @@ import { sfx } from '../juice/sfx';
 import { haptics } from '../juice/haptics';
 import { usePanelStore, type PanelId } from './PanelHost';
 
-type LaunchTarget = Extract<PanelId, 'achievements' | 'leaders' | 'missions'>;
+type LaunchTarget = Extract<PanelId, 'airport' | 'achievements' | 'leaders' | 'missions'>;
 
 interface LaunchItem {
   id: LaunchTarget;
@@ -39,10 +39,24 @@ interface LaunchItem {
 }
 
 const ITEMS: readonly LaunchItem[] = [
+  { id: 'airport',      label: 'Home Airport', Icon: HomeAirportIcon },
   { id: 'leaders',      label: 'Leaderboards', Icon: LeaderIcon },
   { id: 'missions',     label: 'Daily Missions', Icon: MissionsIcon },
   { id: 'achievements', label: 'Achievements', Icon: TrophyIcon },
 ];
+
+function HomeAirportIcon({ color }: { color: string }) {
+  return (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M3 20V11l9-5 9 5v9" stroke={color} strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M3 20h18" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M9 20v-6h6v6" stroke={color} strokeWidth="1.4" />
+      {/* Tower */}
+      <path d="M16 9l1.5-3 1.5 3" stroke={color} strokeWidth="1.2" />
+      <circle cx={17.5} cy={5.6} r={0.8} fill={color} />
+    </svg>
+  );
+}
 
 export function SideLauncher() {
   const tailColor = useGameStore(selectTailColor);
