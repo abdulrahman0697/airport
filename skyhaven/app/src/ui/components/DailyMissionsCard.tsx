@@ -9,6 +9,8 @@
  */
 import { getMissionTemplate } from '../../data/dailyMissions';
 import { selectDailyMissions, useGameStore } from '../../state/store';
+import { Button } from '../design/Button';
+import { Chip } from '../design/Chip';
 import { formatCash } from '../format';
 import { haptics } from '../juice/haptics';
 
@@ -62,20 +64,19 @@ export function DailyMissionsCard() {
                 </div>
               </div>
               <div style={rewardCol}>
-                <div style={rewardAmt}>+${formatCash(m.reward)}</div>
-                <button
+                <Chip tone={done ? 'gold' : 'mute'}>+${formatCash(m.reward)}</Chip>
+                <Button
+                  size="sm"
+                  variant={m.claimed ? 'ghost' : done ? 'gold' : 'secondary'}
                   disabled={m.claimed || !done}
+                  hapticOnPress={done ? 'medium' : 'light'}
                   onClick={(): void => {
                     const res = claim(m.id);
                     if (res.ok) haptics.success();
                   }}
-                  style={{
-                    ...claimBtn,
-                    opacity: m.claimed ? 0.4 : done ? 1 : 0.5,
-                  }}
                 >
-                  {m.claimed ? '✓' : 'Claim'}
-                </button>
+                  {m.claimed ? 'Claimed' : 'Claim'}
+                </Button>
               </div>
             </li>
           );
@@ -129,13 +130,4 @@ const progressLabel: React.CSSProperties = {
 const rewardCol: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', alignItems: 'flex-end',
   justifyContent: 'space-between', gap: 6, minWidth: 80,
-};
-const rewardAmt: React.CSSProperties = {
-  fontSize: 12, color: '#F4C75B', fontWeight: 700,
-  fontFeatureSettings: '"tnum" 1',
-};
-const claimBtn: React.CSSProperties = {
-  background: '#5AC8FA', color: '#0B1120', border: 0,
-  borderRadius: 6, padding: '6px 14px', minHeight: 32,
-  cursor: 'pointer', fontFamily: 'inherit', fontSize: 11, fontWeight: 700,
 };
