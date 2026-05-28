@@ -7,6 +7,9 @@ import { createAirportPins, type AirportPinsLayer } from './AirportPins';
 import { createAmbient, type AmbientLayer } from './Ambient';
 import { ArcsLayer } from './Arcs';
 import { createBasemap } from './Basemap';
+import { createDayNight, type DayNightLayer } from './DayNight';
+import { createHubPulses, type HubPulsesLayer } from './HubPulses';
+import { createRipples, type RipplesLayer } from './Ripples';
 import { Camera } from './Camera';
 import { createClouds, type CloudLayer } from './Clouds';
 import { CollectiblesLayer } from './Collectibles';
@@ -40,6 +43,8 @@ export interface WorldStage {
   setCollectibles(items: readonly Collectible[]): void;
   setCollectibleTapHandler(fn: (id: string) => void): void;
   setUnlockedRegions(regions: ReadonlySet<number>): void;
+  /** Set the player's owned hub IATAs so the world can pulse them. */
+  setHubs(iatas: readonly string[]): void;
   setAirportTapHandler(fn: (airport: Airport, screen: { x: number; y: number }) => void): void;
   setRouteTapHandler(fn: (routeId: string, screen: { x: number; y: number }) => void): void;
   zoomToRegion(regionId: number, scale?: number): void;
@@ -92,7 +97,10 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
   const ambient: AmbientLayer = createAmbient();
   ambient.setReducedMotion(REDUCED_MOTION);
   const countries: CountriesLayer = createCountries();
+  const dayNight: DayNightLayer = createDayNight();
   const clouds: CloudLayer = createClouds();
+  const hubPulses: HubPulsesLayer = createHubPulses(airports);
+  const ripples: RipplesLayer = createRipples();
   const arcsLayer = new ArcsLayer(airports);
 
   // Tap dispatchers — React registers handlers via setXxxTapHandler.
@@ -111,9 +119,14 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
   app.stage.eventMode = 'static';
   root.addChild(basemap);
   root.addChild(ambient.container);
+  // Day/night sits above country fills so the sunlit wash tints the
+  // landmass, but below clouds + pins so legibility is preserved.
+  root.addChild(dayNight.container);
   root.addChild(countries.container);
   root.addChild(clouds.container);
+  root.addChild(hubPulses.container);
   root.addChild(arcsLayer.container);
+  root.addChild(ripples.container);
   root.addChild(pinsLayer.container);
   root.addChild(collectiblesLayer.container);
   // eslint-disable-next-line no-console
@@ -137,6 +150,8 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
   let lastT = 0;
   let dragVx = 0;
   let dragVy = 0;
+  let downX = 0;
+  let downY = 0;
   const pointers = new Map<number, { x: number; y: number }>();
   let pinchDist = 0;
 
@@ -145,6 +160,7 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
     if (pointers.size === 1) {
       dragging = true;
       lastX = e.clientX; lastY = e.clientY; lastT = performance.now();
+      downX = e.clientX; downY = e.clientY;
       dragVx = 0; dragVy = 0;
       camera.stopMomentum();
     } else if (pointers.size === 2) {
@@ -186,7 +202,23 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
     if (pointers.size < 2) pinchDist = 0;
     if (pointers.size === 0 && dragging) {
       dragging = false;
-      if (!REDUCED_MOTION) camera.flick(dragVx, dragVy);
+      // Empty-water ripple: only fires if the gesture was a stationary
+      // tap (≤ 6 px total movement). Interactive elements (pins, arcs,
+      // collectibles) absorb the pointertap before this canvas-level
+      // up event in normal cases — but if they do propagate, a small
+      // ripple at the same spot reads as welcoming, not noisy.
+      const dx = e.clientX - downX;
+      const dy = e.clientY - downY;
+      if (Math.hypot(dx, dy) <= 6) {
+        const rect = app.canvas.getBoundingClientRect();
+        const screenX = e.clientX - rect.left;
+        const screenY = e.clientY - rect.top;
+        const worldX = camera.state.tx + screenX / camera.state.scale;
+        const worldY = camera.state.ty + screenY / camera.state.scale;
+        ripples.spawn(worldX, worldY);
+      } else if (!REDUCED_MOTION) {
+        camera.flick(dragVx, dragVy);
+      }
     }
     try { app.canvas.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
   };
@@ -229,7 +261,13 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
       clouds.tick(dtMs);
       arcsLayer.tick(dtMs);
       ambient.tick(dtMs);
+      hubPulses.tick(dtMs);
+      ripples.tick(dtMs);
     }
+    // Day-night repaint runs even with reduced motion (slow update,
+    // no perceptible animation), so the sunlit-side wash stays
+    // correct as the device clock ticks past noon.
+    dayNight.tick(dtMs);
     collectiblesLayer.tick(dtMs);
     pinsLayer.tick(camera.state.scale);
     applyCamera();
@@ -240,8 +278,12 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
 
   let tailColorNum = 0x5ac8fa;
   let unlockedRegions: ReadonlySet<number> = new Set<number>();
+  let hubIatas: readonly string[] = [];
   function refreshPinRegions(): void {
     pinsLayer.setUnlockedRegions(unlockedRegions, tailColorNum);
+  }
+  function refreshHubPulses(): void {
+    hubPulses.setHubs(hubIatas, tailColorNum);
   }
 
   return {
@@ -254,7 +296,12 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
       if (Number.isFinite(n)) {
         tailColorNum = n;
         refreshPinRegions();
+        refreshHubPulses();
       }
+    },
+    setHubs: (iatas) => {
+      hubIatas = iatas;
+      refreshHubPulses();
     },
     setCollectibles: (items) => collectiblesLayer.setCollectibles(items),
     setCollectibleTapHandler: (fn) => { collectibleTapHandler = fn; },
@@ -287,6 +334,9 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
       pinsLayer.destroy();
       countries.destroy();
       ambient.destroy();
+      dayNight.destroy();
+      hubPulses.destroy();
+      ripples.destroy();
       app.destroy(true, { children: true, texture: true });
     },
   };

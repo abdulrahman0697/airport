@@ -44,6 +44,7 @@ export function WorldView() {
         if (s) {
           stage.setTailColor(s.tailColor);
           stage.setUnlockedRegions(new Set<number>(s.unlockedRegions));
+          stage.setHubs(s.hubs.map((h) => h.iata));
           stage.setRoutes(s.routes);
           stage.setCollectibles(s.collectibles);
           // If exactly one region is unlocked, zoom in on it so the
@@ -94,6 +95,9 @@ export function WorldView() {
       }
       if (!prev.state || state.state.unlockedRegions !== prev.state.unlockedRegions) {
         stage.setUnlockedRegions(new Set<number>(state.state.unlockedRegions));
+      }
+      if (!prev.state || state.state.hubs !== prev.state.hubs) {
+        stage.setHubs(state.state.hubs.map((h) => h.iata));
       }
     });
     return unsub;
