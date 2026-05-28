@@ -168,12 +168,18 @@ function MotionLayer({ tailColor }: { tailColor: string }) {
     return out;
   }, []);
 
-  // Drifting aircraft across the upper sky.
+  // Drifting aircraft across the upper sky. Eight in total — two on
+  // each of four lanes — staggered with different periods + phases so
+  // the sky never looks empty.
   const drifters = useMemo(() => [
-    { y: 9,  scale: 0.7, period: 32000, phase: 0.00, dir:  1, accent: '#F8FAFC' },
-    { y: 17, scale: 0.5, period: 41000, phase: 0.35, dir:  1, accent: '#CBD5E1' },
-    { y: 25, scale: 0.6, period: 36000, phase: 0.65, dir: -1, accent: '#F8FAFC' },
-    { y: 32, scale: 0.4, period: 48000, phase: 0.10, dir:  1, accent: '#94A3B8' },
+    { y:  7, scale: 0.7, period: 32000, phase: 0.00, dir:  1 },
+    { y:  7, scale: 0.5, period: 38000, phase: 0.55, dir: -1 },
+    { y: 14, scale: 0.5, period: 41000, phase: 0.20, dir:  1 },
+    { y: 14, scale: 0.6, period: 35000, phase: 0.75, dir: -1 },
+    { y: 22, scale: 0.6, period: 36000, phase: 0.40, dir: -1 },
+    { y: 22, scale: 0.4, period: 44000, phase: 0.10, dir:  1 },
+    { y: 30, scale: 0.4, period: 48000, phase: 0.10, dir:  1 },
+    { y: 30, scale: 0.55, period: 40000, phase: 0.65, dir: -1 },
   ], []);
 
   // Runway approach lights — perspective line from near end (52, 78)
@@ -196,31 +202,35 @@ function MotionLayer({ tailColor }: { tailColor: string }) {
     <>
       <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" style={svgLayer} aria-hidden>
         <defs>
-          {/* Two-stage filter that turns the airplane JPG into a clean
-              black silhouette with a transparent background. First
-              feColorMatrix keys the white background out via luminance
-              (alpha = -3*luminance + 3, clamped). Second feColorMatrix
-              zeroes out R/G/B so every still-visible pixel becomes
-              pure black, while preserving the alpha computed above.
-              The net effect: a black silhouette of the airplane that
-              composites cleanly onto the sunset sky. */}
-          <filter id="splash-silhouette">
+          {/* Two-stage filter that keys out the airplane JPG's white
+              background AND boosts the plane's colours so they read
+              brightly against the dusk sky.
+
+              Stage 1: alpha-from-luminance, but the alpha row now
+              also multiplies by the SOURCE alpha (4th column = 3).
+              That way pixels outside the image bounding box (which
+              are transparent black) stay transparent, instead of
+              being computed as opaque black — which was causing the
+              dark square halo around each plane.
+
+              Stage 2: a linear RGB transfer that lifts mid-tones
+              ~20% with a small +5% intercept, so the originally
+              washed-out plane body brightens and the red/blue
+              accents pop. Alpha is untouched. */}
+          <filter id="splash-plane-key">
             <feColorMatrix
               type="matrix"
               values="1 0 0 0 0
                       0 1 0 0 0
                       0 0 1 0 0
-                      -0.897 -1.761 -0.342 0 3"
+                      -0.897 -1.761 -0.342 3 0"
               result="keyed"
             />
-            <feColorMatrix
-              in="keyed"
-              type="matrix"
-              values="0 0 0 0 0
-                      0 0 0 0 0
-                      0 0 0 0 0
-                      0 0 0 1 0"
-            />
+            <feComponentTransfer in="keyed">
+              <feFuncR type="linear" slope="1.25" intercept="0.08" />
+              <feFuncG type="linear" slope="1.25" intercept="0.08" />
+              <feFuncB type="linear" slope="1.25" intercept="0.08" />
+            </feComponentTransfer>
           </filter>
         </defs>
 
@@ -247,16 +257,18 @@ function MotionLayer({ tailColor }: { tailColor: string }) {
           );
         })}
 
-        {/* Drifting aircraft — black silhouettes painted from the
-            plane.jpg asset via the silhouette filter. Right-going
-            planes use the natural orientation (image already points
-            up-right); left-going planes flip horizontally. Sized
-            small so they read as distant traffic, not foreground
-            elements. */}
+        {/* Drifting aircraft — colour silhouettes painted from the
+            plane.jpg asset. The splash-plane-key filter strips the
+            white background (preserving the source alpha so there's
+            no dark halo) and brightens the plane's mid-tones so its
+            blues and salmon-red accents read against the dusk sky.
+            Right-going planes use the natural orientation (the image
+            already points up-right); left-going planes flip
+            horizontally via scaleX(-1). */}
         {drifters.map((d, i) => {
           const t = ((now / d.period) + d.phase) % 1;
           const x = d.dir > 0 ? -8 + t * 116 : 108 - t * 116;
-          const sz = 5 * d.scale; // smaller than before — viewBox units wide
+          const sz = 5 * d.scale;
           const sx = d.dir > 0 ? 1 : -1;
           return (
             <g key={`drift-${i}`} transform={`translate(${x} ${d.y}) scale(${sx} 1)`}>
@@ -267,8 +279,8 @@ function MotionLayer({ tailColor }: { tailColor: string }) {
                 width={sz}
                 height={sz}
                 preserveAspectRatio="xMidYMid meet"
-                filter="url(#splash-silhouette)"
-                opacity="0.78"
+                filter="url(#splash-plane-key)"
+                opacity="0.95"
               />
             </g>
           );
