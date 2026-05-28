@@ -7,6 +7,8 @@ import {
   selectTutorialStep,
   useGameStore,
 } from '../../state/store';
+import { Button } from '../design/Button';
+import { Typewriter } from '../design/Typewriter';
 import { usePanelStore, type PanelId } from './PanelHost';
 import { useUiStore } from '../../state/uiStore';
 import type { SaveState } from '../../engine/types';
@@ -280,13 +282,23 @@ function TutorialCard({
         style={(placement === 'center' ? shellCenter : placement === 'top' ? shellTop : shellBottom) as Record<string, unknown>}
       >
         <div style={card}>
+          {/* Scanline overlay — a game-HUD touch */}
+          <div style={scanlines} aria-hidden />
+          {/* Cyan top glow bar */}
+          <div style={topGlow(tailColor)} aria-hidden />
+
           <div style={kicker}>
-            <span>Step {step + 1} of {total}</span>
-            {current.kind === 'wait-state' && <span style={waitTag}>● waiting for you</span>}
-            {current.kind === 'wait-time' && <span style={waitTagNeutral}>● auto-advance</span>}
+            <span style={kickerLeft}>● Mission Briefing</span>
+            {current.kind === 'wait-state' && <span style={waitTag}>waiting for you</span>}
+            {current.kind === 'wait-time' && <span style={waitTagNeutral}>auto-advance</span>}
           </div>
+
+          <StepDots step={step} total={total} tailColor={tailColor} />
+
           <h2 style={title}>{current.title}</h2>
-          <p style={body}>{current.body}</p>
+          <p style={body}>
+            <Typewriter text={current.body} cps={48} />
+          </p>
 
           {current.kind === 'identity' && (
             <IdentityFields
@@ -297,9 +309,15 @@ function TutorialCard({
           )}
 
           {current.kind === 'info' && (
-            <button style={{ ...primaryBtn, background: tailColor }} onClick={onAdvance}>
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              accent={tailColor}
+              onClick={onAdvance}
+            >
               {current.cta}
-            </button>
+            </Button>
           )}
         </div>
       </motion.div>
@@ -343,12 +361,46 @@ function IdentityFields({
           />
         ))}
       </div>
-      <button
-        style={{ ...primaryBtn, background: color, marginTop: 14 }}
-        onClick={(): void => onSubmit(name.trim() || 'SkyHaven Airlines', color)}
-      >
-        Continue
-      </button>
+      <div style={{ marginTop: 14 }}>
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
+          accent={color}
+          onClick={(): void => onSubmit(name.trim() || 'SkyHaven Airlines', color)}
+        >
+          Continue
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Compact step indicator row — dots fill in with the tail color as
+ *  the player advances through the briefing chain. */
+function StepDots({ step, total, tailColor }: { step: number; total: number; tailColor: string }) {
+  return (
+    <div style={stepDotsRow} aria-label={`Step ${step + 1} of ${total}`}>
+      {Array.from({ length: total }).map((_, i) => {
+        const state = i < step ? 'done' : i === step ? 'current' : 'future';
+        return (
+          <span
+            key={i}
+            style={{
+              width: state === 'current' ? 28 : 6,
+              height: 6,
+              borderRadius: 3,
+              background: state === 'future'
+                ? 'rgba(11,17,32,0.15)'
+                : state === 'current'
+                  ? tailColor
+                  : `${tailColor}77`,
+              boxShadow: state === 'current' ? `0 0 8px ${tailColor}` : 'none',
+              transition: 'width 320ms cubic-bezier(0.16,1,0.3,1), background 320ms ease',
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -389,28 +441,56 @@ const shellBottom: React.CSSProperties = {
 const card: React.CSSProperties = {
   width: '100%',
   maxWidth: 380,
-  // Lit-up card: bright bluish-grey panel so the text reads cleanly
-  // against the dimmed world behind it. Doubled-up borders + a strong
-  // cyan halo so the eye locks on to it.
-  background: 'linear-gradient(160deg, #E8EEFB, #C8D4F0)',
-  borderRadius: 16,
-  padding: '16px 18px 18px',
+  // Glassy bright panel — readable against the dimmed world (Phase 10
+  // owner feedback) but with a game-style scanline overlay + glowing
+  // top bar to read as a Mission Briefing HUD frame.
+  background: 'linear-gradient(160deg, #EFF4FB, #D5DEEF)',
+  borderRadius: 18,
+  padding: '18px 18px 18px',
   border: '2px solid #5AC8FA',
   boxShadow:
-    '0 18px 60px rgba(0,0,0,0.55), 0 0 0 4px rgba(90,200,250,0.18), 0 0 48px rgba(90,200,250,0.55)',
+    '0 24px 70px rgba(0,0,0,0.55), 0 0 0 4px rgba(90,200,250,0.20), 0 0 56px rgba(90,200,250,0.55)',
   pointerEvents: 'auto',
   zIndex: 203,
   position: 'relative',
+  overflow: 'hidden',
   color: '#0B1120',
 };
+const scanlines: React.CSSProperties = {
+  position: 'absolute', inset: 0, pointerEvents: 'none',
+  // Faint horizontal scanline pattern reads as a HUD overlay.
+  backgroundImage:
+    'repeating-linear-gradient(to bottom, transparent 0 3px, rgba(11,17,32,0.04) 3px 4px)',
+  mixBlendMode: 'multiply',
+  opacity: 0.6,
+};
+const topGlow = (tail: string): React.CSSProperties => ({
+  position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+  background: `linear-gradient(90deg, transparent, ${tail}, transparent)`,
+  filter: `drop-shadow(0 0 6px ${tail})`,
+});
 const kicker: React.CSSProperties = {
-  fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase',
-  color: '#475569',
+  fontSize: 10,
+  letterSpacing: '0.18em',
+  textTransform: 'uppercase',
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
   gap: 12,
-  fontWeight: 700,
+  fontWeight: 800,
+  position: 'relative',
+};
+const kickerLeft: React.CSSProperties = {
+  color: '#0B4F73',
+  fontFeatureSettings: '"tnum" 1',
+};
+const stepDotsRow: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
+  marginTop: 12,
+  marginBottom: 4,
+  position: 'relative',
 };
 const waitTag: React.CSSProperties = {
   fontSize: 9,
@@ -427,29 +507,21 @@ const waitTagNeutral: React.CSSProperties = {
   fontWeight: 700,
 };
 const title: React.CSSProperties = {
-  margin: '6px 0 6px',
-  fontSize: 19,
+  margin: '8px 0 8px',
+  fontSize: 22,
   color: '#0B1120',
   fontWeight: 800,
   lineHeight: 1.2,
+  letterSpacing: '0.01em',
+  position: 'relative',
 };
 const body: React.CSSProperties = {
-  margin: '0 0 12px',
+  margin: '0 0 14px',
   color: '#1E293B',
   fontSize: 13,
   lineHeight: 1.5,
-};
-const primaryBtn: React.CSSProperties = {
-  width: '100%',
-  padding: '12px 14px',
-  borderRadius: 10,
-  border: 0,
-  color: '#0B1120',
-  fontWeight: 700,
-  fontSize: 14,
-  cursor: 'pointer',
-  fontFamily: 'inherit',
-  minHeight: 44,
+  minHeight: 39,
+  position: 'relative',
 };
 const fieldLabel: React.CSSProperties = {
   display: 'block',
