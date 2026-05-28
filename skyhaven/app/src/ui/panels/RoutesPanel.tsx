@@ -528,6 +528,13 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
     if (!o || !d) return 0;
     return haversineKm(o.lat, o.lon, d.lat, d.lon);
   }, [airports, originIata, destIata]);
+
+  // Design Review v3 — point 9. Surface the 6 nearest reachable
+  // destinations as quick-pick chips so the player doesn't have to drill
+  // through country accordions for a regional hop.
+  const quickDestinations = useMemo(() => {
+    return destAirports.slice(0, 6);
+  }, [destAirports]);
   const cost = distance > 0 ? routeOpenCost(distance) : 0;
   const canOpen = !!(selectedAc && originIata && destIata && originIata !== destIata && cost > 0 && cash >= cost);
 
@@ -597,6 +604,29 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
             )}
 
             <label style={formLabel}>Destination</label>
+            {/* Design Review v3 — point 9. Quick-pick reachable
+                destinations as chips. The country accordion below stays
+                as a secondary filter. */}
+            {originIata && quickDestinations.length > 0 && (
+              <div style={quickDestRow}>
+                <div style={quickDestKicker}>NEAREST · TAP TO PICK</div>
+                <div style={quickDestChipsRow}>
+                  {quickDestinations.map((a) => (
+                    <button
+                      key={a.iata}
+                      onClick={(): void => { setDestIata(a.iata); setDestExpanded(new Set()); }}
+                      style={{
+                        ...quickDestChip,
+                        ...(destIata === a.iata ? quickDestChipActive : {}),
+                      }}
+                    >
+                      <span style={quickDestChipIata}>{a.iata}</span>
+                      <span style={quickDestChipCity}>{a.city || countryName(a.country)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {!originIata ? (
               <div style={empty}>Pick an origin hub first.</div>
             ) : (() => {
@@ -679,14 +709,27 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
               );
             })()}
 
-            {distance > 0 && (
-              <div style={summaryBox}>
-                <div>Distance: <b>{Math.round(distance).toLocaleString()} km</b></div>
-                <div>Opening fee: <b style={{ color: '#F4C75B' }}>${formatCash(cost)}</b></div>
-                <div>
-                  Est. revenue: <b style={{ color: '#34D399' }}>
-                    ${formatCash(estimatedPerMin)}/min
+            {/* Route Preview Card — Design Review v3, point 9. */}
+            {distance > 0 && def && (
+              <div style={routePreview}>
+                <div style={routePreviewKicker}>ROUTE PREVIEW</div>
+                <div style={routePreviewTitle}>
+                  {originIata}  →  {destIata}
+                </div>
+                <div style={routePreviewGrid}>
+                  <Preview label="Distance" value={`${Math.round(distance).toLocaleString()} km`} />
+                  <Preview label="Cycle" value={`~${Math.round(distance / def.cruiseSpeedKmh * 3.6)} s`} />
+                  <Preview label="Aircraft" value={def.displayName} />
+                  <Preview label="Est. revenue" value={`$${formatCash(estimatedPerMin, 1)}/min`} accent="#34D399" />
+                  <Preview label="Opening fee" value={`$${formatCash(cost)}`} accent="#F4C75B" />
+                  <Preview label="Demand" value="Stable" accent="#5AC8FA" />
+                </div>
+                <div style={routePreviewFoot}>
+                  Risk: <b style={{ color: distance > def.rangeKm * 0.9 ? '#F59E0B' : '#34D399' }}>
+                    {distance > def.rangeKm * 0.9 ? 'near max range' : 'low'}
                   </b>
+                  {' · Best aircraft for this leg: '}
+                  <b>{def.rangeKm >= distance ? def.displayName : 'longer-range aircraft'}</b>
                 </div>
               </div>
             )}
@@ -699,7 +742,7 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
                 {...(canOpen ? { 'data-tutorial': 'routes-confirm-button' } : {})}
                 style={{ ...confirmBtn, opacity: canOpen ? 1 : 0.4 }}
               >
-                Open route
+                Authorize Route ✓
               </button>
             </div>
             {error && <div style={errorText}>{error}</div>}
@@ -715,6 +758,15 @@ function sortAirports(arr: Airport[]): Airport[] {
     b.sizeTier - a.sizeTier
     || a.country.localeCompare(b.country)
     || a.city.localeCompare(b.city),
+  );
+}
+
+function Preview({ label, value, accent }: { label: string; value: string; accent?: string }) {
+  return (
+    <div style={previewCell}>
+      <div style={previewCellLabel}>{label}</div>
+      <div style={{ ...previewCellValue, color: accent ?? '#F8FAFC' }}>{value}</div>
+    </div>
   );
 }
 
@@ -907,6 +959,88 @@ const primaryBtn: React.CSSProperties = {
   background: '#5AC8FA', color: '#0B1120', border: 0, fontWeight: 700,
   cursor: 'pointer', minHeight: 40, fontFamily: 'inherit',
 };
+
+// Quick destination chips (Design Review v3 — point 9)
+const quickDestRow: React.CSSProperties = {
+  margin: '4px 0 10px',
+};
+const quickDestKicker: React.CSSProperties = {
+  fontSize: 9, fontWeight: 800, letterSpacing: '0.18em',
+  color: '#94A3B8', marginBottom: 6,
+};
+const quickDestChipsRow: React.CSSProperties = {
+  display: 'flex', gap: 6, flexWrap: 'wrap',
+};
+const quickDestChip: React.CSSProperties = {
+  background: 'rgba(11,17,32,0.55)',
+  border: '1px solid rgba(148,163,184,0.3)',
+  borderRadius: 999,
+  padding: '6px 12px',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  color: '#CBD5E1',
+  display: 'inline-flex',
+  alignItems: 'baseline',
+  gap: 6,
+};
+const quickDestChipActive: React.CSSProperties = {
+  background: 'rgba(90,200,250,0.18)',
+  borderColor: '#5AC8FA',
+  color: '#5AC8FA',
+  boxShadow: '0 0 12px rgba(90,200,250,0.4)',
+};
+const quickDestChipIata: React.CSSProperties = {
+  fontWeight: 800, fontSize: 12, letterSpacing: '0.02em',
+};
+const quickDestChipCity: React.CSSProperties = {
+  fontSize: 11, color: 'inherit', opacity: 0.85,
+};
+
+// Route Preview Card (Design Review v3 — point 9)
+const routePreview: React.CSSProperties = {
+  marginTop: 14,
+  padding: '14px 14px 12px',
+  borderRadius: 12,
+  background: 'linear-gradient(150deg, rgba(11,17,32,0.85), rgba(15,23,42,0.85))',
+  border: '1px solid rgba(90,200,250,0.35)',
+  boxShadow: '0 0 18px rgba(90,200,250,0.18)',
+};
+const routePreviewKicker: React.CSSProperties = {
+  fontSize: 9, fontWeight: 800, letterSpacing: '0.22em',
+  color: '#5AC8FA',
+};
+const routePreviewTitle: React.CSSProperties = {
+  fontSize: 22, fontWeight: 900, color: '#F8FAFC',
+  letterSpacing: '0.04em',
+  marginTop: 4,
+  fontFeatureSettings: '"tnum" 1',
+};
+const routePreviewGrid: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, 1fr)',
+  gap: 6,
+  marginTop: 10,
+};
+const previewCell: React.CSSProperties = {
+  background: 'rgba(11,17,32,0.55)',
+  border: '1px solid rgba(148,163,184,0.18)',
+  borderRadius: 8,
+  padding: '8px 10px',
+};
+const previewCellLabel: React.CSSProperties = {
+  fontSize: 9, fontWeight: 800, letterSpacing: '0.18em',
+  color: '#64748B',
+};
+const previewCellValue: React.CSSProperties = {
+  fontSize: 13, fontWeight: 800, marginTop: 2,
+  fontFeatureSettings: '"tnum" 1',
+};
+const routePreviewFoot: React.CSSProperties = {
+  marginTop: 10,
+  fontSize: 11,
+  color: '#94A3B8',
+  lineHeight: 1.5,
+};
 const hubBadge: React.CSSProperties = {
   fontSize: 9, letterSpacing: '0.1em', fontWeight: 700,
   color: '#F4C75B', background: 'rgba(244,199,91,0.14)',
@@ -944,11 +1078,6 @@ const selectStyle: React.CSSProperties = {
   border: '1px solid rgba(255,255,255,0.1)', color: '#F8FAFC',
   padding: '10px', borderRadius: 8, fontSize: 14, fontFamily: 'inherit',
   minHeight: 44,
-};
-const summaryBox: React.CSSProperties = {
-  marginTop: 12, padding: '10px 12px', background: 'rgba(90,200,250,0.08)',
-  borderRadius: 8, fontSize: 12, color: '#F8FAFC',
-  fontFeatureSettings: '"tnum" 1',
 };
 const cancelBtn: React.CSSProperties = {
   flex: 1, padding: 12, background: 'transparent', color: '#94A3B8',

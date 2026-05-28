@@ -30,7 +30,7 @@ import { sfx } from '../juice/sfx';
 import { haptics } from '../juice/haptics';
 import { usePanelStore, type PanelId } from './PanelHost';
 
-type LaunchTarget = Extract<PanelId, 'airport' | 'achievements' | 'leaders' | 'missions'>;
+type LaunchTarget = Extract<PanelId, 'achievements' | 'leaders' | 'missions'> | 'journey';
 
 interface LaunchItem {
   id: LaunchTarget;
@@ -39,21 +39,21 @@ interface LaunchItem {
 }
 
 const ITEMS: readonly LaunchItem[] = [
-  { id: 'airport',      label: 'Home Airport', Icon: HomeAirportIcon },
+  // Design Review v3 — the home airport surface is always-visible
+  // now, so the side rail surfaces the Empire Journey instead (tier
+  // ladder) so the player can study the road ahead at any time.
+  { id: 'journey',      label: 'Empire Journey', Icon: JourneyIcon },
   { id: 'leaders',      label: 'Leaderboards', Icon: LeaderIcon },
-  { id: 'missions',     label: 'Daily Missions', Icon: MissionsIcon },
-  { id: 'achievements', label: 'Achievements', Icon: TrophyIcon },
+  { id: 'missions',     label: 'Daily Operations', Icon: MissionsIcon },
+  { id: 'achievements', label: 'Pilot Log', Icon: TrophyIcon },
 ];
 
-function HomeAirportIcon({ color }: { color: string }) {
+function JourneyIcon({ color }: { color: string }) {
   return (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M3 20V11l9-5 9 5v9" stroke={color} strokeWidth="1.6" strokeLinejoin="round" />
-      <path d="M3 20h18" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
-      <path d="M9 20v-6h6v6" stroke={color} strokeWidth="1.4" />
-      {/* Tower */}
-      <path d="M16 9l1.5-3 1.5 3" stroke={color} strokeWidth="1.2" />
-      <circle cx={17.5} cy={5.6} r={0.8} fill={color} />
+      <path d="M4 20L9 14L13 17L20 6" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={20} cy={6} r={2.4} fill={color} />
+      <circle cx={4} cy={20} r={1.4} fill={color} />
     </svg>
   );
 }
@@ -89,7 +89,7 @@ export function SideLauncher() {
             style={rail(tailColor) as Record<string, unknown>}
           >
             {ITEMS.map((item) => {
-              const active = activePanel === item.id;
+              const active = item.id !== 'journey' && activePanel === item.id;
               const dot = item.id === 'missions' ? claimableMissions
                         : item.id === 'achievements' ? unreadAchievements
                         : 0;
@@ -99,7 +99,11 @@ export function SideLauncher() {
                   onClick={(): void => {
                     haptics.light();
                     sfx.tick();
-                    open(item.id);
+                    if (item.id === 'journey') {
+                      useUiStore.getState().setEmpireJourneyOpen(true);
+                    } else {
+                      open(item.id);
+                    }
                   }}
                   aria-label={item.label}
                   title={item.label}
