@@ -64,6 +64,7 @@ export function BottomTabs() {
   const tutorialDone = useGameStore(selectTutorialCompleted);
   const mapMode = useUiStore((s) => s.mapMode);
   const setMapMode = useUiStore((s) => s.setMapMode);
+  const tutorialTarget = useUiStore((s) => s.tutorialTarget);
 
   const ctx = {
     fleetSize: fleet.length,
@@ -78,12 +79,22 @@ export function BottomTabs() {
     (s.state?.fleet ?? []).reduce((n, a) => n + (conditionBand(a.condition) !== 'normal' ? 1 : 0), 0),
   );
 
+  // Tap-path guidance — Design Review v4, point 9. If the tutorial is
+  // currently targeting one of the bottom tabs, dim the non-target
+  // tabs and add a pulsing ring around the highlighted one.
+  const targetIsTab = tutorialTarget && /-tab$/.test(tutorialTarget);
+  const guidedTabId = targetIsTab ? tutorialTarget.replace(/-tab$/, '') : null;
+
   return (
     <nav style={{ ...shell, gridTemplateColumns: `repeat(${visibleTabs.length + 1}, 1fr)` }} aria-label="Main">
       {/* Home button — always first, always lights up the home airport. */}
       <button
         onClick={(): void => { close(); setMapMode(false); }}
-        style={{ ...btn, ...((!mapMode && active === null) ? btnActive : {}) }}
+        style={{
+          ...btn,
+          ...((!mapMode && active === null) ? btnActive : {}),
+          ...(guidedTabId && guidedTabId !== 'home' ? dimmedBtn : {}),
+        }}
         aria-label="Home Airport"
         aria-current={(!mapMode && active === null) ? 'page' : undefined}
       >
@@ -95,6 +106,8 @@ export function BottomTabs() {
           ? (mapMode && active === null)
           : active === t.id;
         const showBadge = t.id === 'fleet' && needsAttention > 0;
+        const isGuidedTarget = guidedTabId === t.id;
+        const isDimmed = guidedTabId !== null && !isGuidedTarget;
         return (
           <button
             key={t.id}
@@ -103,13 +116,19 @@ export function BottomTabs() {
               if (t.id === 'map') { close(); setMapMode(true); }
               else { open(t.id); setMapMode(false); }
             }}
-            style={{ ...btn, ...(isActive ? btnActive : {}) }}
+            style={{
+              ...btn,
+              ...(isActive ? btnActive : {}),
+              ...(isDimmed ? dimmedBtn : {}),
+              ...(isGuidedTarget ? guidedBtn : {}),
+            }}
             aria-label={t.label}
             aria-current={isActive ? 'page' : undefined}
           >
-            <t.Icon size={20} color={isActive ? '#5AC8FA' : '#94A3B8'} />
+            <t.Icon size={20} color={isGuidedTarget ? '#F4C75B' : isActive ? '#5AC8FA' : '#94A3B8'} />
             <span style={label}>{t.label}</span>
             {showBadge && <span style={badge}>{needsAttention}</span>}
+            {isGuidedTarget && <span style={guidedRing} aria-hidden />}
           </button>
         );
       })}
@@ -166,6 +185,26 @@ const label: React.CSSProperties = {
   letterSpacing: '0.06em',
   textTransform: 'uppercase',
   fontWeight: 700,
+};
+
+// Tap-path guidance styles (Design Review v4 — point 9).
+const dimmedBtn: React.CSSProperties = {
+  opacity: 0.28,
+  filter: 'saturate(0.4)',
+  transition: 'opacity 240ms ease, filter 240ms ease',
+};
+const guidedBtn: React.CSSProperties = {
+  background: 'radial-gradient(ellipse at center, rgba(244,199,91,0.18), transparent 70%)',
+  color: '#F4C75B',
+};
+const guidedRing: React.CSSProperties = {
+  position: 'absolute',
+  inset: 4,
+  borderRadius: 14,
+  border: '2px solid #F4C75B',
+  boxShadow: '0 0 14px rgba(244,199,91,0.6), inset 0 0 8px rgba(244,199,91,0.3)',
+  animation: 'breathe 1.4s ease-in-out infinite',
+  pointerEvents: 'none',
 };
 
 const badge: React.CSSProperties = {

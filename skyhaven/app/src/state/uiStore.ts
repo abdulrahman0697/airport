@@ -45,6 +45,22 @@ interface UiStore {
    */
   empireJourneyOpen: boolean;
   setEmpireJourneyOpen: (v: boolean) => void;
+  /**
+   * Active tutorial spotlight target (Design Review v4 — point 9).
+   * When set, the BottomTabs row dims non-matching buttons so the
+   * player's tap path is visually guided instead of just described.
+   * Stored as the data-tutorial value (e.g. "fleet-tab").
+   */
+  tutorialTarget: string | null;
+  setTutorialTarget: (v: string | null) => void;
+  /**
+   * In-game push opt-in card (Design Review v4 — point 1). When true,
+   * the StayInTouchCard renders. Triggered after the first offline
+   * income event — the player has now experienced offline earning,
+   * so the value of notifications is concrete.
+   */
+  stayInTouchCard: boolean;
+  setStayInTouchCard: (v: boolean) => void;
 }
 
 export const useUiStore = create<UiStore>((set) => ({
@@ -64,4 +80,8 @@ export const useUiStore = create<UiStore>((set) => ({
   setPendingDelivery: (v): void => set({ pendingDelivery: v }),
   empireJourneyOpen: false,
   setEmpireJourneyOpen: (v): void => set({ empireJourneyOpen: v }),
+  tutorialTarget: null,
+  setTutorialTarget: (v): void => set({ tutorialTarget: v }),
+  stayInTouchCard: false,
+  setStayInTouchCard: (v): void => set({ stayInTouchCard: v }),
 }));

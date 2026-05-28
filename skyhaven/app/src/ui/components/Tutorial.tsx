@@ -118,6 +118,17 @@ export function Tutorial() {
   const target = current?.kind === 'wait-state' ? current.targetFor(activePanel) : null;
   const rect = useTargetRect(target);
 
+  // Publish the currently-spotlighted target so BottomTabs and other
+  // chrome can dim non-target buttons (tap-path guidance — point 9).
+  const setTutorialTarget = useUiStore((s) => s.setTutorialTarget);
+  useEffect(() => {
+    const first: string | null = Array.isArray(target)
+      ? (target[0] ?? null)
+      : (typeof target === 'string' ? target : null);
+    setTutorialTarget(first);
+    return () => setTutorialTarget(null);
+  }, [target, setTutorialTarget]);
+
   useEffect(() => {
     if (!current || current.kind !== 'wait-state' || !state) return;
     if (current.check(state)) advance();
@@ -519,15 +530,17 @@ const stripShellBase = (tail: string): React.CSSProperties => ({
   // (z 30) so the strip is never covered. Sit BELOW the top bar (z 30)
   // — the top bar wins at the top, the strip is anchored just under it.
   zIndex: 120,
-  maxWidth: 480,
+  maxWidth: 460,
   marginLeft: 'auto',
   marginRight: 'auto',
-  background: 'linear-gradient(150deg, rgba(11,17,32,0.96), rgba(15,23,42,0.96))',
-  border: `1px solid ${tail}66`,
-  borderRadius: RADIUS.l,
-  boxShadow: `0 12px 36px rgba(0,0,0,0.6), 0 0 24px ${tail}44`,
+  background: 'linear-gradient(150deg, rgba(11,17,32,0.94), rgba(15,23,42,0.94))',
+  border: `1px solid ${tail}55`,
+  borderRadius: RADIUS.m,
+  boxShadow: `0 10px 28px rgba(0,0,0,0.55), 0 0 18px ${tail}33`,
   backdropFilter: 'blur(14px)',
-  padding: '10px 12px 12px',
+  // Tighter padding — Design Review v4, point 8. The strip should
+  // claim no more than ~22% of the viewport.
+  padding: '8px 10px 10px',
   pointerEvents: 'auto',
 });
 const stripShellBottom = (tail: string): React.CSSProperties => ({
@@ -567,29 +580,29 @@ const stripStatus: React.CSSProperties = {
   fontWeight: 600,
 };
 const stripTitle: React.CSSProperties = {
-  fontSize: 15,
+  fontSize: 13,
   fontWeight: 800,
   color: COLOR.ink.primary,
   letterSpacing: '0.01em',
-  margin: '2px 0 8px',
+  margin: '2px 0 6px',
 };
 const stripBody: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '1fr auto',
-  gap: 8,
+  gap: 6,
 };
 const stripCell: React.CSSProperties = {
   background: 'rgba(11,17,32,0.55)',
   border: `1px solid ${COLOR.border.soft}`,
   borderRadius: RADIUS.s,
-  padding: '6px 10px',
+  padding: '5px 9px',
   minWidth: 0,
 };
 const stripCellAccent = (tail: string): React.CSSProperties => ({
   background: `linear-gradient(135deg, ${tail}1F, rgba(11,17,32,0.55))`,
   border: `1px solid ${COLOR.gold.base}55`,
   borderRadius: RADIUS.s,
-  padding: '6px 10px',
+  padding: '5px 9px',
 });
 const stripCellLabel: React.CSSProperties = {
   fontSize: 8,
@@ -598,7 +611,7 @@ const stripCellLabel: React.CSSProperties = {
   color: COLOR.ink.faint,
 };
 const stripCellValue: React.CSSProperties = {
-  fontSize: 12,
+  fontSize: 11,
   fontWeight: 700,
   color: COLOR.ink.primary,
   marginTop: 2,

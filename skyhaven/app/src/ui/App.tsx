@@ -8,6 +8,7 @@ import { EmpireJourney } from './components/EmpireJourney';
 import { BottomTabs } from './components/BottomTabs';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { DailyReward } from './components/DailyReward';
+import { FirstRouteCeremony } from './components/FirstRouteCeremony';
 import { FirstTakeoffCinematic } from './components/FirstTakeoffCinematic';
 import { NextUnlockBadge } from './components/NextUnlockBadge';
 import { EventBanner } from './components/EventBanner';
@@ -88,6 +89,7 @@ export function App() {
       <DailyReward />
       <HubPicker />
       <Tutorial />
+      <FirstRouteCeremony />
       <FirstTakeoffCinematic />
       <IntroSplash />
     </ErrorBoundary>
