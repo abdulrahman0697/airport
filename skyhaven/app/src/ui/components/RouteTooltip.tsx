@@ -4,6 +4,7 @@ import { conditionBand } from '../../engine/condition';
 import { cashPerSecond, legDurationMs } from '../../engine/economy';
 import type { Route } from '../../engine/types';
 import { selectActiveEvents, selectFleet, selectHubs, useGameStore } from '../../state/store';
+import { popoverBottomCeiling, popoverTopFloor } from '../design/safeArea';
 import { formatRate } from '../format';
 
 /**
@@ -53,8 +54,13 @@ export function RouteTooltip({ route, x, y, onClose }: Props) {
   const condColor = band === 'normal' ? '#34D399' : band === 'degraded' ? '#F59E0B' : '#F87171';
 
   const left = Math.min(window.innerWidth - TOOLTIP_W - 12, Math.max(12, x - TOOLTIP_W / 2));
-  const above = y - TOOLTIP_H_EST - 12 > 12;
-  const top = above ? y - TOOLTIP_H_EST - 12 : y + 18;
+  // Clamp below the top-bar floor + above the bottom tabs so the
+  // popover never renders under the HUD chrome.
+  const floor = popoverTopFloor();
+  const ceiling = popoverBottomCeiling() - TOOLTIP_H_EST;
+  const above = y - TOOLTIP_H_EST - 12 > floor;
+  const proposedTop = above ? y - TOOLTIP_H_EST - 12 : y + 18;
+  const top = Math.max(floor, Math.min(ceiling, proposedTop));
 
   return (
     <div ref={ref} style={{ ...shell, left, top }} onClick={(e): void => e.stopPropagation()}>

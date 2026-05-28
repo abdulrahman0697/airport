@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Airport } from '../../data/airports';
 import { getRegion } from '../../data/regions';
+import { popoverBottomCeiling, popoverTopFloor } from '../design/safeArea';
 import { countryName } from '../countryNames';
 
 /**
@@ -40,8 +41,13 @@ export function AirportTooltip({ airport, x, y, unlocked, onClose }: Props) {
 
   // Position the tooltip so it stays on-screen.
   const left = Math.min(window.innerWidth - TOOLTIP_W - 12, Math.max(12, x - TOOLTIP_W / 2));
-  const above = y - TOOLTIP_H_EST - 12 > 12;
-  const top = above ? y - TOOLTIP_H_EST - 12 : y + 18;
+  // Clamp the tooltip below the top-bar floor and above the bottom
+  // tabs so it never slips under either fixed surface.
+  const floor = popoverTopFloor();
+  const ceiling = popoverBottomCeiling() - TOOLTIP_H_EST;
+  const above = y - TOOLTIP_H_EST - 12 > floor;
+  const proposedTop = above ? y - TOOLTIP_H_EST - 12 : y + 18;
+  const top = Math.max(floor, Math.min(ceiling, proposedTop));
   const region = getRegion(airport.region);
 
   return (
