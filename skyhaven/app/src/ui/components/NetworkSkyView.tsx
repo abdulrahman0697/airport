@@ -41,6 +41,7 @@ interface Arc {
   destY: number;
   cps: number;
   pricing: Route['pricing'];
+  inaugural: boolean;
   // Aircraft progression along the arc, 0..1, ping-pongs over `period` ms.
   period: number;
   // Stable phase offset so multiple routes don't all align.
@@ -83,7 +84,7 @@ export function NetworkSkyView({
       let h = 2166136261;
       for (let k = 0; k < r.id.length; k++) { h ^= r.id.charCodeAt(k); h = Math.imul(h, 16777619); }
       const phase = (Math.abs(h) % 1000) / 1000;
-      return { routeId: r.id, destIata: r.destIata, pathD, midX, midY, destX, destY, cps, pricing: r.pricing, period, phase };
+      return { routeId: r.id, destIata: r.destIata, pathD, midX, midY, destX, destY, cps, pricing: r.pricing, inaugural: r.inaugural === true, period, phase };
     });
   }, [routes, fleet, hubs, activeEvents, width, height, HOME_X, HOME_Y]);
 
@@ -204,12 +205,12 @@ export function NetworkSkyView({
               x={arc.destX}
               y={arc.destY - 8}
               textAnchor="middle"
-              fill={COLOR.ink.muted}
+              fill={arc.inaugural ? COLOR.gold.base : COLOR.ink.muted}
               fontSize="6"
               fontWeight="700"
               letterSpacing="0.1em"
             >
-              {arc.destIata}
+              {arc.inaugural ? `★ ${arc.destIata}` : arc.destIata}
             </text>
           </g>
         );

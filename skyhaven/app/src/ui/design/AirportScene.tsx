@@ -128,6 +128,23 @@ export function AirportScene({
           @keyframes plane-taxi { 0% { transform: translateX(0); } 50% { transform: translateX(40px); } 100% { transform: translateX(0); } }
           @keyframes runway-pulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
           @keyframes ghost-pulse { 0%,100% { opacity: 0.25; } 50% { opacity: 0.55; } }
+          /* Runway takeoff: aircraft accelerates from left, lifts at
+             ~85% across, climbs up & off the right edge. Hidden the
+             rest of the cycle to feel periodic, not continuous. */
+          @keyframes runway-takeoff {
+            0% { transform: translateX(0) translateY(0) rotate(0); opacity: 0; }
+            10% { opacity: 1; }
+            70% { transform: translateX(290px) translateY(0) rotate(0); opacity: 1; }
+            85% { transform: translateX(330px) translateY(-12px) rotate(-12deg); opacity: 1; }
+            100% { transform: translateX(370px) translateY(-50px) rotate(-22deg); opacity: 0; }
+          }
+          @keyframes runway-landing {
+            0% { transform: translateX(0) translateY(-40px) rotate(8deg); opacity: 0; }
+            14% { opacity: 1; }
+            55% { transform: translateX(-150px) translateY(-4px) rotate(2deg); opacity: 1; }
+            72% { transform: translateX(-220px) translateY(0) rotate(0); opacity: 1; }
+            100% { transform: translateX(-310px) translateY(0) rotate(0); opacity: 0; }
+          }
           /* Boarding ring + pax stream for gates (Design Review v4 — point 16). */
           @keyframes gate-board {
             0% { stroke-dashoffset: ${2 * Math.PI * 4}; }
@@ -349,6 +366,32 @@ export function AirportScene({
       {/* A small plane parked at gate 1, gently taxiing */}
       <g style={{ animation: 'plane-taxi 6s ease-in-out infinite' }}>
         <ParkedPlane cx={95} tailColor={tailColor} />
+      </g>
+
+      {/* Runway takeoff cycle — Design Review v5, point 13. Every ~9s
+          an aircraft streaks down the runway and lifts off the
+          end. Gives the airport real motion without needing a per-
+          aircraft simulation hook. */}
+      <g style={{ animation: 'runway-takeoff 9s linear infinite' }}>
+        <g transform="translate(50 158)">
+          <ellipse cx="0" cy="0" rx="6" ry="1.4" fill="#F8FAFC" />
+          <path d="M-1 -0.5 L-4 -3 L-2 -3.2 L1 -0.5 Z" fill={tailColor} opacity="0.85" />
+          <path d="M-1 0.5 L-4 3 L-2 3.2 L1 0.5 Z" fill={tailColor} opacity="0.85" />
+          <path d="M-5 -1 L-7 -2 L-6 0 L-7 2 L-5 1 Z" fill={tailColor} opacity="0.9" />
+          {/* Contrail */}
+          <path d="M -7 0 L -22 0" stroke={tailColor} strokeWidth="0.6" opacity="0.55" />
+        </g>
+      </g>
+
+      {/* Runway landing cycle — every ~12s an aircraft descends from
+          the far end. */}
+      <g style={{ animation: 'runway-landing 12s linear 4.5s infinite' }}>
+        <g transform="translate(360 152)">
+          <ellipse cx="0" cy="0" rx="5.5" ry="1.3" fill="#F8FAFC" />
+          <path d="M-1 -0.4 L-3.5 -2.8 L-1.8 -3 L0.8 -0.4 Z" fill={tailColor} opacity="0.85" />
+          <path d="M-1 0.4 L-3.5 2.8 L-1.8 3 L0.8 0.4 Z" fill={tailColor} opacity="0.85" />
+          <path d="M-4.5 -0.8 L-6.5 -1.8 L-5.5 0 L-6.5 1.8 L-4.5 0.8 Z" fill={tailColor} opacity="0.9" />
+        </g>
       </g>
     </svg>
   );

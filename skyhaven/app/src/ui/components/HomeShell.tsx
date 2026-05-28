@@ -130,10 +130,12 @@ export function HomeShell() {
   // the player's pricing strategy: economy routes → mostly blue dots,
   // balanced → blue + a few gold, premium → blue + business gold +
   // white VIP halo. Tourist green dots appear when traffic is up.
-  const passengerLoad = Math.min(12, 2 + routes.length * 2);
+  // Even a brand-new airport runs 4 dots so the diorama never reads
+  // as dead.
+  const passengerLoad = Math.min(12, 4 + routes.length * 2);
   const premiumPax = routes.some((r) => r.pricing === 'premium');
   const paxMix = useMemo(() => {
-    if (routes.length === 0) return { economy: 2, business: 0, tourist: 0, vip: 0 };
+    if (routes.length === 0) return { economy: 3, business: 0, tourist: 1, vip: 0 };
     let econ = 0, biz = 0, tour = 0, vip = 0;
     for (const r of routes) {
       if (r.pricing === 'economy') { econ += 3; tour += 1; }
