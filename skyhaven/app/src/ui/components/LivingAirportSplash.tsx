@@ -332,6 +332,10 @@ function MotionLayer({ tailColor }: { tailColor: string }) {
 
       {/* Gold streaks travelling up the runway perspective line */}
       <RunwayStreaks />
+
+      {/* Warm rim light catching the right edge of the CEO silhouette
+          in the photo. Subtle, screen-blended, additive only. */}
+      <CeoRimLight />
     </>
   );
 }
@@ -342,17 +346,73 @@ function RunwayStreaks() {
       {[0, 1, 2].map((i) => (
         <div key={i} style={{
           ...streakDot,
-          animation: `runwayStreak 3.6s ease-in ${i * 1.2}s infinite`,
+          animation: `runwayStreak 4.2s ease-in ${i * 1.4}s infinite`,
         }} />
       ))}
       <style>{`
         @keyframes runwayStreak {
-          0%   { transform: translate(-50%, 0)              scale(1.2); opacity: 0; }
-          12%  { opacity: 0.95; }
-          70%  { transform: translate(calc(-50% + 16px), -36vh) scale(0.4); opacity: 0.95; }
-          100% { transform: translate(calc(-50% + 22px), -44vh) scale(0.22); opacity: 0; }
+          0%   { transform: translate(-50%, 0)                  scale(1.0); opacity: 0; }
+          15%  { opacity: 0.7; }
+          70%  { transform: translate(calc(-50% + 4px), -32vh)  scale(0.35); opacity: 0.7; }
+          100% { transform: translate(calc(-50% + 8px), -40vh)  scale(0.18); opacity: 0; }
         }
       `}</style>
+    </div>
+  );
+}
+
+/**
+ * Subtle rim light around the CEO silhouette on the lower-left of the
+ * photo. We don't relight him directly — we just paint warm radial
+ * gradients on the right edge of his head and right edge of his
+ * shoulder/back, with screen blend mode so the bright spots add into
+ * the photo. The light reads as coming from the runway / terminal on
+ * the right and just catches the outline.
+ */
+function CeoRimLight() {
+  return (
+    <div style={rimLightLayer} aria-hidden>
+      {/* Right edge of the head — warm-gold catchlight from the
+          sunset, very small + soft */}
+      <div style={{
+        ...rimSpot,
+        left: '32%',
+        top: '54%',
+        width: 56,
+        height: 70,
+        background: 'radial-gradient(ellipse at 22% 50%, rgba(255,196,120,0.55) 0%, rgba(255,170,90,0.18) 28%, transparent 55%)',
+        filter: 'blur(4px)',
+      }} />
+      {/* Right shoulder / upper back — broader, slightly cooler */}
+      <div style={{
+        ...rimSpot,
+        left: '34%',
+        top: '64%',
+        width: 86,
+        height: 64,
+        background: 'radial-gradient(ellipse at 18% 30%, rgba(255,180,110,0.45) 0%, rgba(255,160,80,0.16) 32%, transparent 60%)',
+        filter: 'blur(6px)',
+      }} />
+      {/* Top of the head + hair — colder light bleeding from the sky */}
+      <div style={{
+        ...rimSpot,
+        left: '27%',
+        top: '49%',
+        width: 48,
+        height: 32,
+        background: 'radial-gradient(ellipse at 50% 80%, rgba(220,200,170,0.40) 0%, transparent 60%)',
+        filter: 'blur(5px)',
+      }} />
+      {/* Back of the head + neck — fainter shaping light */}
+      <div style={{
+        ...rimSpot,
+        left: '24%',
+        top: '57%',
+        width: 36,
+        height: 50,
+        background: 'radial-gradient(ellipse at 80% 50%, rgba(255,190,120,0.30) 0%, transparent 55%)',
+        filter: 'blur(5px)',
+      }} />
     </div>
   );
 }
@@ -424,13 +484,15 @@ const radarSweep = (tail: string): React.CSSProperties => ({
   mixBlendMode: 'screen',
 });
 
-// Runway streaks: small dots that travel up the runway perspective line
-// from the near end (~52% horizontal, 78% vertical) toward the
-// vanishing point.
+// Runway streaks — small subtle dots that travel up the runway
+// centreline toward the vanishing point. Repositioned to sit on the
+// actual centre of the runway in the photo (~60% horizontal, 80%
+// vertical) and made smaller / dimmer so they read as distant
+// runway markers, not loading dots.
 const streakWrap: React.CSSProperties = {
   position: 'absolute',
-  left: '52%',
-  top: '78%',
+  left: '60%',
+  top: '80%',
   width: 1,
   height: 1,
   pointerEvents: 'none',
@@ -440,12 +502,28 @@ const streakDot: React.CSSProperties = {
   position: 'absolute',
   left: '50%',
   top: 0,
-  width: 5,
-  height: 2.5,
+  width: 3,
+  height: 1.6,
   borderRadius: 1,
   background: COLOR.gold.base,
-  boxShadow: `0 0 10px ${COLOR.gold.base}, 0 0 22px ${COLOR.gold.base}`,
+  boxShadow: `0 0 6px ${COLOR.gold.base}, 0 0 14px ${COLOR.gold.base}99`,
   transform: 'translate(-50%, 0)',
+};
+
+// CEO rim light — soft warm glows positioned over the right edge of
+// the suited figure in the photo. Screen blend mode so they additively
+// brighten the underlying photo instead of replacing it. Result: the
+// silhouette stays dark, but its outline reads more clearly as if
+// catching warm light from the runway and terminal off-screen right.
+const rimLightLayer: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  pointerEvents: 'none',
+  zIndex: 2,
+  mixBlendMode: 'screen',
+};
+const rimSpot: React.CSSProperties = {
+  position: 'absolute',
 };
 
 const topShade: React.CSSProperties = {
