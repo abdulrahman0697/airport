@@ -736,11 +736,21 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
     return cashPerSecond(estRoute, selectedAc, hubs) * 60;
   }, [selectedAc, originIata, destIata, distance, hubs]);
 
+  // Route Authorization screen — Design Review v6 point 17. After
+  // tapping Authorize Route, show a brief signature-stamp animation
+  // before actually opening the route. Lands a "ROUTE AUTHORIZED"
+  // stamp over the preview card, then dismisses.
+  const [authorizing, setAuthorizing] = useState(false);
   const onConfirm = (): void => {
     if (!selectedAc) return;
-    const res = openRoute(originIata, destIata, selectedAc.uid);
-    if (res.ok) { haptics.heavy(); onClose(); }
-    else { haptics.warning(); setError(res.message); }
+    if (authorizing) return;
+    setAuthorizing(true);
+    haptics.medium();
+    window.setTimeout(() => {
+      const res = openRoute(originIata, destIata, selectedAc.uid);
+      if (res.ok) { haptics.heavy(); onClose(); }
+      else { haptics.warning(); setError(res.message); setAuthorizing(false); }
+    }, 950);
   };
 
   return (
@@ -926,6 +936,27 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
             </div>
             {error && <div style={errorText}>{error}</div>}
           </>
+        )}
+        {/* Authorization stamp overlay — Design Review v6 point 17.
+            Briefly covers the modal with a "ROUTE AUTHORIZED" stamp
+            that lands with a spring + flash. */}
+        {authorizing && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            style={authOverlay as Record<string, unknown>}
+          >
+            <motion.div
+              initial={{ scale: 1.8, rotate: -22, opacity: 0 }}
+              animate={{ scale: 1, rotate: -12, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 14 }}
+              style={authStamp as Record<string, unknown>}
+            >
+              <div style={authStampTitle}>ROUTE AUTHORIZED</div>
+              <div style={authStampSub}>{originIata} → {destIata}</div>
+              <div style={authStampSig}>Signed · SkyHaven Authority</div>
+            </motion.div>
+          </motion.div>
         )}
       </div>
     </div>
@@ -1330,6 +1361,7 @@ const modalBackdrop: React.CSSProperties = {
   display: 'grid', placeItems: 'center', padding: 16, zIndex: 100,
 };
 const modalShell: React.CSSProperties = {
+  position: 'relative',
   background: '#0B1120', borderRadius: 14, padding: 20,
   width: '100%', maxWidth: 420, maxHeight: '85%', overflowY: 'auto',
   border: '1px solid rgba(255,255,255,0.08)',
@@ -1343,6 +1375,46 @@ const selectStyle: React.CSSProperties = {
   border: '1px solid rgba(255,255,255,0.1)', color: '#F8FAFC',
   padding: '10px', borderRadius: 8, fontSize: 14, fontFamily: 'inherit',
   minHeight: 44,
+};
+// Route Authorization stamp overlay (Design Review v6 — point 17)
+const authOverlay: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  display: 'grid',
+  placeItems: 'center',
+  background: 'rgba(7,10,24,0.65)',
+  borderRadius: 18,
+  zIndex: 4,
+};
+const authStamp: React.CSSProperties = {
+  textAlign: 'center',
+  padding: '20px 28px',
+  background: 'rgba(244,199,91,0.08)',
+  border: '4px solid #F4C75B',
+  color: '#F4C75B',
+  borderRadius: 12,
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+  boxShadow: '0 18px 36px rgba(0,0,0,0.6), 0 0 32px rgba(244,199,91,0.55)',
+};
+const authStampTitle: React.CSSProperties = {
+  fontSize: 22,
+  fontWeight: 900,
+  letterSpacing: '0.14em',
+};
+const authStampSub: React.CSSProperties = {
+  marginTop: 4,
+  fontSize: 13,
+  fontWeight: 800,
+  letterSpacing: '0.12em',
+  color: '#F8FAFC',
+};
+const authStampSig: React.CSSProperties = {
+  marginTop: 8,
+  fontSize: 9,
+  letterSpacing: '0.18em',
+  color: '#CBD5E1',
+  fontStyle: 'italic',
+  fontFamily: 'serif',
 };
 const cancelBtn: React.CSSProperties = {
   flex: 1, padding: 12, background: 'transparent', color: '#94A3B8',

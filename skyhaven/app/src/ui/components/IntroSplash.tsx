@@ -143,6 +143,10 @@ export function IntroSplash() {
             <OrbitRing color={tailColor} radius={140} dur={42} reverse={false} />
             <OrbitRing color={tailColor} radius={210} dur={64} reverse />
             <OrbitRing color={COLOR.gold.base} radius={280} dur={88} reverse={false} />
+            {/* Radar sweep — Design Review v6 point 1. A slow
+                conic-gradient wedge rotates behind the wordmark to
+                give the splash a control-tower "tracking" feel. */}
+            <RadarSweep tailColor={tailColor} />
           </div>
 
           {/* Distant aircraft drifting across the sky — keeps the
@@ -321,6 +325,25 @@ function Wordmark({ text, tailColor }: { text: string; tailColor: string }) {
         </motion.span>
       ))}
     </div>
+  );
+}
+
+function RadarSweep({ tailColor }: { tailColor: string }) {
+  return (
+    <motion.div
+      style={{
+        position: 'absolute',
+        left: '50%', top: '50%',
+        width: 480, height: 480,
+        marginLeft: -240, marginTop: -240,
+        borderRadius: '50%',
+        background: `conic-gradient(from 0deg, ${tailColor}33 0deg, ${tailColor}55 18deg, transparent 60deg, transparent 360deg)`,
+        opacity: 0.55,
+        pointerEvents: 'none',
+      } as Record<string, unknown>}
+      animate={{ rotate: 360 }}
+      transition={{ duration: 5, ease: 'linear', repeat: Infinity }}
+    />
   );
 }
 

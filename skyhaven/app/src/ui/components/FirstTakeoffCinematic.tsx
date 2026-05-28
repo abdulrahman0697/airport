@@ -28,13 +28,16 @@ import { useEffect, useState } from 'react';
 import { selectTailColor, useGameStore } from '../../state/store';
 import { useUiStore } from '../../state/uiStore';
 import { ConfettiBurst } from '../design/ConfettiBurst';
-import { Button } from '../design/Button';
 import { AircraftIllustration } from '../design/SvgAircraft';
-import { COLOR, MOTION, RADIUS, SHADOW, SPACE, TYPE } from '../design/tokens';
+import { COLOR, MOTION, RADIUS, SPACE } from '../design/tokens';
 import { haptics } from '../juice/haptics';
 import { sfx } from '../juice/sfx';
 
-const TOTAL_MS = 7200; // total runtime before the welcome card
+// Design Review v6 — point 3. The cinematic is now a clean 5-second
+// sequence with a single text overlay at the end ("First flight
+// cleared.") instead of a welcome card. The next surface (FounderCard
+// / HomeShell) takes over directly.
+const TOTAL_MS = 5000;
 
 export function FirstTakeoffCinematic() {
   const tailColor = useGameStore(selectTailColor);
@@ -52,15 +55,17 @@ export function FirstTakeoffCinematic() {
   useEffect(() => {
     if (!visible) return;
     const timers: number[] = [];
-    timers.push(window.setTimeout(() => setStage(1), 200));   // walking
-    timers.push(window.setTimeout(() => { setStage(2); haptics.medium(); }, 1800)); // pushback
-    timers.push(window.setTimeout(() => { setStage(3); sfx.confirm(); }, 3200));    // takeoff
-    timers.push(window.setTimeout(() => { setStage(4); haptics.success(); sfx.success(); }, 5400)); // money burst
-    timers.push(window.setTimeout(() => setStage(5), TOTAL_MS));                    // welcome card
+    timers.push(window.setTimeout(() => setStage(1), 200));   // walking (boarding)
+    timers.push(window.setTimeout(() => { setStage(2); haptics.medium(); }, 1300)); // pushback
+    timers.push(window.setTimeout(() => { setStage(3); sfx.confirm(); }, 2300));    // takeoff
+    timers.push(window.setTimeout(() => { setStage(4); haptics.success(); sfx.success(); }, 3600)); // money burst + status
+    // At TOTAL_MS we auto-mark the cinematic as seen and clear it.
+    // No welcome card — the founder flow takes over directly.
+    timers.push(window.setTimeout(() => { markCinematicSeen(); }, TOTAL_MS));
     return () => {
       for (const t of timers) window.clearTimeout(t);
     };
-  }, [visible]);
+  }, [visible, markCinematicSeen]);
 
   const skip = (): void => {
     haptics.light();
@@ -148,31 +153,26 @@ export function FirstTakeoffCinematic() {
           {stage >= 4 && 'YOUR FIRST FLIGHT — AIRBORNE'}
         </motion.div>
 
-        {/* Welcome card */}
+        {/* Clean text overlay — Design Review v6 point 3. Replaces
+            the bulky welcome card. The next surface (FounderCard) is
+            what the player wants to interact with; no panel here. */}
         <AnimatePresence>
-          {stage >= 5 && (
+          {stage >= 4 && (
             <motion.div
-              key="welcome"
-              initial={{ opacity: 0, y: 24, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ type: 'spring', stiffness: 360, damping: 28 }}
-              style={welcomeCard(tailColor) as Record<string, unknown>}
+              key="cleared"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5, ease: 'easeOut' }}
+              style={clearedOverlay as Record<string, unknown>}
             >
-              <div style={welcomeKicker(tailColor)}>YOUR FIRST ROUTE IS LIVE</div>
-              <h2 style={welcomeTitle}>Welcome to your aviation empire.</h2>
-              <p style={welcomeBody}>
-                You just earned your first <span style={{ color: COLOR.gold.base, fontWeight: 800 }}>$5 000</span>.
-                The world map is waiting — pick your first hub, open more routes, and watch the empire grow.
-              </p>
-              <Button variant="gold" size="lg" fullWidth onClick={skip} hapticOnPress="heavy">
-                Open Your Network  →
-              </Button>
+              <div style={clearedKicker(tailColor)}>★ FIRST FLIGHT CLEARED ★</div>
+              <div style={clearedBody}>+$5 000 logged · ready for the founder flow</div>
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* Skip control (always visible) */}
-        {stage < 5 && (
+        {stage < 4 && (
           <button onClick={skip} style={skipBtn} aria-label="Skip intro">
             Skip ▸
           </button>
@@ -497,44 +497,33 @@ const moneyBurst: React.CSSProperties = {
   zIndex: 10,
 };
 
-const welcomeCard = (tail: string): React.CSSProperties => ({
+// Cleared overlay (Design Review v6 — point 3). Replaces the bulky
+// welcome card with a single "First flight cleared." centered text
+// moment so the cinematic ends on emotion, not on a panel.
+const clearedOverlay: React.CSSProperties = {
   position: 'absolute',
-  left: SPACE.l, right: SPACE.l,
-  bottom: 'max(24px, calc(env(safe-area-inset-bottom, 0) + 24px))',
-  background: `linear-gradient(170deg, ${COLOR.bg.panel}, ${COLOR.bg.canvas})`,
-  border: `2px solid ${tail}66`,
-  borderRadius: RADIUS.l,
-  boxShadow: `${SHADOW.modal}, 0 0 48px ${tail}33`,
-  padding: SPACE.l,
-  maxWidth: 460,
-  margin: '0 auto',
+  left: 0, right: 0,
+  bottom: '24%',
+  textAlign: 'center',
   zIndex: 20,
-});
-
-const welcomeKicker = (tail: string): React.CSSProperties => ({
-  fontSize: TYPE.label.size,
-  fontWeight: TYPE.label.weight,
-  letterSpacing: TYPE.label.letter,
-  textTransform: TYPE.label.transform,
+  pointerEvents: 'none',
+};
+const clearedKicker = (tail: string): React.CSSProperties => ({
+  fontSize: 14,
+  fontWeight: 900,
+  letterSpacing: '0.32em',
   color: tail,
-  marginBottom: SPACE.xs,
+  textShadow: `0 0 24px ${tail}, 0 4px 12px rgba(0,0,0,0.6)`,
 });
-
-const welcomeTitle: React.CSSProperties = {
-  margin: '0 0 8px',
-  fontSize: 22,
-  fontWeight: 800,
-  color: COLOR.ink.primary,
-  letterSpacing: '0.01em',
-  lineHeight: 1.2,
+const clearedBody: React.CSSProperties = {
+  marginTop: 6,
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: '0.18em',
+  color: COLOR.ink.muted,
+  textTransform: 'uppercase',
 };
 
-const welcomeBody: React.CSSProperties = {
-  margin: '0 0 16px',
-  fontSize: TYPE.body.size,
-  color: COLOR.ink.secondary,
-  lineHeight: 1.5,
-};
 
 const skipBtn: React.CSSProperties = {
   position: 'absolute',
