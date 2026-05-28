@@ -182,18 +182,21 @@ function MotionLayer({ tailColor }: { tailColor: string }) {
     { y: 30, scale: 0.55, period: 40000, phase: 0.65, dir: -1 },
   ], []);
 
-  // Runway approach lights — perspective line from near end (52, 78)
-  // toward vanishing point (58, 40). Each light strobes on its own
-  // phase so the sequence reads as a wave racing to the horizon.
+  // Runway approach lights — line of 8 pulsing dots that march up
+  // the runway in sequence (each light delays its strobe by an
+  // extra ~0.18s, so the pattern reads as a wave going toward the
+  // horizon). Aligned to the user's yellow markup: near end at
+  // (87, 80) and vanishing end at (85, 38) in viewBox-100 units,
+  // which renders right over the runway centreline in the photo.
   const lights = useMemo(() => {
     const out: Array<{ x: number; y: number; r: number; phase: number }> = [];
     const N = 8;
     for (let i = 0; i < N; i++) {
       const t = i / (N - 1);
-      const x = 52 + t * 6;
-      const y = 78 - t * 38;
-      const r = 0.9 - t * 0.55;
-      out.push({ x, y, r, phase: t * 0.7 });
+      const x = 87 - t * 2;
+      const y = 80 - t * 42;
+      const r = 1.1 - t * 0.7;
+      out.push({ x, y, r, phase: t * 1.4 });
     }
     return out;
   }, []);
@@ -289,19 +292,22 @@ function MotionLayer({ tailColor }: { tailColor: string }) {
         {/* Hero takeoff aircraft removed per design feedback — only
             the small drifting silhouettes in the upper sky remain. */}
 
-        {/* Runway approach-light sequence racing to vanishing point */}
+        {/* Runway approach-light sequence — eight pulsing dots
+            running up the runway centreline. The 1.4s per-light
+            stagger combined with a 3.0s cycle gives an obvious "wave
+            travelling toward the horizon" feel. */}
         {lights.map((p, i) => (
           <circle key={`rl-${i}`} cx={p.x} cy={p.y} r={p.r * 0.6}
-            fill={COLOR.gold.base} opacity="0.85"
+            fill={COLOR.gold.base} opacity="0.2"
             style={{
-              filter: `drop-shadow(0 0 ${p.r * 2}px ${COLOR.gold.base})`,
+              filter: `drop-shadow(0 0 ${p.r * 2.4}px ${COLOR.gold.base})`,
             }}>
             <animate attributeName="opacity"
-              values="0.25;1;0.25"
-              dur="2.4s" begin={`${p.phase}s`} repeatCount="indefinite" />
+              values="0.15;1;0.15"
+              dur="3.0s" begin={`${p.phase}s`} repeatCount="indefinite" />
             <animate attributeName="r"
-              values={`${p.r * 0.5};${p.r * 0.95};${p.r * 0.5}`}
-              dur="2.4s" begin={`${p.phase}s`} repeatCount="indefinite" />
+              values={`${p.r * 0.4};${p.r * 1.0};${p.r * 0.4}`}
+              dur="3.0s" begin={`${p.phase}s`} repeatCount="indefinite" />
           </circle>
         ))}
 
