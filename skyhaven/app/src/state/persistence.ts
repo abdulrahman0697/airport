@@ -18,8 +18,12 @@ import { Preferences } from '@capacitor/preferences';
 import { migrate } from '../engine/migrations';
 import type { SaveState } from '../engine/types';
 
-const KEY_MAIN = 'skyhaven.savegame';
-const KEY_BAK = 'skyhaven.savegame.bak';
+// Design Review v2 — owner requested a fresh start so the new
+// cinematic onboarding fires on next install. Bumping the key suffix
+// is the safest way: old saves stay on disk (recoverable for debug)
+// but the runtime ignores them and creates a fresh save on launch.
+const KEY_MAIN = 'skyhaven.savegame.v2';
+const KEY_BAK = 'skyhaven.savegame.v2.bak';
 
 export async function loadSave(nowMs: number): Promise<SaveState | null> {
   for (const key of [KEY_MAIN, KEY_BAK] as const) {
