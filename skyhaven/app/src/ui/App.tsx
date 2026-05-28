@@ -10,7 +10,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { DailyReward } from './components/DailyReward';
 import { FirstFlightStory } from './components/FirstFlightStory';
 import { FirstRouteCeremony } from './components/FirstRouteCeremony';
-import { NextUnlockBadge } from './components/NextUnlockBadge';
+import { FuelContractToast } from './components/FuelContractToast';
 import { EventBanner } from './components/EventBanner';
 import { EventPopup } from './components/EventPopup';
 import { FuelGauge } from './components/FuelGauge';
@@ -75,7 +75,6 @@ export function App() {
       <EventBanner />
       <FuelGauge />
       <SideLauncher />
-      <NextUnlockBadge />
       <HomeShell />
       <MapLiveTicker />
       <MoneyTrailLayer />
@@ -96,6 +95,7 @@ export function App() {
       <Tutorial />
       <FirstRouteCeremony />
       <FirstFlightStory />
+      <FuelContractToast />
       {/* LivingAirportSplash is the new opening surface — fully alive
           airport scene with route arcs overhead and ground motion.
           The legacy IntroSplash stays in the tree but no longer

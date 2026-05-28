@@ -1362,8 +1362,12 @@ const modalBackdrop: React.CSSProperties = {
 };
 const modalShell: React.CSSProperties = {
   position: 'relative',
-  background: '#0B1120', borderRadius: 14, padding: 20,
-  width: '100%', maxWidth: 420, maxHeight: '85%', overflowY: 'auto',
+  background: '#0B1120', borderRadius: 14, padding: 16,
+  width: '100%', maxWidth: 420,
+  // Fill nearly the entire panel so the destination list, route
+  // preview and the Authorize button all stay on-screen without the
+  // player having to scroll the modal.
+  maxHeight: 'calc(100% - 12px)', overflowY: 'auto',
   border: '1px solid rgba(255,255,255,0.08)',
 };
 const formLabel: React.CSSProperties = {
@@ -1483,7 +1487,10 @@ const destClearBtn: React.CSSProperties = {
   cursor: 'pointer', fontFamily: 'inherit',
 };
 const destScroller: React.CSSProperties = {
-  maxHeight: 260, overflowY: 'auto',
+  // Cap the country list so it scrolls internally instead of pushing
+  // the Authorize button below the fold. 30 dvh keeps it sensible on
+  // both phones and tablets.
+  maxHeight: 'min(220px, 30dvh)', overflowY: 'auto',
   display: 'flex', flexDirection: 'column', gap: 8,
   paddingRight: 4,
 };

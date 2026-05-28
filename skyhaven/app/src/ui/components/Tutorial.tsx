@@ -313,6 +313,9 @@ function MissionControlStrip({
         exit={{ y: placement === 'top' ? -30 : 30, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 360, damping: 28 }}
         style={shellStyle as Record<string, unknown>}
+        {...(placement === 'top'
+          ? { 'data-popover-block-top': true }
+          : { 'data-popover-block-bottom': true })}
       >
         <div style={stripKickerRow}>
           <span style={stripKicker(tailColor)}>

@@ -29,7 +29,7 @@ export function EventBanner() {
   if (events.length === 0) return null;
 
   return (
-    <div style={shell} aria-label="Active events">
+    <div style={shell} aria-label="Active events" data-popover-block-top>
       <AnimatePresence>
         {events.map((e) => {
           const def = EVENT_DEFS[e.kind];

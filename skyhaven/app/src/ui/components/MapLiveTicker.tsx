@@ -38,16 +38,6 @@ export function MapLiveTicker() {
   const activeEvents = useGameStore(selectActiveEvents);
 
   const liveCount = routes.length;
-  const perSec = useMemo(() => {
-    const byUid = new Map(fleet.map((a) => [a.uid, a]));
-    let total = 0;
-    for (const r of routes) {
-      const a = byUid.get(r.aircraftUid);
-      if (!a || !getAircraftDef(a.defId)) continue;
-      total += cashPerSecond(r, a, hubs, activeEvents);
-    }
-    return total;
-  }, [routes, fleet, hubs, activeEvents]);
 
   // Build a rotating list of "ticker events" from the routes. We don't
   // need real timing — the player just needs to see the network move.
@@ -98,14 +88,16 @@ export function MapLiveTicker() {
 
   return (
     <>
-      {/* Top pill — "X aircraft in the air" */}
-      <div style={pill(tailColor)}>
+      {/* Top pill — "X aircraft in the air". The per-minute revenue
+          already lives in TopBar under the cash balance, so the pill
+          now just counts live routes (no "/MIN" duplicate). */}
+      <div style={pill(tailColor)} data-popover-block-top>
         <span style={pillDot(tailColor)} />
-        <span style={pillText}>{liveCount} ACTIVE  ·  {perSec > 0 ? `$${(perSec * 60).toFixed(0)}/MIN` : 'IDLE'}</span>
+        <span style={pillText}>{liveCount} ACTIVE {liveCount === 1 ? 'ROUTE' : 'ROUTES'}</span>
       </div>
 
       {/* Ticker bar at the bottom of the map (above tabs + goal chain). */}
-      <div style={tickerBar}>
+      <div style={tickerBar} data-popover-block-bottom>
         <div style={tickerLabel(tailColor)}>LIVE NETWORK</div>
         <div style={tickerLine} key={current.id}>
           <span style={tickerIcon}>{kindIcon}</span>
