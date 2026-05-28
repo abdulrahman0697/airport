@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { createGameLoop } from '../state/gameLoop';
 import { selectTutorialCompleted, useGameStore } from '../state/store';
 import { AchievementToast } from './components/AchievementToast';
+import { CashTickToast } from './components/CashTickToast';
 import { BottomTabs } from './components/BottomTabs';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { DailyReward } from './components/DailyReward';
@@ -72,6 +73,7 @@ export function App() {
       <VintageDropPopup />
       <HeroMoments />
       <AchievementToast />
+      <CashTickToast />
       <OfflineSummary />
       <DailyReward />
       <HubPicker />

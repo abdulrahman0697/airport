@@ -128,18 +128,23 @@ function RouteRow({ route }: { route: Route }) {
       </div>
 
       {!isCargo && (
-        <div style={pricingRow}>
-          {(['economy', 'balanced', 'premium'] as const).map((p) => (
-            <button key={p}
-              onClick={(): void => {
-                const res = setPricing(route.id, p);
-                setError(res.ok ? null : res.message);
-              }}
-              style={{ ...pricingBtn, ...(route.pricing === p ? pricingActive : {}) }}
-            >
-              {p[0]!.toUpperCase() + p.slice(1)}
-            </button>
-          ))}
+        <div>
+          <div style={pricingRow}>
+            {PRICING_MODES.map((m) => (
+              <button key={m.id}
+                onClick={(): void => {
+                  const res = setPricing(route.id, m.id);
+                  setError(res.ok ? null : res.message);
+                }}
+                style={{ ...pricingBtn, ...(route.pricing === m.id ? pricingActive : {}) }}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <div style={pricingTradeoff}>
+            {PRICING_MODES.find((m) => m.id === route.pricing)?.tradeoff}
+          </div>
         </div>
       )}
       <button
@@ -658,6 +663,15 @@ const tabBtn: React.CSSProperties = {
   cursor: 'pointer', fontSize: 12, minHeight: 32, fontFamily: 'inherit',
 };
 const tabActive: React.CSSProperties = { background: 'rgba(90,200,250,0.18)', color: '#5AC8FA' };
+
+/** Pricing-mode catalogue (Design Review v2 — point 12). Each mode
+ *  shows a one-line trade-off below the toggle so the player sees the
+ *  strategic consequence of the pick at a glance. */
+const PRICING_MODES = [
+  { id: 'economy'  as const, label: 'Economy',  tradeoff: 'High volume · lower margin · friendly to short legs.' },
+  { id: 'balanced' as const, label: 'Balanced', tradeoff: 'Stable demand · moderate margin · low risk.' },
+  { id: 'premium'  as const, label: 'Premium',  tradeoff: 'Fewer passengers · higher revenue · rewards strong hubs.' },
+];
 const body: React.CSSProperties = { flex: 1, overflowY: 'auto', padding: 12 };
 const list: React.CSSProperties = { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 };
 const sectionTitle: React.CSSProperties = {
@@ -681,6 +695,16 @@ const pricingBtn: React.CSSProperties = {
 const pricingActive: React.CSSProperties = {
   background: 'rgba(90,200,250,0.18)', color: '#5AC8FA',
   borderColor: 'rgba(90,200,250,0.5)',
+};
+const pricingTradeoff: React.CSSProperties = {
+  marginTop: 6,
+  padding: '6px 10px',
+  background: 'rgba(11,17,32,0.55)',
+  border: '1px solid rgba(255,255,255,0.06)',
+  borderRadius: 6,
+  fontSize: 11,
+  color: '#CBD5E1',
+  lineHeight: 1.5,
 };
 const closeBtn: React.CSSProperties = {
   width: '100%', marginTop: 8, background: 'transparent',
