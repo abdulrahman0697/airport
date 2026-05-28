@@ -3,6 +3,7 @@ import { AIRCRAFT_DEFS, getAircraftDef } from '../../data/aircraft';
 import { conditionBand, repairCost } from '../../engine/condition';
 import { MAX_TIER } from '../../engine/tierUnlocks';
 import { AircraftDetailModal } from '../components/AircraftDetailModal';
+import { HangarShowroomCard } from '../components/HangarShowroomCard';
 import { PanelHeader } from '../design/PanelHeader';
 import {
   UPGRADE_LABELS,
@@ -226,67 +227,23 @@ function BuyList() {
       {grouped.map(({ tier: t, label, items }) => (
         <section key={t} style={tierBlock}>
           <h3 style={tierHeading}>{label}</h3>
-          <ul style={list}>
+          <div style={showroomGrid}>
             {items.map((d) => (
-              <BuyRow
+              <HangarShowroomCard
                 key={d.id}
                 def={d}
                 unlocked={d.category === 'cargo' ? cargoUnlocked : d.tier <= tier}
+                isTutorialTarget={d.id === 't1.atr42'}
               />
             ))}
-          </ul>
+          </div>
         </section>
       ))}
     </>
   );
 }
 
-function BuyRow({ def, unlocked }: { def: AircraftDef; unlocked: boolean }) {
-  const cash = useGameStore(selectCash);
-  const buy = useGameStore((s) => s.buyAircraft);
-  const [error, setError] = useState<string | null>(null);
-  const afford = cash >= def.basePurchaseCost;
-  const isCargo = def.category === 'cargo';
-  const lockedLabel = isCargo ? 'Unlock at T5' : `Unlock at T${def.tier}`;
-  const tierLabel = isCargo ? 'Cargo' : `T${def.tier}`;
-  const capLabel = isCargo ? `${def.capacity} units` : `${def.capacity} pax`;
-
-  const tryBuy = (): void => {
-    const res = buy(def.id);
-    if (res.ok) haptics.medium();
-    else haptics.warning();
-    setError(res.ok ? null : res.message);
-  };
-
-  return (
-    <li style={card}>
-      <div style={cardHeader}>
-        <div>
-          <div style={cardTitle}>
-            {def.displayName}
-            {isCargo && <span style={cargoBadge}>CARGO</span>}
-          </div>
-          <div style={cardSubtitle}>
-            {tierLabel} · {capLabel} · {def.rangeKm.toLocaleString()} km · {def.cruiseSpeedKmh} km/h
-          </div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={priceText}>${formatCash(def.basePurchaseCost, 1)}</div>
-          {!unlocked && <div style={lockedPill}>{lockedLabel}</div>}
-        </div>
-      </div>
-      <button
-        {...(def.id === 't1.atr42' && unlocked && afford ? { 'data-tutorial': 'buy-aircraft-atr42' } : {})}
-        disabled={!unlocked || !afford}
-        onClick={tryBuy}
-        style={{ ...buyBtn, opacity: !unlocked ? 0.35 : afford ? 1 : 0.6 }}
-      >
-        {!unlocked ? lockedLabel : afford ? 'Buy' : 'Not enough cash'}
-      </button>
-      {error && <div style={errorText}>{error}</div>}
-    </li>
-  );
-}
+// BuyRow removed in Design Review v2 X5; replaced by HangarShowroomCard.
 
 // ─── Styles ──────────────────────────────────────────────────────────
 const shell: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100%' };
@@ -350,17 +307,6 @@ const repairBtn: React.CSSProperties = {
   border: '1px solid rgba(245,158,11,0.45)', minHeight: 44, cursor: 'pointer',
   fontWeight: 600, fontFamily: 'inherit', fontFeatureSettings: '"tnum" 1',
 };
-const buyBtn: React.CSSProperties = {
-  width: '100%', marginTop: 12, padding: '12px', borderRadius: 8,
-  background: '#5AC8FA', color: '#0B1120', border: 0,
-  minHeight: 44, cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit',
-};
-const priceText: React.CSSProperties = { color: '#F4C75B', fontSize: 14, fontWeight: 700, fontFeatureSettings: '"tnum" 1' };
-const lockedPill: React.CSSProperties = {
-  marginTop: 4, fontSize: 9, color: '#94A3B8', letterSpacing: '0.08em',
-  textTransform: 'uppercase', background: 'rgba(255,255,255,0.05)',
-  padding: '2px 6px', borderRadius: 4, display: 'inline-block',
-};
 const cargoBadge: React.CSSProperties = {
   fontSize: 9, letterSpacing: '0.1em', fontWeight: 700,
   color: '#F4C75B', background: 'rgba(244,199,91,0.14)',
@@ -385,6 +331,7 @@ const catActive: React.CSSProperties = {
   borderColor: 'rgba(90,200,250,0.4)',
 };
 const tierBlock: React.CSSProperties = { marginBottom: 14 };
+const showroomGrid: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 12 };
 const tierHeading: React.CSSProperties = {
   margin: '0 4px 6px',
   fontSize: 11,
