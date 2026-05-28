@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useUiStore } from '../../state/uiStore';
 import { AIRCRAFT_DEFS } from '../../data/aircraft';
 import { MAX_TIER } from '../../engine/tierUnlocks';
 import { AircraftDetailModal } from '../components/AircraftDetailModal';
@@ -19,6 +20,17 @@ type BuyCategoryFilter = 'passenger' | 'cargo';
 
 export function FleetPanel() {
   const [tab, setTab] = useState<'owned' | 'buy' | 'vintage'>('owned');
+  // Home tiles ("Buy a new aircraft" / "Manage your hangar") set this
+  // intent so the panel opens directly on the right tab. We consume +
+  // clear it on mount.
+  const fleetTabIntent = useUiStore((s) => s.fleetTabIntent);
+  const setFleetTabIntent = useUiStore((s) => s.setFleetTabIntent);
+  useEffect(() => {
+    if (fleetTabIntent) {
+      setTab(fleetTabIntent);
+      setFleetTabIntent(null);
+    }
+  }, [fleetTabIntent, setFleetTabIntent]);
   const fleet = useGameStore(selectFleet);
   const vintage = useGameStore(selectVintage);
   const tutorialCompleted = useGameStore(selectTutorialCompleted);

@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useUiStore } from '../../state/uiStore';
 import { getAircraftDef } from '../../data/aircraft';
 import { loadTopAirports, type Airport } from '../../data/airports';
 import { REGIONS } from '../../data/regions';
@@ -34,6 +35,15 @@ export function RoutesPanel() {
   const [showNew, setShowNew] = useState(false);
   const routes = useGameStore(selectRoutes);
   const hubs = useGameStore(selectHubs);
+  // Honour the home-tile intent ("Upgrade your airport" → 'hubs').
+  const routesTabIntent = useUiStore((s) => s.routesTabIntent);
+  const setRoutesTabIntent = useUiStore((s) => s.setRoutesTabIntent);
+  useEffect(() => {
+    if (routesTabIntent) {
+      setTab(routesTabIntent);
+      setRoutesTabIntent(null);
+    }
+  }, [routesTabIntent, setRoutesTabIntent]);
 
   return (
     <div style={shell}>

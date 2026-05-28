@@ -74,11 +74,13 @@ export function MapLiveTicker() {
     return () => window.clearInterval(id);
   }, [mapMode, items.length]);
 
-  // Design Review v6 — point 18. The ticker now also runs on the
-  // home view (not just map mode) so the airport always reads as part
-  // of a live network. We still require the tutorial to be done so
-  // the spotlight has a clear canvas during onboarding.
+  // Tutorial keeps the spotlight clean.
   if (!tutorialDone) return null;
+  // Home owns its own embedded live-network strip (Phase X redesign),
+  // so this fixed-position ticker only shows on the world-map view.
+  // Without this gate the pill + bar would overlap the home image
+  // and the new tile buttons.
+  if (!mapMode) return null;
 
   const current = items[now % items.length] ?? items[0]!;
   const kindIcon = current.kind === 'boarding' ? '🛫'

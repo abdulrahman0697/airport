@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { create } from 'zustand';
 
-export type PanelId = 'fleet' | 'routes' | 'fuel' | 'store' | 'crew' | 'office' | 'leaders' | 'achievements' | 'missions' | 'airport' | 'settings' | null;
+export type PanelId = 'fleet' | 'routes' | 'fuel' | 'store' | 'crew' | 'office' | 'leaders' | 'achievements' | 'missions' | 'airport' | 'settings' | 'tower' | null;
 
 interface PanelStore {
   active: PanelId;
@@ -26,6 +26,7 @@ const AchievementsPanel = lazy(() => import('../panels/AchievementsPanel').then(
 const MissionsPanel = lazy(() => import('../panels/MissionsPanel').then((m) => ({ default: m.MissionsPanel })));
 const AirportPanel = lazy(() => import('../panels/AirportPanel').then((m) => ({ default: m.AirportPanel })));
 const SettingsPanel = lazy(() => import('../panels/SettingsPanel').then((m) => ({ default: m.SettingsPanel })));
+const ControlTowerPanel = lazy(() => import('../panels/ControlTowerPanel').then((m) => ({ default: m.ControlTowerPanel })));
 
 export function PanelHost() {
   const active = usePanelStore((s) => s.active);
@@ -64,6 +65,7 @@ export function PanelHost() {
             {active === 'missions' && <MissionsPanel />}
             {active === 'airport' && <AirportPanel />}
             {active === 'settings' && <SettingsPanel />}
+            {active === 'tower' && <ControlTowerPanel />}
             {active === 'store' && <ComingSoonPanel name="Executive Deals" />}
           </Suspense>
         </motion.div>

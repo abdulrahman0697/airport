@@ -62,6 +62,19 @@ interface UiStore {
    */
   stayInTouchCard: boolean;
   setStayInTouchCard: (v: boolean) => void;
+  /**
+   * Tab to open inside FleetPanel when it's launched. Set from home
+   * tiles ("Buy a new aircraft" → 'buy'; "Manage your hangar" → 'owned')
+   * and cleared by FleetPanel after it reads it once.
+   */
+  fleetTabIntent: 'owned' | 'buy' | 'vintage' | null;
+  setFleetTabIntent: (v: UiStore['fleetTabIntent']) => void;
+  /**
+   * Tab to open inside RoutesPanel when it's launched. Set from the
+   * home "Upgrade your airport" tile ('hubs') and cleared by RoutesPanel.
+   */
+  routesTabIntent: 'routes' | 'hubs' | 'regions' | null;
+  setRoutesTabIntent: (v: UiStore['routesTabIntent']) => void;
 }
 
 export const useUiStore = create<UiStore>((set) => ({
@@ -86,4 +99,8 @@ export const useUiStore = create<UiStore>((set) => ({
   setTutorialTarget: (v): void => set({ tutorialTarget: v }),
   stayInTouchCard: false,
   setStayInTouchCard: (v): void => set({ stayInTouchCard: v }),
+  fleetTabIntent: null,
+  setFleetTabIntent: (v): void => set({ fleetTabIntent: v }),
+  routesTabIntent: null,
+  setRoutesTabIntent: (v): void => set({ routesTabIntent: v }),
 }));
