@@ -192,6 +192,7 @@ export type { GameStore };
 export const selectCash = (s: GameStore): number => s.state?.cash ?? 0;
 export const selectLifetime = (s: GameStore): number => s.state?.lifetimeEarnings ?? 0;
 export const selectAirlineName = (s: GameStore): string => s.state?.airlineName ?? '';
+export const selectAirlineCode = (s: GameStore): string => s.state?.code ?? 'SH';
 export const selectTailColor = (s: GameStore): string => s.state?.tailColor ?? '#5AC8FA';
 export const selectTier = (s: GameStore): number => s.state?.tierUnlocked ?? 1;
 // Frozen empty arrays shared by every selector that needs a fallback.

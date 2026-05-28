@@ -58,6 +58,13 @@ export interface Route {
   legProgress: number;
   /** Which way the plane is currently flying. */
   legDirection: 'outbound' | 'inbound';
+  /**
+   * True for the very first commercial route the airline ever opened.
+   * Surfaced in the UI as an "★ INAUGURAL" badge that never leaves the
+   * route card — the player remembers their first route forever
+   * (Design Review v5 — point 9).
+   */
+  inaugural?: boolean;
 }
 
 export interface Hub {
@@ -189,6 +196,14 @@ export interface SaveState {
    * tick.
    */
   dailyMissionSnapshot: DailyMissionSnapshot | null;
+  /**
+   * Persistent commit flag — set true the first time any route is
+   * opened. The Inaugural Route badge anchors on the route that
+   * happens to be open when this flag was first flipped. Closing and
+   * re-opening routes does not re-award the badge. Defaults to false
+   * via migration v8 → v9 for backwards-compatible loads.
+   */
+  inauguralRouteCommitted?: boolean;
 }
 
 export interface DailyMission {

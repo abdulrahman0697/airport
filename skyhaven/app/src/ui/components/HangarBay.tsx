@@ -16,11 +16,13 @@
  * MaintenanceMenu (Design Review v4, point 21) — three repair modes
  * presented as service options, not punishments.
  */
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { getAircraftDef } from '../../data/aircraft';
 import { conditionBand, repairCost } from '../../engine/condition';
+import { aircraftNickname, aircraftTailNumber } from '../../engine/identity';
 import type { OwnedAircraft, Route } from '../../engine/types';
 import {
+  selectAirlineCode,
   selectCash,
   selectFleet,
   selectRoutes,
@@ -98,12 +100,14 @@ function HangarSlot({
   onOpenDetail: () => void;
   onMaintenance: () => void;
 }) {
+  const airlineCode = useGameStore(selectAirlineCode);
   const def = getAircraftDef(aircraft.defId);
   if (!def) return null;
   const route = aircraft.routeId ? routes.find((r) => r.id === aircraft.routeId) : null;
   const band = conditionBand(aircraft.condition);
   const condColor = band === 'normal' ? COLOR.success : band === 'degraded' ? COLOR.warn : COLOR.danger;
-  const nickname = useNickname(aircraft.uid);
+  const nickname = aircraftNickname(aircraft.uid);
+  const tailNumber = aircraftTailNumber(aircraft.uid, airlineCode);
   const milestones = computeMilestones(aircraft, def, lifetimeRevenueEst);
 
   // Rough flight count: condition-decay rate × hours accumulated → flights.
@@ -121,6 +125,7 @@ function HangarSlot({
           <div style={nameplate}>
             <span style={nameplateRivet} />
             <span style={nameplateText}>{nickname}</span>
+            <span style={tailNumberPlate}>{tailNumber}</span>
             <span style={nameplateRivet} />
           </div>
           <div style={slotSub}>
@@ -326,31 +331,6 @@ function Stat({ label, value, accent = COLOR.ink.primary }: { label: string; val
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────
-const NICKNAMES_FIRST = [
-  'Desert', 'Mistral', 'Pearl', 'Atlas', 'Falcon', 'Zephyr', 'Nimbus', 'Crescent',
-  'Aurora', 'Phoenix', 'Solano', 'Albatross', 'Stardust', 'Compass', 'Horizon',
-  'Skyborne', 'Echo', 'Equinox', 'Skylark', 'Cinder',
-];
-const NICKNAMES_SECOND = [
-  'Swift', 'Voyager', 'Star', 'Pilgrim', 'Drift', 'Lance', 'Wing', 'Skylight',
-  'Beacon', 'Halo', 'Talon', 'Strider', 'Sentinel', 'Dawn', 'Crown', 'Tempo',
-  'Cinder', 'Tide', 'Spark', 'Echo',
-];
-
-function useNickname(uid: string): string {
-  return useMemo(() => {
-    let h = 2166136261;
-    for (let i = 0; i < uid.length; i++) {
-      h ^= uid.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    const a = NICKNAMES_FIRST[Math.abs(h) % NICKNAMES_FIRST.length];
-    h = Math.imul(h, 31);
-    const b = NICKNAMES_SECOND[Math.abs(h) % NICKNAMES_SECOND.length];
-    return `${a} ${b}`;
-  }, [uid]);
-}
-
 function computeMilestones(
   aircraft: OwnedAircraft,
   def: ReturnType<typeof getAircraftDef>,
@@ -439,6 +419,16 @@ const nameplateRivet: React.CSSProperties = {
   borderRadius: 999,
   background: 'radial-gradient(circle, #1A2244, #0B1120)',
   border: '1px solid rgba(148,163,184,0.4)',
+};
+const tailNumberPlate: React.CSSProperties = {
+  fontSize: 9,
+  fontWeight: 800,
+  letterSpacing: '0.18em',
+  color: '#0B1120',
+  background: '#F4C75B',
+  padding: '1px 6px',
+  borderRadius: 3,
+  fontFamily: '"Courier New", monospace',
 };
 const slotSub: React.CSSProperties = {
   fontSize: 11,

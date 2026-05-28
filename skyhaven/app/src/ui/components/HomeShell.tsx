@@ -200,30 +200,22 @@ export function HomeShell() {
 
   return (
     <div style={shell}>
-      {/* Header line */}
+      {/* Header line — slim, just identity + view-network shortcut. */}
       <div style={topBand(tailColor)}>
         <div style={topBandRow}>
-          <div style={topKicker}>HOME BASE  ·  {hubs[0]?.iata ?? '—'}</div>
+          <div style={topKicker}>HOME BASE  ·  {hubs[0]?.iata ?? '—'}  ·  TIER {tier}</div>
           <button onClick={(): void => setMapMode(true)} style={mapPeekBtn(tailColor)}>
             View Network →
           </button>
         </div>
-        <div style={topTitle}>Your Airport  ·  Tier {tier}</div>
-        {currentGrowth && (
-          <div style={topSubtitle}>{currentGrowth.label}</div>
-        )}
       </div>
 
-      {/* Living Airport + Global Network Split View (Design Review v4 — point 25).
-          A sky strip above the airport diorama shows the active route
-          arcs with aircraft sprites traveling from this airport to
-          their destinations. Forms the signature visual loop of the
-          game: watch your airport, planes take off into the sky,
-          empire grows, cash comes back. */}
+      {/* Living Airport + Global Network Split View — signature loop.
+          Compact sky strip above the dominant diorama. */}
       <div style={skyStripWrap}>
         <NetworkSkyView
           width={Math.min(560, window.innerWidth - 16)}
-          height={130}
+          height={110}
           routes={routes}
           fleet={fleet}
           hubs={hubs}
@@ -232,8 +224,12 @@ export function HomeShell() {
         />
       </div>
 
-      {/* Big interactive diorama */}
-      <div style={dioramaWrap}>
+      {/* Dominant interactive diorama — Design Review v5 point 12, 13.
+          Now ~60% of the home surface. The stats grid + expansion
+          preview used to live below it; they've been moved behind the
+          "Operations details" disclosure so the player sees the airport
+          breathing, not a dashboard. */}
+      <div style={dioramaWrapBig}>
         <div style={dioramaInner}>
           <AirportScene
             tier={tier}
@@ -257,18 +253,6 @@ export function HomeShell() {
             CARGO ACTIVE  ·  APRON SERVICING
           </div>
         )}
-      </div>
-
-      {/* Active ops strip — clickable stats */}
-      <div style={statsRow}>
-        <StatTile label="Flights" value={flightsToday.toString()} accent={tailColor}
-          onClick={(): void => setOpsDrill('flights')} />
-        <StatTile label="Boarding" value={boardingNow.toString()} accent={COLOR.gold.base}
-          onClick={(): void => setOpsDrill('boarding')} />
-        <StatTile label="Baggage" value={baggageInTransit.toString()}
-          onClick={(): void => setOpsDrill('baggage')} />
-        <StatTile label="Pax served" value={formatCash(passengersServed, 1)} accent={COLOR.success}
-          onClick={(): void => setOpsDrill('passengers')} />
       </div>
 
       {/* Action cards: the three big things you can do from home. */}
@@ -299,18 +283,22 @@ export function HomeShell() {
         />
       </div>
 
-      {/* Before / After expansion preview — full card, glowing tile. */}
-      {nextGrowth && remainingToNext !== null && (
-        <ExpansionPreview
-          tailColor={tailColor}
-          current={currentGrowth?.label ?? '—'}
-          next={nextGrowth.label}
-          era={nextGrowth.era}
-          remaining={remainingToNext}
-          pct={upgradePct}
-          tier={tier}
-        />
-      )}
+      {/* Operations details — collapsed by default. Tapping reveals
+          the stats grid + expansion preview that used to clutter the
+          home view. Most casual taps never need it. */}
+      <OperationsDetailsDeck
+        tailColor={tailColor}
+        flightsToday={flightsToday}
+        boardingNow={boardingNow}
+        baggageInTransit={baggageInTransit}
+        passengersServed={passengersServed}
+        nextGrowth={nextGrowth}
+        currentGrowth={currentGrowth}
+        remainingToNext={remainingToNext}
+        upgradePct={upgradePct}
+        tier={tier}
+        onOpsDrill={setOpsDrill}
+      />
 
       {/* Zone-detail card overlay */}
       <AnimatePresence>
@@ -336,6 +324,74 @@ export function HomeShell() {
             perSec={perSec}
             onClose={(): void => setOpsDrill(null)}
           />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function OperationsDetailsDeck({
+  tailColor, flightsToday, boardingNow, baggageInTransit, passengersServed,
+  nextGrowth, currentGrowth, remainingToNext, upgradePct, tier, onOpsDrill,
+}: {
+  tailColor: string;
+  flightsToday: number;
+  boardingNow: number;
+  baggageInTransit: number;
+  passengersServed: number;
+  nextGrowth: { tier: number; label: string; era: string } | undefined;
+  currentGrowth: { label: string } | undefined;
+  remainingToNext: number | null;
+  upgradePct: number;
+  tier: number;
+  onOpsDrill: (k: 'flights' | 'boarding' | 'baggage' | 'passengers') => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={detailsDeck}>
+      <button
+        onClick={(): void => setOpen((v) => !v)}
+        style={detailsToggle(open, tailColor)}
+        aria-expanded={open}
+      >
+        <span style={detailsToggleLabel}>
+          {open ? '▾' : '▸'} Operations details
+        </span>
+        <span style={detailsToggleHint(tailColor)}>
+          {flightsToday} flights  ·  {boardingNow} boarding  ·  {nextGrowth ? `next: ${nextGrowth.era}` : 'max tier'}
+        </span>
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div style={statsRow}>
+              <StatTile label="Flights" value={flightsToday.toString()} accent={tailColor}
+                onClick={(): void => onOpsDrill('flights')} />
+              <StatTile label="Boarding" value={boardingNow.toString()} accent={COLOR.gold.base}
+                onClick={(): void => onOpsDrill('boarding')} />
+              <StatTile label="Baggage" value={baggageInTransit.toString()}
+                onClick={(): void => onOpsDrill('baggage')} />
+              <StatTile label="Pax served" value={formatCash(passengersServed, 1)} accent={COLOR.success}
+                onClick={(): void => onOpsDrill('passengers')} />
+            </div>
+            {nextGrowth && remainingToNext !== null && (
+              <ExpansionPreview
+                tailColor={tailColor}
+                current={currentGrowth?.label ?? '—'}
+                next={nextGrowth.label}
+                era={nextGrowth.era}
+                remaining={remainingToNext}
+                pct={upgradePct}
+                tier={tier}
+              />
+            )}
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
@@ -526,13 +582,6 @@ const mapPeekBtn = (tail: string): React.CSSProperties => ({
   padding: '6px 10px', borderRadius: 999,
   cursor: 'pointer', fontFamily: 'inherit',
 });
-const topTitle: React.CSSProperties = {
-  fontSize: 20, fontWeight: 900, color: COLOR.ink.primary,
-  letterSpacing: '0.02em',
-};
-const topSubtitle: React.CSSProperties = {
-  fontSize: 11, color: COLOR.ink.muted, marginTop: 2, letterSpacing: '0.06em',
-};
 
 const skyStripWrap: React.CSSProperties = {
   display: 'flex',
@@ -541,18 +590,56 @@ const skyStripWrap: React.CSSProperties = {
   background: 'transparent',
   marginBottom: -4,
 };
-const dioramaWrap: React.CSSProperties = {
+const dioramaWrapBig: React.CSSProperties = {
   position: 'relative',
-  padding: '4px 8px 8px',
+  padding: '4px 8px 10px',
+  flex: '1 1 auto',
+  minHeight: 280,
+  display: 'flex',
+  flexDirection: 'column',
 };
+const detailsDeck: React.CSSProperties = {
+  borderTop: '1px solid rgba(255,255,255,0.05)',
+  marginTop: 6,
+};
+const detailsToggle = (open: boolean, tail: string): React.CSSProperties => ({
+  width: '100%',
+  background: 'transparent',
+  border: 0,
+  padding: '10px 14px',
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: 12,
+  color: open ? tail : '#94A3B8',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  fontSize: 11,
+  fontWeight: 800,
+  letterSpacing: '0.12em',
+  textTransform: 'uppercase',
+});
+const detailsToggleLabel: React.CSSProperties = {
+  fontWeight: 800,
+};
+const detailsToggleHint = (_tail: string): React.CSSProperties => ({
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: '0.08em',
+  color: '#64748B',
+  textTransform: 'none',
+});
 const dioramaInner: React.CSSProperties = {
+  flex: 1,
   display: 'flex',
   justifyContent: 'center',
+  alignItems: 'center',
   borderRadius: RADIUS.l,
   overflow: 'hidden',
   border: `1px solid ${COLOR.border.soft}`,
   background: 'linear-gradient(180deg, #0F1734, #050912)',
   boxShadow: SHADOW.card,
+  minHeight: 240,
 };
 const cargoActiveBadge: React.CSSProperties = {
   position: 'absolute',

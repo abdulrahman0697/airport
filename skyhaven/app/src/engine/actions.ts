@@ -225,6 +225,11 @@ export function openRoute(
   const loadFactor = def.category === 'cargo'
     ? 1.0
     : Math.min(0.98, 0.55 + 0.03 * aircraft.upgrades.marketing);
+  // The very first route the airline ever opens is the Inaugural —
+  // we mark it once and persist a state-level commit flag so closing
+  // and re-opening doesn't "regenerate" the badge (Design Review v5
+  // — point 9).
+  const isInaugural = !state.inauguralRouteCommitted;
   const route: Route = {
     id: nextRouteUid(state),
     originIata,
@@ -235,6 +240,7 @@ export function openRoute(
     loadFactor,
     legProgress: 0,
     legDirection: 'outbound',
+    ...(isInaugural ? { inaugural: true } : {}),
   };
 
   const fleet = state.fleet.slice();
@@ -245,6 +251,7 @@ export function openRoute(
     cash: state.cash - cost,
     fleet,
     routes: [...state.routes, route],
+    ...(isInaugural ? { inauguralRouteCommitted: true } : {}),
   });
 }
 

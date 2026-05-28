@@ -14,9 +14,15 @@
  * on close, clears the entry.
  */
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { getAircraftDef } from '../../data/aircraft';
-import { selectTailColor, useGameStore } from '../../state/store';
+import { aircraftNickname, aircraftTailNumber } from '../../engine/identity';
+import {
+  selectAirlineCode,
+  selectFleet,
+  selectTailColor,
+  useGameStore,
+} from '../../state/store';
 import { useUiStore } from '../../state/uiStore';
 import { Button } from '../design/Button';
 import { AircraftIllustration } from '../design/SvgAircraft';
@@ -33,9 +39,21 @@ export function AircraftDeliveryRitual() {
   const pending = useUiStore((s) => s.pendingDelivery);
   const clear = useUiStore((s) => s.setPendingDelivery);
   const tailColor = useGameStore(selectTailColor);
+  const fleet = useGameStore(selectFleet);
+  const airlineCode = useGameStore(selectAirlineCode);
   const open = usePanelStore((s) => s.open);
 
   const [beat, setBeat] = useState<1 | 2 | 3>(1);
+
+  // The uid of the brand-new aircraft. The buyAircraft action appends
+  // it to the fleet; we grab the latest entry as our handle.
+  const newUid = useMemo(() => {
+    if (!pending) return null;
+    if (pending.uid) return pending.uid;
+    return fleet[fleet.length - 1]?.uid ?? null;
+  }, [pending, fleet]);
+  const nickname = newUid ? aircraftNickname(newUid) : null;
+  const tailNumber = newUid ? aircraftTailNumber(newUid, airlineCode) : null;
 
   useEffect(() => {
     if (!pending) return;
@@ -104,8 +122,14 @@ export function AircraftDeliveryRitual() {
 
           {/* Aircraft headline */}
           <div style={nameRow}>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <div style={subline}>{isCargo ? 'FREIGHTER' : `TIER ${def.tier}`}  ·  {def.displayName}</div>
+              {nickname && tailNumber && (
+                <div style={liveryRow}>
+                  <span style={{ ...liveryName, color: tailColor }}>"{nickname}"</span>
+                  <span style={liveryTail}>{tailNumber}</span>
+                </div>
+              )}
               <div style={priceLine}>${formatCash(def.basePurchaseCost, 1)}  ·  {def.capacity}{isCargo ? ' t' : ' seats'}</div>
             </div>
           </div>
@@ -156,7 +180,7 @@ export function AircraftDeliveryRitual() {
                 Park in Hangar
               </Button>
               <Button variant="gold" size="md" fullWidth onClick={assignNow} hapticOnPress="heavy">
-                Assign Now →
+                Assign to a Route →
               </Button>
             </div>
           ) : (
@@ -227,6 +251,27 @@ const stamp: React.CSSProperties = {
   background: 'rgba(52,211,153,0.06)',
   pointerEvents: 'none',
   transformOrigin: 'center',
+};
+const liveryRow: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  marginTop: 3,
+};
+const liveryName: React.CSSProperties = {
+  fontSize: 16,
+  fontWeight: 800,
+  letterSpacing: '0.04em',
+};
+const liveryTail: React.CSSProperties = {
+  fontSize: 10,
+  fontWeight: 800,
+  letterSpacing: '0.18em',
+  color: '#0B1120',
+  background: '#F4C75B',
+  padding: '2px 7px',
+  borderRadius: 3,
+  fontFamily: '"Courier New", monospace',
 };
 const nameRow: React.CSSProperties = {
   display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end',
