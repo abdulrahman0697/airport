@@ -27,7 +27,6 @@ import { StayInTouchCard } from './components/StayInTouchCard';
 import { Tutorial } from './components/Tutorial';
 import { VintageDropPopup } from './components/VintageDropPopup';
 import { PanelHost } from './components/PanelHost';
-import { SideLauncher } from './components/SideLauncher';
 import { TopBar } from './components/TopBar';
 import { WorldView } from './components/WorldView';
 
@@ -74,7 +73,6 @@ export function App() {
       <TopBar />
       <EventBanner />
       <FuelGauge />
-      <SideLauncher />
       <HomeShell />
       <MapLiveTicker />
       <MoneyTrailLayer />

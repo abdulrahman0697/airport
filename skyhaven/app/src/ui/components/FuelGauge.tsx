@@ -50,12 +50,14 @@ export function FuelGauge() {
   }, []);
 
   if (!fuel) return null;
-  // Design Review v3 — the home airport surface owns "fuel" via the
-  // cargo-apron zone + stat tile. Keep the gauge for the tutorial
-  // (which still spotlights it) and for the world-map view. Hide it
-  // on home so the airport diorama isn't overlapped.
-  const homeShellShowing = !mapMode && activePanel === null && tutorialDone;
-  if (homeShellShowing) return null;
+  // The global floating gauge is now redundant: the home tab embeds
+  // its own larger gauge inside the airport scene, and the network /
+  // panel views don't need a fixed corner indicator. Keep the
+  // component file (state + smoothing logic are reused there), but
+  // skip rendering everywhere except the tutorial spotlight step
+  // that explicitly hunts data-tutorial="fuel-gauge".
+  if (tutorialDone) return null;
+  if (mapMode || activePanel !== null) return null;
   const pct = fuel.capacity > 0 ? Math.max(0, Math.min(1, shown / fuel.capacity)) : 0;
   const net = fuel.supplyRate - fuel.demandRate;
   const draining = net < 0;

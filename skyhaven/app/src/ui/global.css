@@ -105,3 +105,16 @@ a:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+
+/* Watch Tower radar — sweeping arm rotates around the disc centre,
+   and the random blip dots fade out as the arm passes them. */
+@keyframes radar-sweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes radar-blip {
+  0%   { opacity: 1.0; }
+  35%  { opacity: 0.9; }
+  70%  { opacity: 0.0; }
+  100% { opacity: 0.0; }
+}
