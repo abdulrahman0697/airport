@@ -139,7 +139,7 @@ export function HomeShell() {
             <TileButton
               onClick={(): void => go('fleet', () => setFleetTabIntent('owned'))}
               left={37.5}
-              title="Manage Your Hangar"
+              title="Your Hangar"
               subtitle={`${Math.round(avgCondition)}% avg condition`}
               accent={tailColor}
               subtitleColor={condColor}
@@ -237,21 +237,25 @@ const shell: React.CSSProperties = {
 };
 
 const inner: React.CSSProperties = {
-  maxWidth: 560,
+  // Enlarged home (player feedback) — let the image breathe on
+  // bigger phones / tablets too. Side padding is zero so the picture
+  // runs edge-to-edge; the strip + CEO button keep their own breathing
+  // room via marginInline.
+  maxWidth: 760,
   margin: '0 auto',
-  padding: '8px 8px 12px',
+  padding: 0,
   display: 'flex',
   flexDirection: 'column',
-  gap: 10,
+  gap: 8,
 };
 
 const imageWrap = (tail: string): React.CSSProperties => ({
   position: 'relative',
   width: '100%',
   aspectRatio: `${IMAGE_RATIO}`,
-  borderRadius: 18,
+  borderRadius: 0,
   overflow: 'hidden',
-  border: `1px solid ${tail}33`,
+  borderBottom: `1px solid ${tail}33`,
   boxShadow: `${SHADOW.card}, 0 0 32px ${tail}22`,
 });
 
@@ -295,30 +299,32 @@ const hubCityLine: React.CSSProperties = {
   marginTop: 3,
 };
 
-/* Control tower — right side of image, above the parked plane. */
+/* Control tower — right side of image, above the parked plane.
+   Sits a little higher than the boarding tag and is smaller now
+   that the player has confirmed the location reads. */
 const towerTag: React.CSSProperties = {
   position: 'absolute',
-  top: '38%',
-  right: '4%',
+  top: '30%',
+  right: '5%',
   background: 'rgba(15,23,47,0.78)',
   backdropFilter: 'blur(6px)',
   border: '1px solid rgba(244,199,91,0.6)',
   borderRadius: 999,
-  padding: '6px 12px',
-  fontSize: 11,
+  padding: '4px 9px',
+  fontSize: 9,
   fontWeight: 800,
-  letterSpacing: '0.14em',
+  letterSpacing: '0.12em',
   color: COLOR.gold.base,
   cursor: 'pointer',
   display: 'inline-flex',
   alignItems: 'center',
-  gap: 6,
+  gap: 5,
   fontFamily: 'inherit',
   textTransform: 'uppercase',
-  boxShadow: '0 4px 14px rgba(0,0,0,0.5), 0 0 14px rgba(244,199,91,0.35)',
+  boxShadow: '0 3px 10px rgba(0,0,0,0.5), 0 0 10px rgba(244,199,91,0.32)',
 };
 const towerGlyph: React.CSSProperties = {
-  fontSize: 9,
+  fontSize: 8,
   color: COLOR.gold.base,
 };
 
@@ -330,39 +336,39 @@ const boardingTag: React.CSSProperties = {
   background: 'rgba(11,17,32,0.78)',
   backdropFilter: 'blur(6px)',
   border: `1px solid ${COLOR.success}66`,
-  borderRadius: RADIUS.m,
-  padding: '8px 12px',
+  borderRadius: RADIUS.s,
+  padding: '6px 10px',
   cursor: 'pointer',
   fontFamily: 'inherit',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'flex-start',
-  gap: 2,
-  minWidth: 116,
-  boxShadow: '0 6px 16px rgba(0,0,0,0.5), 0 0 14px rgba(52,211,153,0.35)',
+  gap: 1,
+  minWidth: 96,
+  boxShadow: '0 5px 12px rgba(0,0,0,0.5), 0 0 10px rgba(52,211,153,0.3)',
 };
 const boardingDot: React.CSSProperties = {
   position: 'absolute',
-  top: 10, left: 12,
-  width: 7, height: 7, borderRadius: 999,
+  top: 8, left: 10,
+  width: 6, height: 6, borderRadius: 999,
   background: COLOR.success,
   boxShadow: `0 0 8px ${COLOR.success}`,
   animation: 'breathe 1.4s ease-in-out infinite',
 };
 const boardingLabel: React.CSSProperties = {
-  fontSize: 10,
+  fontSize: 8,
   fontWeight: 800,
-  letterSpacing: '0.18em',
+  letterSpacing: '0.16em',
   color: COLOR.success,
   textTransform: 'uppercase',
-  marginLeft: 14,
+  marginLeft: 12,
 };
 const boardingCount: React.CSSProperties = {
-  fontSize: 13,
+  fontSize: 10,
   fontWeight: 800,
   color: COLOR.ink.primary,
   fontFeatureSettings: '"tnum" 1',
-  marginLeft: 14,
+  marginLeft: 12,
 };
 
 /* Three tiles overlaid on the bottom card row of the image.
@@ -399,17 +405,17 @@ const tileBtn: React.CSSProperties = {
   backdropFilter: 'blur(2px)',
 };
 const tileTitle: React.CSSProperties = {
-  fontSize: 11,
+  fontSize: 9,
   fontWeight: 900,
   color: COLOR.ink.primary,
-  letterSpacing: '0.04em',
+  letterSpacing: '0.03em',
   lineHeight: 1.2,
 };
 const tileSubtitle: React.CSSProperties = {
-  fontSize: 10,
+  fontSize: 8,
   fontWeight: 700,
   letterSpacing: '0.04em',
-  marginTop: 3,
+  marginTop: 2,
   fontFeatureSettings: '"tnum" 1',
 };
 
@@ -424,6 +430,7 @@ const liveStrip: React.CSSProperties = {
   alignItems: 'center',
   gap: 12,
   minWidth: 0,
+  margin: '0 8px',
 };
 const liveKicker = (tail: string): React.CSSProperties => ({
   fontSize: 9,
@@ -462,7 +469,8 @@ const ceoBtn = (tail: string): React.CSSProperties => ({
   fontFamily: 'inherit',
   color: COLOR.ink.primary,
   boxShadow: `${SHADOW.card}, 0 0 22px ${tail}26`,
-  minHeight: 60,
+  minHeight: 56,
+  margin: '0 8px 4px',
 });
 const ceoGlyph = (tail: string): React.CSSProperties => ({
   width: 42, height: 42,
