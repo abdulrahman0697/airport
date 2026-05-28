@@ -217,11 +217,15 @@ const panel = (tail: string): React.CSSProperties => ({
   width: '100%',
   maxWidth: 540,
   margin: '0 auto',
-  maxHeight: '88vh',
+  // dvh tracks the dynamic mobile viewport (URL bar shown/hidden) so
+  // the panel never spills off the bottom of the screen.
+  maxHeight: 'min(92dvh, calc(100dvh - env(safe-area-inset-top, 0px) - 8px))',
+  minHeight: 0,
   display: 'flex',
   flexDirection: 'column',
   boxShadow: SHADOW.modal,
   paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+  overflow: 'hidden',
 });
 const header: React.CSSProperties = {
   display: 'flex',
@@ -255,6 +259,7 @@ const subhead: React.CSSProperties = {
 const muralWrap: React.CSSProperties = {
   borderBottom: '1px solid rgba(255,255,255,0.05)',
   padding: '4px 4px 12px',
+  flexShrink: 0,
 };
 const muralKicker = (tail: string): React.CSSProperties => ({
   fontSize: 9,
@@ -336,6 +341,10 @@ const list: React.CSSProperties = {
   flexDirection: 'column',
   gap: 8,
   overflowY: 'auto',
+  // Absorb the remaining panel height so the list scrolls internally
+  // rather than pushing the panel beyond its own maxHeight.
+  flex: 1,
+  minHeight: 0,
 };
 const row: React.CSSProperties = {
   display: 'flex',

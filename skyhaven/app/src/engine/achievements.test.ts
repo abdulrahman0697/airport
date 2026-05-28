@@ -16,16 +16,25 @@ describe('evaluateAchievements', () => {
     expect(out.totalReward).toBe(0);
   });
 
-  it('credits the fresh-save predicate achievements (fleet + capacity)', () => {
+  it('unlocks nothing on a fresh founder save — paced predicates require real growth', () => {
     const s = createInitialState(0);
     const out = evaluateAchievements(s);
-    // A fresh founder save starts with 1 aircraft (fleet.size.1) and
-    // a starter capacity contract (ops.capacity.2). Starter cash $50K
-    // sits *below* the econ.cash.100k threshold, so those don't credit.
-    expect(out.newlyUnlocked).toEqual(expect.arrayContaining(['fleet.size.1', 'ops.capacity.2']));
+    // After the achievement rewrite, every catalogue entry sits past
+    // where the tutorial leaves the player (1 hub, 1 plane, 1 route,
+    // $50K cash, tier 1, starter fuel contract). Finishing the
+    // tutorial yields exactly one achievement (mil.tutorial); nothing
+    // should fire on the bare initial state.
+    expect(out.newlyUnlocked).toHaveLength(0);
+    expect(out.totalReward).toBe(0);
+    expect(out.state).toBe(s);
+  });
+
+  it('fires exactly one achievement when the tutorial is marked complete', () => {
+    const s = createInitialState(0);
+    const completed = { ...s, tutorialCompleted: true };
+    const out = evaluateAchievements(completed);
+    expect(out.newlyUnlocked).toEqual(['mil.tutorial']);
     expect(out.totalReward).toBeGreaterThan(0);
-    expect(out.state.cash).toBe(s.cash + out.totalReward);
-    expect(out.state.lifetimeEarnings).toBe(s.lifetimeEarnings + out.totalReward);
   });
 
   it('does not double-credit on subsequent passes', () => {
@@ -38,6 +47,6 @@ describe('evaluateAchievements', () => {
 
   it('has the expected achievement count', () => {
     expect(ACHIEVEMENT_COUNT).toBe(ACHIEVEMENT_DEFS.length);
-    expect(ACHIEVEMENT_COUNT).toBeGreaterThanOrEqual(55);
+    expect(ACHIEVEMENT_COUNT).toBeGreaterThanOrEqual(50);
   });
 });
