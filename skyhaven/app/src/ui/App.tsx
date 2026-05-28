@@ -5,6 +5,7 @@ import { AchievementToast } from './components/AchievementToast';
 import { BottomTabs } from './components/BottomTabs';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { DailyReward } from './components/DailyReward';
+import { FirstTakeoffCinematic } from './components/FirstTakeoffCinematic';
 import { EventBanner } from './components/EventBanner';
 import { EventPopup } from './components/EventPopup';
 import { FuelGauge } from './components/FuelGauge';
@@ -75,6 +76,7 @@ export function App() {
       <DailyReward />
       <HubPicker />
       <Tutorial />
+      <FirstTakeoffCinematic />
       <IntroSplash />
     </ErrorBoundary>
   );
