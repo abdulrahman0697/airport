@@ -1,12 +1,9 @@
 import { useMemo, useState } from 'react';
-import { signInWithGoogle, signOut } from '../../backend/auth';
-import { useAuth } from '../../backend/useAuth';
 import { ACHIEVEMENT_COUNT, frameTier, FRAME_COLORS } from '../../data/achievements';
 import { FrameBadge } from '../components/AchievementFrame';
 import { AirlineCrest } from '../design/AirlineCrest';
 import { Button } from '../design/Button';
 import { PanelHeader } from '../design/PanelHeader';
-import { FriendsCard } from '../components/FriendsCard';
 import { usePanelStore } from '../components/PanelHost';
 import { ShareAirlineModal } from '../components/ShareAirlineModal';
 import { AIRCRAFT_DEFS, getAircraftDef } from '../../data/aircraft';
@@ -125,9 +122,44 @@ export function OfficePanel() {
         </section>
         <ShareAirlineModal open={shareOpen} onClose={(): void => setShareOpen(false)} />
 
-        <CloudAccountCard />
+        {/* Strategic Decisions — replaces the friends/cloud/etc. clutter that
+            used to live here. Cloud save + friends moved to Settings panel
+            (Design Review v2 — point 8). */}
+        <section style={card}>
+          <div style={sectionHead}>Strategic Decisions</div>
+          <div style={advisorList}>
+            <AdvisorCard
+              title="Approve new terminal"
+              body="A new terminal unlocks at the next tier. Stay on the lifetime-earnings curve to lift it."
+              accent="#5AC8FA"
+            />
+            <AdvisorCard
+              title="Negotiate fuel contract"
+              body="Sign higher-supply contracts in Fuel to weather price spikes without grounding routes."
+              accent="#F4C75B"
+            />
+            <AdvisorCard
+              title="Launch a premium route"
+              body="Try Premium pricing on a route from a Tier-4+ hub to capture higher-yield passengers."
+              accent="#34D399"
+            />
+          </div>
+        </section>
 
-        <FriendsCard />
+        {/* Settings access — moved out of CEO Office */}
+        <section style={card}>
+          <div style={sectionHead}>Account &amp; Settings</div>
+          <div style={settingsRow}>
+            <div style={{ fontSize: 12, color: '#94A3B8', lineHeight: 1.5 }}>
+              Cloud sync, friends, sign-in and other preferences live in the
+              Settings panel.
+            </div>
+            <Button variant="secondary" size="sm" accent={tailColor}
+              onClick={(): void => openPanel('settings' as never)}>
+              Open Settings →
+            </Button>
+          </div>
+        </section>
 
         {/* Tier progress */}
         <section style={card}>
@@ -275,96 +307,27 @@ export function OfficePanel() {
 }
 
 /**
- * Cloud-save account card (BRD §11). Surfaces the current auth state
- * and offers a Google sign-in upgrade. The card is intentionally low
- * key — the local game works fine without it; this is for players
- * who want cross-device sync.
+ * Strategic-decision advisor card (Design Review v2 — point 8).
+ *
+ * Replaces the cloud-sync / friend-graph clutter that used to live in
+ * the CEO Office. Each card frames a strategic move the player can
+ * take next. Pure copy for now — the next iteration ties them to
+ * actual gameplay actions ("Approve" → opens the relevant panel).
  */
-function CloudAccountCard() {
-  const user = useAuth();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const onSignIn = async (): Promise<void> => {
-    setBusy(true); setError(null);
-    const res = await signInWithGoogle();
-    setBusy(false);
-    if (!res.ok) {
-      // Surface the real failure (code + message) so misconfig like a
-      // missing SHA-1 or a disabled Google provider in the Firebase
-      // Console is diagnosable from the device instead of a vague
-      // "check connection" string.
-      setError(`${res.code}: ${res.message}`);
-    }
-  };
-  const onSignOut = async (): Promise<void> => {
-    setBusy(true); setError(null);
-    await signOut();
-    setBusy(false);
-  };
-
-  const status =
-    !user ? 'Offline' :
-    user.providerId === 'google.com' ? 'Cloud sync enabled' :
-    'Anonymous device sync';
-  const statusColor =
-    !user ? '#94A3B8' :
-    user.providerId === 'google.com' ? '#34D399' :
-    '#5AC8FA';
-
+function AdvisorCard({ title, body, accent }: { title: string; body: string; accent: string }) {
   return (
-    <section style={card}>
-      <div style={sectionHead}>Cloud Save</div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: statusColor }}>{status}</div>
-          <div style={subStat}>
-            {!user
-              ? 'Trying to connect — local progress is always safe.'
-              : user.providerId === 'google.com'
-                ? `Signed in as ${user.displayName ?? user.email ?? user.uid.slice(0, 8)}`
-                : 'Sign in to keep your progress across devices.'}
-          </div>
-        </div>
-        {user?.providerId === 'google.com' ? (
-          <button
-            onClick={(): void => { void onSignOut(); }}
-            disabled={busy}
-            style={cloudBtnSecondary}
-          >
-            Sign out
-          </button>
-        ) : (
-          <button
-            onClick={(): void => { void onSignIn(); }}
-            disabled={busy}
-            style={cloudBtnPrimary}
-          >
-            {busy ? '…' : 'Sign in with Google'}
-          </button>
-        )}
-      </div>
-      {error && <div style={cloudError}>{error}</div>}
-    </section>
+    <div style={{
+      background: 'rgba(11,17,32,0.55)',
+      border: `1px solid ${accent}33`,
+      borderLeft: `3px solid ${accent}`,
+      borderRadius: 10,
+      padding: 12,
+    }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#F8FAFC' }}>{title}</div>
+      <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 4, lineHeight: 1.5 }}>{body}</div>
+    </div>
   );
 }
-
-const cloudBtnPrimary: React.CSSProperties = {
-  background: '#5AC8FA', color: '#0B1120', border: 0,
-  borderRadius: 8, padding: '10px 14px', fontWeight: 700,
-  cursor: 'pointer', minHeight: 40, fontFamily: 'inherit',
-  fontSize: 12, whiteSpace: 'nowrap',
-};
-const cloudBtnSecondary: React.CSSProperties = {
-  background: 'transparent', color: '#94A3B8',
-  border: '1px solid rgba(255,255,255,0.15)',
-  borderRadius: 8, padding: '8px 14px', minHeight: 36,
-  cursor: 'pointer', fontFamily: 'inherit', fontSize: 12,
-};
-const cloudError: React.CSSProperties = {
-  marginTop: 8, padding: '6px 10px', fontSize: 11, color: '#F87171',
-  background: 'rgba(248,113,113,0.08)', borderRadius: 6,
-};
 
 function Stat({ label, value, sub, accent }: {
   label: string;
@@ -493,6 +456,10 @@ const chip: React.CSSProperties = {
 };
 const standingRow: React.CSSProperties = { display: 'flex', gap: 12 };
 const standingLeft: React.CSSProperties = { flex: 1 };
+const advisorList: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8 };
+const settingsRow: React.CSSProperties = {
+  display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
+};
 const standingRight: React.CSSProperties = { flex: 1 };
 const standingKey: React.CSSProperties = {
   fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#94A3B8',
