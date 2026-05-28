@@ -126,6 +126,7 @@ export function HubPicker() {
                 <FounderMarketMap
                   airports={airports}
                   tailColor={tailColor}
+                  regionId={pending}
                   onPick={handlePick}
                 />
                 <div style={starterRow}>
@@ -226,8 +227,150 @@ function isInternational(a: Airport): boolean {
 interface FounderMarketMapProps {
   airports: readonly Airport[];
   tailColor: string;
+  regionId: number;
   onPick: (iata: string) => void;
 }
+
+/**
+ * Per-region map definition — bounding box + stylised land path +
+ * display label. Each region paints its own outline so the player
+ * sees the geography of whatever region they actually picked
+ * (Middle East ≠ Europe ≠ North America etc.). The bbox is also
+ * used by `project()` to position the pins, so the same lat/lon
+ * lands in different viewport positions depending on the region.
+ *
+ * Paths are intentionally stylised — broad shapes drawn within the
+ * 320×220 viewBox that read as the continent at a glance without
+ * trying to be cartographic. The 3 recommended airport pins anchor
+ * the player's attention; the land outlines just give a sense of
+ * place.
+ */
+interface RegionMap {
+  label: string;
+  bbox: { latMin: number; latMax: number; lonMin: number; lonMax: number };
+  paths: readonly string[];
+}
+const MAP_W = 320;
+const MAP_H = 220;
+const REGION_MAPS: Record<number, RegionMap> = {
+  // North America — wide continent narrowing toward Mexico
+  1: {
+    label: 'NORTH AMERICA',
+    bbox: { latMin: 15, latMax: 60, lonMin: -130, lonMax: -60 },
+    paths: [
+      // Main landmass (Canada + US)
+      'M 18 20 Q 60 12 110 18 Q 160 14 210 20 Q 260 24 300 32 L 308 60 Q 290 80 270 90 Q 240 110 210 105 Q 180 110 150 100 Q 120 110 100 100 Q 70 110 50 100 Q 25 90 16 60 Q 12 38 18 20 Z',
+      // Mexico / Central America tail
+      'M 150 100 Q 158 130 168 155 Q 178 180 198 195 Q 215 200 222 188 Q 215 170 200 150 Q 188 135 178 125 Q 170 115 165 105 Z',
+    ],
+  },
+  // Latin America — South America inverted triangle + Central America stub
+  2: {
+    label: 'LATIN AMERICA',
+    bbox: { latMin: -55, latMax: 25, lonMin: -85, lonMax: -35 },
+    paths: [
+      // S America silhouette
+      'M 70 40 Q 100 30 140 40 Q 180 35 215 50 Q 240 70 245 100 Q 240 130 220 155 Q 200 180 175 200 L 160 210 Q 150 215 140 205 Q 130 190 130 170 Q 115 160 95 155 Q 75 140 70 120 Q 60 95 55 75 Q 55 55 70 40 Z',
+      // C America stub
+      'M 40 30 Q 55 30 60 45 Q 62 55 55 60 Q 45 60 38 50 Z',
+    ],
+  },
+  // Europe — continental Europe + UK islands + Scandinavia
+  3: {
+    label: 'EUROPE',
+    bbox: { latMin: 35, latMax: 66, lonMin: -10, lonMax: 35 },
+    paths: [
+      // Mainland + Scandinavia
+      'M 50 80 Q 80 55 130 60 Q 170 55 210 50 Q 250 38 280 30 Q 300 45 305 70 Q 295 95 270 110 Q 240 105 215 115 Q 195 110 175 120 L 160 145 Q 150 165 145 175 L 138 185 Q 130 175 130 160 Q 130 145 120 138 Q 100 132 80 130 Q 60 120 55 105 Q 50 92 50 80 Z',
+      // UK + Ireland
+      'M 22 60 Q 38 55 42 70 Q 40 90 30 95 Q 18 95 18 80 Q 18 65 22 60 Z',
+      // Iberia
+      'M 35 110 Q 60 105 75 115 Q 80 130 70 138 Q 50 142 40 132 Q 30 122 35 110 Z',
+      // Italy peninsula already mostly drawn via mainland sweep
+    ],
+  },
+  // Middle East — Eurasia block + Arabian peninsula
+  4: {
+    label: 'MIDDLE EAST',
+    bbox: { latMin: 12, latMax: 42, lonMin: 32, lonMax: 62 },
+    paths: [
+      // Northern landmass (Anatolia + Iran + Caucasus)
+      'M 14 38 Q 50 25 100 32 Q 150 22 200 30 Q 250 26 290 36 Q 308 56 305 80 Q 280 100 240 102 Q 200 110 170 100 Q 140 108 110 100 Q 80 108 55 100 Q 28 88 16 70 Q 8 52 14 38 Z',
+      // Arabian peninsula
+      'M 130 100 Q 155 130 175 158 Q 198 178 218 180 Q 232 178 232 162 Q 222 142 205 124 Q 188 110 170 102 Q 150 104 130 100 Z',
+    ],
+  },
+  // Africa — broad rounded triangle pointing down
+  5: {
+    label: 'AFRICA',
+    bbox: { latMin: -35, latMax: 38, lonMin: -20, lonMax: 52 },
+    paths: [
+      // Continent silhouette
+      'M 60 35 Q 110 20 170 30 Q 230 26 270 38 Q 290 60 280 88 Q 270 115 250 138 Q 235 158 210 168 Q 195 184 175 196 L 162 205 Q 152 208 148 198 Q 138 178 142 158 Q 132 150 120 145 Q 100 130 88 110 Q 75 92 68 70 Q 56 50 60 35 Z',
+      // Madagascar
+      'M 270 160 Q 282 168 286 182 Q 282 196 274 200 Q 266 195 264 182 Q 264 168 270 160 Z',
+    ],
+  },
+  // South Asia — Indian subcontinent triangle + Sri Lanka
+  6: {
+    label: 'SOUTH ASIA',
+    bbox: { latMin: 5, latMax: 38, lonMin: 62, lonMax: 95 },
+    paths: [
+      // Indian subcontinent + Himalayan northland
+      'M 30 60 Q 80 40 140 45 Q 200 38 260 50 Q 290 62 305 80 Q 295 98 270 102 Q 240 100 220 110 L 200 130 Q 180 150 170 170 L 158 188 Q 148 192 142 180 Q 140 165 138 148 Q 128 132 112 120 Q 95 110 78 102 Q 55 90 38 78 Q 26 70 30 60 Z',
+      // Sri Lanka
+      'M 152 198 Q 162 198 164 208 Q 162 218 154 218 Q 148 212 150 202 Z',
+    ],
+  },
+  // East Asia — continent + Japan archipelago
+  7: {
+    label: 'EAST ASIA',
+    bbox: { latMin: 18, latMax: 52, lonMin: 100, lonMax: 145 },
+    paths: [
+      // Mainland China + Korea
+      'M 18 30 Q 60 18 110 22 Q 160 18 210 28 Q 230 45 235 70 Q 232 95 220 118 Q 200 138 178 150 Q 158 158 138 158 Q 118 158 100 150 Q 80 140 65 125 Q 45 110 32 90 Q 18 70 18 30 Z',
+      // Korea protrusion
+      'M 200 100 Q 215 110 218 130 Q 215 148 205 152 Q 195 142 196 122 Z',
+      // Japan archipelago
+      'M 245 60 Q 262 70 268 88 Q 272 105 260 110 Q 248 105 244 88 Q 240 72 245 60 Z',
+      'M 270 110 Q 282 118 286 130 Q 282 142 275 145 Q 268 138 268 122 Z',
+      // Taiwan
+      'M 195 158 Q 202 162 203 172 Q 199 180 195 180 Q 191 172 192 162 Z',
+    ],
+  },
+  // Southeast Asia — peninsula + island scatter
+  8: {
+    label: 'SOUTHEAST ASIA',
+    bbox: { latMin: -10, latMax: 25, lonMin: 90, lonMax: 140 },
+    paths: [
+      // Mainland (Thailand/Vietnam)
+      'M 30 30 Q 60 22 90 30 Q 110 35 115 55 Q 110 80 95 100 L 88 122 Q 80 135 70 130 Q 65 115 70 95 Q 60 90 50 80 Q 38 65 30 50 Q 24 38 30 30 Z',
+      // Sumatra
+      'M 70 130 Q 100 138 130 150 Q 145 165 138 175 Q 110 175 90 168 Q 70 158 65 145 Z',
+      // Java
+      'M 150 175 Q 180 178 210 178 Q 232 178 245 188 Q 232 198 200 196 Q 175 196 155 192 Z',
+      // Borneo
+      'M 158 110 Q 185 105 205 118 Q 215 138 205 152 Q 180 158 162 148 Q 152 130 158 110 Z',
+      // Philippines
+      'M 230 60 Q 240 70 240 85 Q 235 95 226 95 Q 222 85 222 70 Z',
+      'M 230 105 Q 240 110 240 122 Q 235 130 226 125 Q 222 115 226 108 Z',
+    ],
+  },
+  // Oceania — Australia blob + NZ + island scatter
+  9: {
+    label: 'OCEANIA',
+    bbox: { latMin: -45, latMax: 0, lonMin: 110, lonMax: 180 },
+    paths: [
+      // Australia
+      'M 30 90 Q 70 70 120 75 Q 170 70 220 80 Q 240 100 235 130 Q 220 155 188 170 Q 158 178 130 175 Q 100 178 70 168 Q 40 155 28 130 Q 20 108 30 90 Z',
+      // New Zealand
+      'M 270 175 Q 280 180 282 195 Q 278 208 270 210 Q 264 200 266 188 Z',
+      'M 285 195 Q 295 200 296 212 Q 290 220 283 218 Q 280 208 282 198 Z',
+      // PNG
+      'M 165 50 Q 200 55 230 60 Q 232 72 215 75 Q 185 72 165 65 Z',
+    ],
+  },
+};
 
 // Design Review v6 — point 5. One reason per card. The previous
 // "tag + line" was redundant.
@@ -242,7 +385,7 @@ const RECOMMENDED_PROFILES: Record<string, { tag: string; profile: 'HIGH' | 'BAL
   BAH: { tag: 'Easy entry, short hops', profile: 'EASY' },
 };
 
-function FounderMarketMap({ airports, tailColor, onPick }: FounderMarketMapProps) {
+function FounderMarketMap({ airports, tailColor, regionId, onPick }: FounderMarketMapProps) {
   // Pick the three best matches present in the region.
   const ranked = (() => {
     const high: Airport | null = pickFirst(airports, ['DXB', 'AUH', 'RUH']);
@@ -265,7 +408,7 @@ function FounderMarketMap({ airports, tailColor, onPick }: FounderMarketMapProps
       {/* Stylised regional map — Design Review v6 point 4. The
           recommended bases sit as glowing pins on a soft regional
           backdrop instead of in flat rows. */}
-      <RegionalMapBackdrop ranked={ranked} tailColor={tailColor} onPick={onPick} />
+      <RegionalMapBackdrop ranked={ranked} tailColor={tailColor} regionId={regionId} onPick={onPick} />
       <div style={fmmCards}>
         {ranked.map((a) => {
           const profile = RECOMMENDED_PROFILES[a.iata] ?? {
@@ -300,20 +443,29 @@ function FounderMarketMap({ airports, tailColor, onPick }: FounderMarketMapProps
 }
 
 function RegionalMapBackdrop({
-  ranked, tailColor, onPick,
+  ranked, tailColor, regionId, onPick,
 }: {
   ranked: readonly Airport[];
   tailColor: string;
+  regionId: number;
   onPick: (iata: string) => void;
 }) {
-  // Project each ranked airport into the map viewport. Lat/lon ranges
-  // are clamped to the Middle East window (15°N–40°N, 35°E–60°E) so
-  // the markers spread across the canvas.
-  const W = 320, H = 130;
+  // Look up the region-specific map definition. Fallback to Europe
+  // (id 3) if an unknown region somehow comes through.
+  const mapDef = REGION_MAPS[regionId] ?? REGION_MAPS[3]!;
+  const W = MAP_W, H = MAP_H;
+
+  // Project lat/lon into the SVG viewport using THIS region's bbox.
+  // Pads the projection slightly inside the edges so pins never crowd
+  // the frame.
   const project = (lat: number, lon: number): { x: number; y: number } => {
-    const x = ((lon - 35) / 25) * W;
-    const y = H - ((lat - 12) / 30) * H;
-    return { x: Math.max(12, Math.min(W - 12, x)), y: Math.max(10, Math.min(H - 18, y)) };
+    const { latMin, latMax, lonMin, lonMax } = mapDef.bbox;
+    const x = ((lon - lonMin) / (lonMax - lonMin)) * W;
+    const y = H - ((lat - latMin) / (latMax - latMin)) * H;
+    return {
+      x: Math.max(28, Math.min(W - 28, x)),
+      y: Math.max(28, Math.min(H - 28, y)),
+    };
   };
 
   return (
@@ -321,75 +473,74 @@ function RegionalMapBackdrop({
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
         style={{ display: 'block' }}>
         <defs>
-          <radialGradient id="map-sea" cx="0.5" cy="0.5" r="0.7">
+          <radialGradient id={`map-sea-${regionId}`} cx="0.5" cy="0.5" r="0.85">
             <stop offset="0" stopColor="#10172E" />
             <stop offset="1" stopColor="#070A18" />
           </radialGradient>
-          <linearGradient id="map-land" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={`map-land-${regionId}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="#1A2347" />
             <stop offset="1" stopColor="#0E1832" />
           </linearGradient>
-          <radialGradient id="pin-glow" cx="0.5" cy="0.5" r="0.5">
-            <stop offset="0" stopColor={tailColor} stopOpacity="0.4" />
+          <radialGradient id={`pin-glow-${regionId}`} cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0" stopColor={tailColor} stopOpacity="0.45" />
             <stop offset="1" stopColor={tailColor} stopOpacity="0" />
           </radialGradient>
         </defs>
+
         {/* Sea backdrop */}
-        <rect x="0" y="0" width={W} height={H} fill="url(#map-sea)" />
-        {/* Stylised land masses — abstract blobs for the Middle East. */}
-        <path
-          d="M 10 30 Q 40 22 80 28 Q 120 18 165 24 L 200 32 Q 240 28 280 36 Q 310 44 318 60 Q 305 78 270 84 Q 230 90 195 78 Q 165 86 130 78 Q 100 88 75 80 Q 45 86 22 70 Q 8 50 10 30 Z"
-          fill="url(#map-land)"
-          stroke={tailColor}
-          strokeOpacity="0.15"
-          strokeWidth="0.5"
-        />
-        {/* Arabian peninsula tail (south) */}
-        <path
-          d="M 130 78 Q 145 100 170 110 Q 200 116 220 108 Q 220 96 200 90 Q 175 85 150 90 Q 138 86 130 78 Z"
-          fill="url(#map-land)"
-          stroke={tailColor}
-          strokeOpacity="0.15"
-          strokeWidth="0.5"
-        />
-        {/* Compass + label */}
-        <g transform={`translate(${W - 36} 18)`} opacity="0.5">
-          <circle cx="0" cy="0" r="9" fill="none" stroke={tailColor} strokeWidth="0.6" />
-          <path d="M 0 -7 L 2 0 L 0 7 L -2 0 Z" fill={tailColor} opacity="0.85" />
-          <text x="0" y="-10" textAnchor="middle" fontSize="6" fill={tailColor} letterSpacing="0.2em">N</text>
+        <rect x="0" y="0" width={W} height={H} fill={`url(#map-sea-${regionId})`} />
+
+        {/* Region-specific land masses */}
+        {mapDef.paths.map((d, i) => (
+          <path
+            key={`land-${i}`}
+            d={d}
+            fill={`url(#map-land-${regionId})`}
+            stroke={tailColor}
+            strokeOpacity="0.18"
+            strokeWidth="0.6"
+          />
+        ))}
+
+        {/* Compass */}
+        <g transform={`translate(${W - 30} 22)`} opacity="0.55">
+          <circle cx="0" cy="0" r="11" fill="none" stroke={tailColor} strokeWidth="0.7" />
+          <path d="M 0 -8 L 2 0 L 0 8 L -2 0 Z" fill={tailColor} opacity="0.9" />
+          <text x="0" y="-13" textAnchor="middle" fontSize="6" fontWeight="800"
+            fill={tailColor} letterSpacing="0.2em">N</text>
         </g>
-        <text x="14" y="14" fontSize="8" fontWeight="800" letterSpacing="0.16em"
-          fill={tailColor} opacity="0.7">MIDDLE EAST</text>
 
-        {/* Faint scatter of smaller airports for atmosphere */}
-        {[
-          { lat: 26.5, lon: 50.6 }, { lat: 32.1, lon: 36.0 },
-          { lat: 33.3, lon: 44.4 }, { lat: 35.7, lon: 51.4 },
-          { lat: 24.9, lon: 67.0 }, { lat: 30.0, lon: 31.2 },
-        ].map((p, i) => {
-          const pt = project(p.lat, p.lon);
-          return <circle key={i} cx={pt.x} cy={pt.y} r="1.2" fill="#94A3B8" opacity="0.35" />;
-        })}
+        {/* Region label */}
+        <text x="14" y="20" fontSize="11" fontWeight="800" letterSpacing="0.18em"
+          fill={tailColor} opacity="0.85">{mapDef.label}</text>
 
-        {/* Recommended base pins — clickable */}
+        {/* Recommended base pins — only the three picks, no clutter */}
         {ranked.map((a) => {
           const pt = project(a.lat, a.lon);
           const profile = RECOMMENDED_PROFILES[a.iata];
           const accent = profile?.profile === 'HIGH' ? COLOR.gold.base
             : profile?.profile === 'EASY' ? COLOR.success : tailColor;
+          const cityName = (a.city || countryName(a.country)).toUpperCase().slice(0, 14);
           return (
             <g key={a.iata} onClick={(): void => onPick(a.iata)} style={{ cursor: 'pointer' }}>
-              <circle cx={pt.x} cy={pt.y} r="14" fill="url(#pin-glow)" />
-              <circle cx={pt.x} cy={pt.y} r="5" fill={accent}
-                style={{ filter: `drop-shadow(0 0 4px ${accent})` }} />
-              <circle cx={pt.x} cy={pt.y} r="2" fill="#0B1120" />
-              <text x={pt.x} y={pt.y - 9} textAnchor="middle" fontSize="6"
-                fontWeight="800" letterSpacing="0.12em" fill={accent}>
+              {/* Soft halo around the pin */}
+              <circle cx={pt.x} cy={pt.y} r="20" fill={`url(#pin-glow-${regionId})`} />
+              {/* Main pin */}
+              <circle cx={pt.x} cy={pt.y} r="6" fill={accent}
+                style={{ filter: `drop-shadow(0 0 6px ${accent})` }} />
+              <circle cx={pt.x} cy={pt.y} r="2.4" fill="#0B1120" />
+              {/* IATA label above with subtle text shadow plate */}
+              <rect x={pt.x - 13} y={pt.y - 21} width="26" height="11" rx="1.5"
+                fill="rgba(11,17,32,0.78)" />
+              <text x={pt.x} y={pt.y - 13} textAnchor="middle" fontSize="8"
+                fontWeight="900" letterSpacing="0.14em" fill={accent}>
                 {a.iata}
               </text>
-              <text x={pt.x} y={pt.y + 13} textAnchor="middle" fontSize="5"
-                fontWeight="700" letterSpacing="0.06em" fill="#CBD5E1">
-                {(a.city || countryName(a.country)).toUpperCase().slice(0, 12)}
+              {/* City label below */}
+              <text x={pt.x} y={pt.y + 18} textAnchor="middle" fontSize="7"
+                fontWeight="700" letterSpacing="0.08em" fill="#E2E8F0"
+                style={{ paintOrder: 'stroke', stroke: '#0B1120', strokeWidth: 2 }}>
+                {cityName}
               </text>
             </g>
           );

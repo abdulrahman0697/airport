@@ -153,9 +153,6 @@ export function FirstFlightStory() {
               transition={{ duration: 0.45, ease: 'easeOut' }}
               style={captionInner as Record<string, unknown>}
             >
-              <div style={kicker(tailColor)}>
-                CHAPTER {Math.min(beat + 1, BEATS.length)}  /  {BEATS.length}
-              </div>
               <div style={captionText}>{current.caption}</div>
             </motion.div>
           </AnimatePresence>
@@ -246,14 +243,6 @@ const captionInner: React.CSSProperties = {
   textAlign: 'center',
   maxWidth: 460,
 };
-const kicker = (tail: string): React.CSSProperties => ({
-  fontSize: 10,
-  fontWeight: 800,
-  letterSpacing: '0.28em',
-  color: tail,
-  marginBottom: 6,
-  textShadow: '0 2px 8px rgba(0,0,0,0.8)',
-});
 const captionText: React.CSSProperties = {
   fontSize: 20,
   fontWeight: 800,
