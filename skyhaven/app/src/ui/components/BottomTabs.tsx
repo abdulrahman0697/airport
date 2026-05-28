@@ -51,7 +51,12 @@ const TABS: readonly TabSpec[] = [
   { id: 'leaders', label: 'Control Tower',   Icon: TowerIcon,
     unlock: (s) => s.tier >= 3 || s.tutorialDone, unlockHint: 'Leaderboards unlocked' },
   { id: 'store',   label: 'Executive Deals', Icon: DealsIcon,
-    unlock: (s) => s.tutorialDone, unlockHint: 'Premium services unlocked' },
+    // Design Review v4 — point 24. Don't surface monetization until
+    // the player has clear value-moment proof: 3 routes, 2 aircraft,
+    // and at least the first airport tier-up. Showing the store
+    // before this point makes the game read as commercial too early.
+    unlock: (s) => s.routeCount >= 3 && s.fleetSize >= 2 && s.tier >= 2,
+    unlockHint: 'Premium services unlocked' },
 ];
 
 export function BottomTabs() {

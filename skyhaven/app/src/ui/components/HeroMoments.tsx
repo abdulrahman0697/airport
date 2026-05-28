@@ -172,6 +172,13 @@ export function HeroMoments() {
                 />
               </motion.div>
             )}
+            {/* Construction phases — Design Review v4, point 15. Three
+                progressive phase chips animate above the hero card so
+                a tier-up physically reads as construction → opening,
+                not just a number going up. */}
+            {top.kind === 'tier' && (
+              <ConstructionPhases accent={top.accent} />
+            )}
             <div style={inner}>
               <div style={{ ...kicker, color: top.accent }}>{top.secondary}</div>
               <h1 style={{ ...primary, textShadow: `0 0 32px ${top.accent}55` }}>{top.primary}</h1>
@@ -196,6 +203,41 @@ export function HeroMoments() {
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+function ConstructionPhases({ accent }: { accent: string }) {
+  const [phase, setPhase] = useState<0 | 1 | 2 | 3>(0);
+  useEffect(() => {
+    const t1 = window.setTimeout(() => setPhase(1), 320);
+    const t2 = window.setTimeout(() => setPhase(2), 1200);
+    const t3 = window.setTimeout(() => setPhase(3), 2100);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
+    };
+  }, []);
+  const phases: Array<{ icon: string; label: string }> = [
+    { icon: '📐', label: 'Planning' },
+    { icon: '🏗', label: 'Construction' },
+    { icon: '✨', label: 'Opening' },
+  ];
+  return (
+    <div style={phaseStrip}>
+      {phases.map((p, i) => {
+        const reached = phase > i;
+        const current = phase === i + 1;
+        return (
+          <div key={p.label} style={phaseCell(reached || current, accent)}>
+            <span style={phaseIcon}>{p.icon}</span>
+            <span style={phaseLabel(reached || current, accent)}>{p.label}</span>
+            {current && <span style={phaseSpinner(accent)} />}
+            {reached && <span style={{ ...phaseCheck, color: accent }}>✓</span>}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -286,6 +328,44 @@ const tierStampBig: React.CSSProperties = {
 const tierStampBottom: React.CSSProperties = {
   fontSize: 8, lineHeight: 1.0, letterSpacing: '0.2em',
 };
+// Construction phase strip (Design Review v4 — point 15)
+const phaseStrip: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, 1fr)',
+  gap: 4,
+  padding: '4px 16px 0',
+};
+const phaseCell = (active: boolean, accent: string): React.CSSProperties => ({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 4,
+  fontSize: 10,
+  letterSpacing: '0.12em',
+  fontWeight: 700,
+  padding: '5px 4px',
+  borderRadius: 8,
+  background: active ? `${accent}22` : 'rgba(11,17,32,0.4)',
+  border: `1px solid ${active ? `${accent}55` : 'rgba(255,255,255,0.06)'}`,
+  textTransform: 'uppercase',
+  position: 'relative',
+});
+const phaseIcon: React.CSSProperties = {
+  fontSize: 12,
+};
+const phaseLabel = (active: boolean, accent: string): React.CSSProperties => ({
+  color: active ? accent : '#94A3B8',
+});
+const phaseSpinner = (accent: string): React.CSSProperties => ({
+  width: 5, height: 5, borderRadius: 999,
+  background: accent,
+  boxShadow: `0 0 4px ${accent}`,
+  animation: 'breathe 0.9s ease-in-out infinite',
+});
+const phaseCheck: React.CSSProperties = {
+  fontSize: 11, fontWeight: 900,
+};
+
 const heroIllustration: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'center',

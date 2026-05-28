@@ -172,9 +172,14 @@ export function LeaderboardsPanel() {
             arrive. */}
         {showRivalSim && (
           <>
+            {/* Weekly rivalry goal — Design Review v4, point 23. The
+                "beat X by Y" framing turns rivals into a clock target,
+                not just a static board. */}
             {rivalTarget && (
               <div style={rivalTargetCard}>
-                <div style={rivalTargetKicker}>NEXT TO BEAT</div>
+                <div style={rivalTargetKicker}>
+                  WEEKLY GOAL · NEXT TO BEAT
+                </div>
                 <div style={rivalTargetRow}>
                   <div style={{ ...rivalChip, background: `${rivalTarget.rival.tail}1c`, borderColor: `${rivalTarget.rival.tail}55` }}>
                     <span style={{ color: rivalTarget.rival.tail, fontWeight: 800 }}>{rivalTarget.rival.code}</span>
@@ -184,9 +189,12 @@ export function LeaderboardsPanel() {
                     <div style={rivalTargetMotto}>{rivalTarget.rival.motto}</div>
                   </div>
                   <div style={rivalTargetGap}>
-                    <span style={rivalTargetGapLabel}>NEED</span>
+                    <span style={rivalTargetGapLabel}>OVERTAKE BY</span>
                     <span style={rivalTargetGapValue}>+{board.format(rivalTarget.need)}</span>
                   </div>
+                </div>
+                <div style={rivalTargetFoot}>
+                  Resets in {weeklyTimeRemaining()}  ·  Bragging rights + a vintage drop on overtake.
                 </div>
               </div>
             )}
@@ -231,6 +239,22 @@ export function LeaderboardsPanel() {
       </div>
     </div>
   );
+}
+
+function weeklyTimeRemaining(): string {
+  // Time until the next Monday 00:00 local. Deterministic per call,
+  // shown as "Xd Yh" so the goal feels like a clock, not text.
+  const now = new Date();
+  const day = now.getDay(); // 0..6 (Sun..Sat)
+  const daysUntilMonday = day === 0 ? 1 : (8 - day);
+  const reset = new Date(now);
+  reset.setDate(reset.getDate() + daysUntilMonday);
+  reset.setHours(0, 0, 0, 0);
+  const diff = reset.getTime() - now.getTime();
+  const d = Math.floor(diff / (24 * 3600 * 1000));
+  const h = Math.floor((diff - d * 24 * 3600 * 1000) / (3600 * 1000));
+  if (d <= 0) return `${h}h`;
+  return `${d}d ${h}h`;
 }
 
 function YourCard({
@@ -413,6 +437,13 @@ const rivalTargetGapLabel: React.CSSProperties = {
 const rivalTargetGapValue: React.CSSProperties = {
   display: 'block', fontSize: 14, fontWeight: 800,
   color: COLOR.gold.base, fontFeatureSettings: '"tnum" 1',
+};
+const rivalTargetFoot: React.CSSProperties = {
+  marginTop: 10,
+  fontSize: 10,
+  letterSpacing: '0.06em',
+  color: COLOR.ink.muted,
+  fontWeight: 600,
 };
 const rivalsNotice: React.CSSProperties = {
   fontSize: 11,

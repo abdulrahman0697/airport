@@ -20,6 +20,7 @@ import {
   useGameStore,
 } from '../../state/store';
 import { useUiStore } from '../../state/uiStore';
+import { AirportScene } from '../design/AirportScene';
 import { COLOR, RADIUS, SHADOW } from '../design/tokens';
 import { formatCash } from '../format';
 
@@ -84,6 +85,53 @@ export function EmpireJourney() {
           <div style={subhead}>
             From Local Air Taxi to Global Aviation Empire — every tier is
             a physical change at your airport and a new strategic surface.
+          </div>
+
+          {/* Horizontal mural — Design Review v4, point 22. Eight
+              stage tiles with ghost airport previews, the player's
+              progress sliding across them. Aspirational, not just a
+              roadmap. */}
+          <div style={muralWrap}>
+            <div style={muralKicker(tailColor)}>WORLD PROGRESSION</div>
+            <div style={muralScroller}>
+              {rows.map((r) => {
+                const reached = tier >= r.tier;
+                const current = tier === r.tier;
+                return (
+                  <div
+                    key={`mural-${r.tier}`}
+                    style={muralTile(reached, current, tailColor)}
+                  >
+                    <div style={muralTileLabel(reached, current, tailColor)}>
+                      T{r.tier} · {r.era.toUpperCase()}
+                    </div>
+                    <div style={{
+                      ...muralPreview,
+                      opacity: reached || current ? 1 : 0.55,
+                      filter: reached || current ? 'none' : 'grayscale(0.7)',
+                    }}>
+                      <AirportScene
+                        tier={r.tier}
+                        tailColor={reached || current ? tailColor : '#475569'}
+                        width={220}
+                        passengerLoad={0}
+                      />
+                    </div>
+                    <div style={muralTileTitle}>{r.label}</div>
+                    {!reached && !current && (
+                      <div style={muralLocked}>🔒 +${formatCash(r.threshold, 0)} lifetime</div>
+                    )}
+                    {current && (
+                      <div style={{ ...muralCurrent, color: tailColor }}>● HERE</div>
+                    )}
+                    {reached && !current && (
+                      <div style={{ ...muralReached, color: COLOR.success }}>✓ COMPLETE</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={muralScrollHint}>← Swipe to see the full empire ladder →</div>
           </div>
 
           <div style={list}>
@@ -203,6 +251,85 @@ const subhead: React.CSSProperties = {
   color: COLOR.ink.muted,
   lineHeight: 1.5,
 };
+// Mural (Design Review v4 — point 22)
+const muralWrap: React.CSSProperties = {
+  borderBottom: '1px solid rgba(255,255,255,0.05)',
+  padding: '4px 4px 12px',
+};
+const muralKicker = (tail: string): React.CSSProperties => ({
+  fontSize: 9,
+  fontWeight: 800,
+  letterSpacing: '0.22em',
+  color: tail,
+  padding: '0 12px',
+});
+const muralScroller: React.CSSProperties = {
+  display: 'flex',
+  gap: 8,
+  overflowX: 'auto',
+  scrollSnapType: 'x mandatory',
+  padding: '8px 12px',
+  WebkitOverflowScrolling: 'touch',
+};
+const muralTile = (reached: boolean, current: boolean, tail: string): React.CSSProperties => ({
+  flexShrink: 0,
+  width: 220,
+  scrollSnapAlign: 'start',
+  background: current
+    ? `linear-gradient(180deg, ${tail}26, rgba(11,17,32,0.85))`
+    : reached
+      ? 'linear-gradient(180deg, rgba(52,211,153,0.10), rgba(11,17,32,0.85))'
+      : 'rgba(11,17,32,0.55)',
+  border: `1px solid ${current ? tail : reached ? `${COLOR.success}55` : COLOR.border.soft}`,
+  borderRadius: RADIUS.m,
+  padding: 8,
+  boxShadow: current ? `0 6px 18px ${tail}33` : 'none',
+});
+const muralTileLabel = (reached: boolean, current: boolean, tail: string): React.CSSProperties => ({
+  fontSize: 9,
+  letterSpacing: '0.16em',
+  fontWeight: 800,
+  color: current ? tail : reached ? COLOR.success : COLOR.ink.faint,
+});
+const muralPreview: React.CSSProperties = {
+  marginTop: 6,
+  marginBottom: 6,
+  borderRadius: 8,
+  overflow: 'hidden',
+  background: '#050912',
+};
+const muralTileTitle: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 800,
+  color: COLOR.ink.primary,
+  marginBottom: 4,
+  letterSpacing: '0.02em',
+};
+const muralLocked: React.CSSProperties = {
+  fontSize: 10,
+  color: COLOR.gold.base,
+  fontWeight: 700,
+  fontFeatureSettings: '"tnum" 1',
+};
+const muralCurrent: React.CSSProperties = {
+  fontSize: 9,
+  letterSpacing: '0.18em',
+  fontWeight: 900,
+};
+const muralReached: React.CSSProperties = {
+  fontSize: 9,
+  letterSpacing: '0.18em',
+  fontWeight: 800,
+};
+const muralScrollHint: React.CSSProperties = {
+  fontSize: 9,
+  letterSpacing: '0.12em',
+  color: COLOR.ink.faint,
+  textAlign: 'center',
+  padding: '0 12px 2px',
+  fontWeight: 700,
+};
+
 const list: React.CSSProperties = {
   padding: '0 12px 16px',
   display: 'flex',

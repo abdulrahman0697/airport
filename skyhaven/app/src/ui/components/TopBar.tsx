@@ -105,6 +105,13 @@ export function TopBar() {
         </div>
       </button>
       <div style={cashCol}>
+        {/* Design Review v4 — point 6. Until the player has earned
+            their first revenue, the balance reads as "Founder Capital"
+            to ground the startup-airline fantasy. The label transitions
+            to "Cash" once revenue is flowing. */}
+        <div style={cashKicker(hasIncome)}>
+          {hasIncome || lifetime > 0 ? 'CASH BALANCE' : 'FOUNDER CAPITAL'}
+        </div>
         <div style={cashAmount}>
           <RollingCash value={cash} />
         </div>
@@ -174,6 +181,14 @@ const cashCol: React.CSSProperties = {
   flexDirection: 'column',
   alignItems: 'flex-end',
 };
+
+const cashKicker = (hasIncome: boolean): React.CSSProperties => ({
+  fontSize: 8,
+  fontWeight: 800,
+  letterSpacing: '0.22em',
+  color: hasIncome ? '#94A3B8' : '#F4C75B',
+  marginBottom: 1,
+});
 
 const cashAmount: React.CSSProperties = {
   fontSize: 20,

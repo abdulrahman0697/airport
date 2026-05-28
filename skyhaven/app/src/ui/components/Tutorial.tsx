@@ -9,6 +9,7 @@ import {
 } from '../../state/store';
 import { AirlineCrest } from '../design/AirlineCrest';
 import { Button } from '../design/Button';
+import { AircraftIllustration } from '../design/SvgAircraft';
 import { COLOR, RADIUS, SPACE } from '../design/tokens';
 import { usePanelStore, type PanelId } from './PanelHost';
 import { useUiStore } from '../../state/uiStore';
@@ -382,6 +383,19 @@ function FounderCard({
   const [name, setName] = useState(airlineName || NAME_SUGGESTIONS[0]!);
   const [color, setColor] = useState(tailColor);
   const [editing, setEditing] = useState(false);
+  // Design Review v4 — point 4. Two phases: identity setup and the
+  // boarding-pass-style Founder Certificate stamp moment.
+  const [phase, setPhase] = useState<'setup' | 'certificate'>('setup');
+
+  if (phase === 'certificate') {
+    return (
+      <FounderCertificate
+        name={name.trim() || 'SkyHaven Air'}
+        color={color}
+        onContinue={(): void => onConfirm(name.trim() || 'SkyHaven Air', color)}
+      />
+    );
+  }
 
   return (
     <motion.div
@@ -399,7 +413,18 @@ function FounderCard({
         <div style={founderKicker(color)}>FOUNDER CARD</div>
 
         <div style={founderHero}>
-          <AirlineCrest name={name} tailColor={color} size={88} />
+          <AirlineCrest name={name} tailColor={color} size={68} />
+        </div>
+
+        {/* Live aircraft livery preview — Design Review v4, point 5.
+            The selected tail colour applies in real-time to the
+            aircraft tail/wings so the player sees their airline come
+            alive on a plane, not just on a button. */}
+        <div style={liveryPreviewWrap(color)}>
+          <div style={liveryPreviewKicker}>LIVERY PREVIEW</div>
+          <div style={liveryPreviewStage}>
+            <AircraftIllustration defId="t1.atr42" tailColor={color} width={180} />
+          </div>
         </div>
 
         <h2 style={founderTitle}>{name.toUpperCase()}</h2>
@@ -465,13 +490,125 @@ function FounderCard({
             size="lg"
             fullWidth
             hapticOnPress="heavy"
-            onClick={(): void => onConfirm(name.trim() || 'SkyHaven Air', color)}
+            onClick={(): void => setPhase('certificate')}
           >
-            Establish Airline
+            Submit for Approval  →
           </Button>
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+// ─── Founder Certificate (Design Review v4 — point 4) ───────────────
+/**
+ * A boarding-pass-style commercial operator license. Animated approval
+ * stamp lands ~700ms after mount; "Cleared for Commercial Operations"
+ * text reveals; player taps Continue to advance the tutorial.
+ */
+function FounderCertificate({
+  name, color, onContinue,
+}: {
+  name: string;
+  color: string;
+  onContinue: () => void;
+}) {
+  const [stamped, setStamped] = useState(false);
+  useEffect(() => {
+    const id = window.setTimeout(() => setStamped(true), 700);
+    return () => window.clearTimeout(id);
+  }, []);
+  const today = new Date();
+  const dateStr = `${today.getDate()}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={founderShell as Record<string, unknown>}
+    >
+      <motion.div
+        initial={{ scale: 0.94, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 320, damping: 26 }}
+        style={certificateShell(color) as Record<string, unknown>}
+      >
+        {/* Boarding-pass perforated top edge */}
+        <div style={certPerforation} aria-hidden />
+
+        <div style={certHeaderRow}>
+          <div>
+            <div style={certKicker(color)}>COMMERCIAL OPERATOR LICENSE</div>
+            <div style={certCarrier}>{name.toUpperCase()}</div>
+          </div>
+          <div style={certCrest}>
+            <AirlineCrest name={name} tailColor={color} size={48} />
+          </div>
+        </div>
+
+        <div style={certDashed} />
+
+        <div style={certGrid}>
+          <CertCell label="LICENSE" value="REGIONAL · CARGO · INTL" />
+          <CertCell label="DATE" value={dateStr} />
+          <CertCell label="BASE" value="HUB · TBD" />
+          <CertCell label="CAPITAL" value="$50,000 USD" accent={COLOR.gold.base} />
+          <CertCell label="FOUNDING FLEET" value="1 × ATR 42" />
+          <CertCell label="ROUTE RIGHTS" value="REGIONAL ↔ INTL" />
+        </div>
+
+        <div style={certDashed} />
+
+        <div style={{ position: 'relative', minHeight: 78 }}>
+          <div style={certFooter}>
+            <div style={certFooterKicker}>AUTHORIZED BY</div>
+            <div style={certFooterValue}>SkyHaven Aviation Authority</div>
+          </div>
+
+          {/* Approval stamp */}
+          <AnimatePresence>
+            {stamped && (
+              <motion.div
+                initial={{ scale: 1.8, opacity: 0, rotate: -22 }}
+                animate={{ scale: 1, opacity: 0.95, rotate: -12 }}
+                transition={{ type: 'spring', stiffness: 320, damping: 20 }}
+                style={stamp(color) as Record<string, unknown>}
+              >
+                <div style={stampLine1}>CLEARED FOR</div>
+                <div style={stampLine2}>COMMERCIAL</div>
+                <div style={stampLine3}>OPERATIONS  ✓</div>
+                <div style={stampMeta}>{dateStr}  ·  #SKY-{Math.floor(Math.random() * 9000 + 1000)}</div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <div style={certPerforation} aria-hidden />
+
+        <div style={{ marginTop: SPACE.m }}>
+          <Button
+            variant={stamped ? 'gold' : 'ghost'}
+            size="lg"
+            fullWidth
+            hapticOnPress="heavy"
+            disabled={!stamped}
+            onClick={onContinue}
+          >
+            {stamped ? 'Take the controls  →' : 'Awaiting approval…'}
+          </Button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function CertCell({ label, value, accent }: { label: string; value: string; accent?: string }) {
+  return (
+    <div style={certCell}>
+      <div style={certCellLabel}>{label}</div>
+      <div style={{ ...certCellValue, color: accent ?? COLOR.ink.primary }}>{value}</div>
+    </div>
   );
 }
 
@@ -646,6 +783,150 @@ const founderKicker = (tail: string): React.CSSProperties => ({
   color: tail,
   textAlign: 'center',
 });
+// Livery preview (Design Review v4 — point 5)
+const liveryPreviewWrap = (color: string): React.CSSProperties => ({
+  margin: '6px 0 4px',
+  padding: '10px 8px 6px',
+  background: `linear-gradient(180deg, ${color}1a, rgba(11,17,32,0.4))`,
+  border: `1px solid ${color}33`,
+  borderRadius: 12,
+  textAlign: 'center',
+});
+const liveryPreviewKicker: React.CSSProperties = {
+  fontSize: 8,
+  fontWeight: 800,
+  letterSpacing: '0.22em',
+  color: COLOR.ink.faint,
+  marginBottom: 4,
+};
+const liveryPreviewStage: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+};
+
+// Founder certificate (Design Review v4 — point 4)
+const certificateShell = (color: string): React.CSSProperties => ({
+  width: '100%',
+  maxWidth: 400,
+  background: 'linear-gradient(170deg, #EFF4FB, #D5DEEF)',
+  borderRadius: 18,
+  border: `2px solid ${color}66`,
+  padding: '14px 16px 16px',
+  boxShadow: `0 32px 60px rgba(0,0,0,0.6), 0 0 64px ${color}44`,
+  color: '#0B1120',
+  position: 'relative',
+});
+const certPerforation: React.CSSProperties = {
+  height: 8,
+  background: 'radial-gradient(circle at 4px 4px, rgba(11,17,32,0.3) 1.6px, transparent 2.4px) 0 0 / 12px 8px',
+  margin: '-4px -16px',
+};
+const certHeaderRow: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  paddingTop: 6,
+};
+const certKicker = (color: string): React.CSSProperties => ({
+  fontSize: 9,
+  fontWeight: 800,
+  letterSpacing: '0.24em',
+  color,
+});
+const certCarrier: React.CSSProperties = {
+  fontSize: 18,
+  fontWeight: 900,
+  letterSpacing: '0.04em',
+  color: '#0B1120',
+  marginTop: 2,
+};
+const certCrest: React.CSSProperties = {
+  flexShrink: 0,
+};
+const certDashed: React.CSSProperties = {
+  height: 1,
+  background: 'repeating-linear-gradient(90deg, rgba(11,17,32,0.3) 0, rgba(11,17,32,0.3) 4px, transparent 4px, transparent 8px)',
+  margin: '10px 0',
+};
+const certGrid: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: 8,
+};
+const certCell: React.CSSProperties = {
+  background: 'rgba(11,17,32,0.06)',
+  borderRadius: 6,
+  padding: '5px 8px',
+};
+const certCellLabel: React.CSSProperties = {
+  fontSize: 8,
+  letterSpacing: '0.18em',
+  fontWeight: 800,
+  color: '#475569',
+  textTransform: 'uppercase',
+};
+const certCellValue: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 800,
+  marginTop: 1,
+  letterSpacing: '0.02em',
+  color: '#0B1120',
+  fontFeatureSettings: '"tnum" 1',
+};
+const certFooter: React.CSSProperties = {
+  paddingTop: 4,
+};
+const certFooterKicker: React.CSSProperties = {
+  fontSize: 8,
+  letterSpacing: '0.2em',
+  fontWeight: 800,
+  color: '#475569',
+};
+const certFooterValue: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 700,
+  color: '#0B1120',
+  marginTop: 2,
+  fontStyle: 'italic',
+};
+const stamp = (color: string): React.CSSProperties => ({
+  position: 'absolute',
+  top: -4,
+  right: 6,
+  border: `3px solid ${color}`,
+  color,
+  background: `${color}10`,
+  padding: '6px 12px',
+  borderRadius: 8,
+  textAlign: 'center',
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+  boxShadow: `0 4px 12px rgba(0,0,0,0.15)`,
+  transformOrigin: 'center',
+});
+const stampLine1: React.CSSProperties = {
+  fontSize: 8,
+  fontWeight: 800,
+  letterSpacing: '0.2em',
+};
+const stampLine2: React.CSSProperties = {
+  fontSize: 13,
+  fontWeight: 900,
+  letterSpacing: '0.04em',
+};
+const stampLine3: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 800,
+  letterSpacing: '0.08em',
+};
+const stampMeta: React.CSSProperties = {
+  fontSize: 7,
+  fontWeight: 600,
+  letterSpacing: '0.1em',
+  marginTop: 3,
+  opacity: 0.85,
+};
+
 const founderHero: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'center',
