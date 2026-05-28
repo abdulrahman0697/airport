@@ -128,10 +128,20 @@ export function Tutorial() {
     return () => setTutorialTarget(null);
   }, [target, setTutorialTarget]);
 
+  // When a wait-state's goal is reached, advance the step AND close
+  // any open panel (Fuel / Fleet / Routes) so the player drops back
+  // to the home screen for the next instruction. Without this the
+  // player would stay on the panel after, say, signing the fuel
+  // contract and the next spotlight (which targets a home tile)
+  // would be hidden behind the open panel.
+  const closePanelForStep = usePanelStore((s) => s.close);
   useEffect(() => {
     if (!current || current.kind !== 'wait-state' || !state) return;
-    if (current.check(state)) advance();
-  }, [current, state, advance]);
+    if (current.check(state)) {
+      advance();
+      closePanelForStep();
+    }
+  }, [current, state, advance, closePanelForStep]);
 
   useEffect(() => {
     if (!current || current.kind !== 'wait-time') return;
