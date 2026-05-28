@@ -99,3 +99,9 @@ a:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
   -webkit-text-fill-color: transparent;
   animation: title-shimmer 6s ease-in-out infinite;
 }
+
+/* Skeleton-loader shimmer (Design pass D9). */
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

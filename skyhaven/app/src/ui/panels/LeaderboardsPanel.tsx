@@ -15,6 +15,8 @@ import { useAuth } from '../../backend/useAuth';
 import { getAircraftDef } from '../../data/aircraft';
 import { BOARDS, getBoard, type BoardId } from '../../data/leaderboards';
 import { cashPerSecond } from '../../engine/economy';
+import { EmptyState } from '../design/EmptyState';
+import { Skeleton } from '../design/Skeleton';
 import {
   selectActiveEvents,
   selectAirlineName,
@@ -138,8 +140,20 @@ export function LeaderboardsPanel() {
             ⟳ Refresh
           </button>
         </div>
-        {loading && <div style={empty}>Loading…</div>}
-        {!loading && error && <div style={empty}>{error}</div>}
+        {loading && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} height={44} radius={8} />
+            ))}
+          </div>
+        )}
+        {!loading && error && (
+          <EmptyState
+            icon="🏆"
+            title={scope === 'friends' ? 'Friends-only board' : 'No entries yet'}
+            body={error}
+          />
+        )}
         {!loading && !error && (
           <ol style={list}>
             {rows.map((r, idx) => {
@@ -290,7 +304,4 @@ const youPill: React.CSSProperties = {
 const score: React.CSSProperties = {
   fontSize: 13, fontWeight: 700, color: '#F4C75B',
   fontFeatureSettings: '"tnum" 1',
-};
-const empty: React.CSSProperties = {
-  padding: 24, textAlign: 'center', color: '#94A3B8', fontSize: 13,
 };
