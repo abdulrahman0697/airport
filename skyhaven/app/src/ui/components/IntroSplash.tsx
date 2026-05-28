@@ -33,9 +33,9 @@ import { haptics } from '../juice/haptics';
 import { sfx } from '../juice/sfx';
 
 const TAGLINES = [
-  'Build the world’s most beautiful airport empire.',
-  'One gate. One plane. A global network ahead.',
-  'Routes, terminals, hubs — your tycoon empire awaits.',
+  'Start with one gate. Build a global aviation empire.',
+  'Found an airline. Watch your airport breathe.',
+  'Open routes, deliver aircraft, expand the airport.',
 ];
 
 const WORDMARK = 'SKYHAVEN';
@@ -206,6 +206,23 @@ export function IntroSplash() {
               </AnimatePresence>
             </div>
 
+            {/* Design Review v6 — point 2. Three-icon promise row so
+                the player understands the whole game in five seconds.
+                Open Routes · Buy Aircraft · Expand Airport — the three
+                loops everything else feeds into. */}
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8, duration: 0.5 }}
+              style={promiseRow as Record<string, unknown>}
+            >
+              <PromiseIcon tail={tailColor} symbol="✈" label="OPEN ROUTES" />
+              <span style={promiseDivider(tailColor)} aria-hidden />
+              <PromiseIcon tail={tailColor} symbol="🛬" label="BUY AIRCRAFT" />
+              <span style={promiseDivider(tailColor)} aria-hidden />
+              <PromiseIcon tail={tailColor} symbol="🏗" label="EXPAND AIRPORT" />
+            </motion.div>
+
             <motion.div
               initial={{ scale: 0.92, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -274,6 +291,17 @@ export function IntroSplash() {
 }
 
 /* ─── Sub-components ──────────────────────────────────────────────── */
+
+function PromiseIcon({ tail, symbol, label }: { tail: string; symbol: string; label: string }) {
+  return (
+    <div style={promiseCell}>
+      <div style={{ ...promiseSymbol, color: tail, filter: `drop-shadow(0 0 8px ${tail}88)` }}>
+        {symbol}
+      </div>
+      <div style={promiseLabel}>{label}</div>
+    </div>
+  );
+}
 
 function Wordmark({ text, tailColor }: { text: string; tailColor: string }) {
   return (
@@ -687,6 +715,38 @@ const subMarkUnderline: React.CSSProperties = {
   borderRadius: 1,
   boxShadow: `0 0 12px ${COLOR.gold.base}`,
 };
+
+// Three-icon promise row (Design Review v6 — point 2)
+const promiseRow: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 12,
+  marginTop: SPACE.m,
+};
+const promiseCell: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: 4,
+  minWidth: 86,
+};
+const promiseSymbol: React.CSSProperties = {
+  fontSize: 24,
+  lineHeight: 1,
+};
+const promiseLabel: React.CSSProperties = {
+  fontSize: 9,
+  fontWeight: 800,
+  letterSpacing: '0.16em',
+  color: COLOR.ink.muted,
+  textTransform: 'uppercase',
+};
+const promiseDivider = (tail: string): React.CSSProperties => ({
+  width: 1,
+  height: 22,
+  background: `linear-gradient(180deg, transparent, ${tail}66, transparent)`,
+});
 
 const taglineWrap: React.CSSProperties = {
   height: 24,

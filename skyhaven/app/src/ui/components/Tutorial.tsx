@@ -9,7 +9,6 @@ import {
 } from '../../state/store';
 import { AirlineCrest } from '../design/AirlineCrest';
 import { Button } from '../design/Button';
-import { AircraftIllustration } from '../design/SvgAircraft';
 import { COLOR, RADIUS, SPACE } from '../design/tokens';
 import { usePanelStore, type PanelId } from './PanelHost';
 import { useUiStore } from '../../state/uiStore';
@@ -51,12 +50,9 @@ type Step =
   | { kind: 'wait-time'; title: string; body: string; durationMs: number };
 
 const STEPS: readonly Step[] = [
-  {
-    kind: 'info',
-    title: 'Welcome to SkyHaven Tycoon',
-    body: 'You are about to found an airline with $50K of founder capital. From one regional turboprop to a global aviation empire — let’s start.',
-    cta: 'Begin Boarding',
-  },
+  // Design Review v6 — point 6. The opening "Welcome to SkyHaven
+  // Tycoon" full-screen modal was a lecture. Removed entirely. The
+  // player goes straight from cinematic into picking a base.
   {
     kind: 'identity',
     title: 'Found your airline',
@@ -96,12 +92,8 @@ const STEPS: readonly Step[] = [
     body: 'Your aircraft is flying. Cash counts up automatically — no taps to claim. SkyHaven is an idle airline.',
     durationMs: 6_000,
   },
-  {
-    kind: 'info',
-    title: 'You’re ready, Founder',
-    body: 'Your home airport will physically grow with every milestone. Open routes. Hire managers. Unlock regions. The skies are yours.',
-    cta: 'Open Your Network',
-  },
+  // Closing info-moment removed too — the player dismisses Mission
+  // Control by hitting the goal, not by reading a final card.
 ];
 
 export function Tutorial() {
@@ -386,6 +378,11 @@ function FounderCard({
   // Design Review v4 — point 4. Two phases: identity setup and the
   // boarding-pass-style Founder Certificate stamp moment.
   const [phase, setPhase] = useState<'setup' | 'certificate'>('setup');
+  // Design Review v6 — point 7. Three livery styles for the live
+  // preview. Classic Stripe = single tail-colour stripe down the
+  // fuselage. Modern Tail = bold filled tail fin. Premium Minimal =
+  // thin tail-colour bands.
+  const [livery, setLivery] = useState<'classic' | 'modern' | 'premium'>('modern');
 
   if (phase === 'certificate') {
     return (
@@ -422,8 +419,37 @@ function FounderCard({
             alive on a plane, not just on a button. */}
         <div style={liveryPreviewWrap(color)}>
           <div style={liveryPreviewKicker}>LIVERY PREVIEW</div>
-          <div style={liveryPreviewStage}>
-            <AircraftIllustration defId="t1.atr42" tailColor={color} width={180} />
+          {/* Live repaint — Design Review v6 point 7. Picker chips
+              below trigger a snap-repaint via key change on the
+              illustration container. */}
+          <motion.div
+            key={`livery-${livery}-${color}`}
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 22 }}
+            style={liveryPreviewStage as Record<string, unknown>}
+          >
+            <LiveryAircraft tailColor={color} livery={livery} />
+          </motion.div>
+          <div style={liveryChipsRow}>
+            <LiveryChip
+              label="Classic Stripe"
+              active={livery === 'classic'}
+              tail={color}
+              onClick={(): void => setLivery('classic')}
+            />
+            <LiveryChip
+              label="Modern Tail"
+              active={livery === 'modern'}
+              tail={color}
+              onClick={(): void => setLivery('modern')}
+            />
+            <LiveryChip
+              label="Premium Minimal"
+              active={livery === 'premium'}
+              tail={color}
+              onClick={(): void => setLivery('premium')}
+            />
           </div>
         </div>
 
@@ -492,11 +518,89 @@ function FounderCard({
             hapticOnPress="heavy"
             onClick={(): void => setPhase('certificate')}
           >
-            Submit for Approval  →
+            Register Airline  →
           </Button>
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+// Live aircraft livery preview — Design Review v6 point 7.
+function LiveryAircraft({ tailColor, livery }: { tailColor: string; livery: 'classic' | 'modern' | 'premium' }) {
+  // Side-view ATR-style turboprop with parametric livery painting.
+  return (
+    <svg width="200" height="68" viewBox="0 0 200 68">
+      <defs>
+        <linearGradient id="livery-fuselage" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#F8FAFC" />
+          <stop offset="1" stopColor="#CBD5E1" />
+        </linearGradient>
+      </defs>
+      {/* Wing under fuselage */}
+      <path d="M 60 36 L 100 36 L 90 44 L 70 44 Z" fill="#94A3B8" opacity="0.6" />
+      {/* Fuselage */}
+      <path
+        d="M 28 32 Q 28 24 44 22 L 158 22 Q 174 24 178 32 Q 174 40 158 42 L 44 42 Q 28 40 28 32 Z"
+        fill="url(#livery-fuselage)"
+      />
+      {/* Cockpit */}
+      <path d="M 28 30 L 38 28 L 38 35 L 28 33 Z" fill="#2A3556" opacity="0.85" />
+      {/* Window strip */}
+      {Array.from({ length: 18 }).map((_, i) => (
+        <rect key={i} x={48 + i * 6} y={28} width="2.5" height="4" fill="#2A3556" opacity="0.75" />
+      ))}
+      {/* Door */}
+      <rect x="44" y="29" width="3" height="9" fill="#2A3556" opacity="0.4" />
+      {/* Engine + prop */}
+      <g transform="translate(80 38)">
+        <circle cx="0" cy="0" r="3.5" fill="#1F2A4D" />
+        <ellipse cx="-3" cy="0" rx="0.8" ry="4" fill="#94A3B8" opacity="0.55" />
+      </g>
+      {/* Tail fin */}
+      {livery === 'modern' && (
+        <>
+          <path d="M 158 22 L 178 8 L 188 22 L 178 24 Z" fill={tailColor} />
+          <text x="172" y="20" fontSize="6" fontWeight="900" letterSpacing="0.1em"
+            fill="#0B1120" textAnchor="middle">SH</text>
+        </>
+      )}
+      {livery === 'classic' && (
+        <>
+          <path d="M 158 22 L 178 8 L 188 22 L 178 24 Z" fill="#F8FAFC" stroke={tailColor} strokeWidth="1.2" />
+          <rect x="34" y="30" width="148" height="3" fill={tailColor} opacity="0.9" />
+        </>
+      )}
+      {livery === 'premium' && (
+        <>
+          <path d="M 158 22 L 178 8 L 188 22 L 178 24 Z" fill="#F8FAFC" stroke={tailColor} strokeWidth="0.8" />
+          <rect x="34" y="36" width="148" height="0.8" fill={tailColor} opacity="0.85" />
+          <rect x="34" y="38" width="148" height="0.4" fill={tailColor} opacity="0.55" />
+          {/* Tail accent dot */}
+          <circle cx="178" cy="16" r="2" fill={tailColor} />
+        </>
+      )}
+      {/* Wheels */}
+      <circle cx="62" cy="48" r="2.5" fill="#2A3556" />
+      <circle cx="98" cy="48" r="2.5" fill="#2A3556" />
+      <circle cx="38" cy="46" r="2" fill="#2A3556" />
+    </svg>
+  );
+}
+
+function LiveryChip({ label, active, tail, onClick }: { label: string; active: boolean; tail: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        ...liveryChip,
+        background: active ? `${tail}22` : 'rgba(11,17,32,0.55)',
+        border: `1px solid ${active ? tail : 'rgba(148,163,184,0.3)'}`,
+        color: active ? tail : COLOR.ink.muted,
+      }}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -803,6 +907,22 @@ const liveryPreviewStage: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
+};
+const liveryChipsRow: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'center',
+  gap: 6,
+  marginTop: 8,
+  flexWrap: 'wrap',
+};
+const liveryChip: React.CSSProperties = {
+  fontFamily: 'inherit',
+  fontSize: 10,
+  fontWeight: 800,
+  letterSpacing: '0.08em',
+  padding: '5px 9px',
+  borderRadius: 999,
+  cursor: 'pointer',
 };
 
 // Founder certificate (Design Review v4 — point 4)

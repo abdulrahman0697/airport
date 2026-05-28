@@ -229,28 +229,27 @@ interface FounderMarketMapProps {
   onPick: (iata: string) => void;
 }
 
-const RECOMMENDED_PROFILES: Record<string, { tag: string; line: string; profile: 'HIGH' | 'BALANCED' | 'EASY' }> = {
-  DXB: { tag: 'High demand', line: 'High cost · high reward.', profile: 'HIGH' },
-  DOH: { tag: 'Balanced growth', line: 'Steady demand · solid margins.', profile: 'BALANCED' },
-  MCT: { tag: 'Easy first route', line: 'Low cost · quick to profit.', profile: 'EASY' },
-  AUH: { tag: 'Premium hub', line: 'Wealthy pax · premium yield.', profile: 'HIGH' },
-  RUH: { tag: 'Massive market', line: 'Huge demand · scale fast.', profile: 'HIGH' },
-  JED: { tag: 'Pilgrimage gateway', line: 'Seasonal surges · loyal pax.', profile: 'BALANCED' },
-  KWI: { tag: 'Wealthy corridor', line: 'Business travel · steady cash.', profile: 'BALANCED' },
-  BAH: { tag: 'Small but easy', line: 'Easy entry · short hops.', profile: 'EASY' },
+// Design Review v6 — point 5. One reason per card. The previous
+// "tag + line" was redundant.
+const RECOMMENDED_PROFILES: Record<string, { tag: string; profile: 'HIGH' | 'BALANCED' | 'EASY' }> = {
+  DXB: { tag: 'Fastest growth, expensive upgrades', profile: 'HIGH' },
+  DOH: { tag: 'Balanced route demand', profile: 'BALANCED' },
+  MCT: { tag: 'Cheapest first expansion', profile: 'EASY' },
+  AUH: { tag: 'Wealthy premium pax', profile: 'HIGH' },
+  RUH: { tag: 'Huge market, scale fast', profile: 'HIGH' },
+  JED: { tag: 'Seasonal surges, loyal pax', profile: 'BALANCED' },
+  KWI: { tag: 'Business travel corridor', profile: 'BALANCED' },
+  BAH: { tag: 'Easy entry, short hops', profile: 'EASY' },
 };
 
 function FounderMarketMap({ airports, tailColor, onPick }: FounderMarketMapProps) {
-  // Pick the three best matches present in the region. Preserve our
-  // explicit order: 1 high, 1 balanced, 1 easy. Fall back to the top
-  // three airports if explicit profiles aren't found.
+  // Pick the three best matches present in the region.
   const ranked = (() => {
     const high: Airport | null = pickFirst(airports, ['DXB', 'AUH', 'RUH']);
     const balanced: Airport | null = pickFirst(airports, ['DOH', 'JED', 'KWI']);
     const easy: Airport | null = pickFirst(airports, ['MCT', 'BAH']);
     const picks = [high, balanced, easy].filter((x): x is Airport => x !== null);
     if (picks.length >= 3) return picks.slice(0, 3);
-    // Top up with whichever airports we have.
     const seen = new Set(picks.map((p) => p.iata));
     for (const a of airports) {
       if (seen.has(a.iata)) continue;
@@ -262,12 +261,19 @@ function FounderMarketMap({ airports, tailColor, onPick }: FounderMarketMapProps
 
   return (
     <div style={fmmWrap}>
-      <div style={fmmKicker(tailColor)}>FOUNDER MARKET MAP · RECOMMENDED BASES</div>
+      <div style={fmmKicker(tailColor)}>FOUNDER MARKET MAP · TAP A CITY TO FOUND YOUR BASE</div>
+      {/* Stylised regional map — Design Review v6 point 4. The
+          recommended bases sit as glowing pins on a soft regional
+          backdrop instead of in flat rows. */}
+      <RegionalMapBackdrop ranked={ranked} tailColor={tailColor} onPick={onPick} />
       <div style={fmmCards}>
         {ranked.map((a) => {
           const profile = RECOMMENDED_PROFILES[a.iata] ?? {
-            tag: 'Available hub', line: `Operate from ${a.city || countryName(a.country)}.`, profile: 'BALANCED' as const,
+            tag: `Operate from ${a.city || countryName(a.country)}`, profile: 'BALANCED' as const,
           };
+          const difficulty: 'EASY' | 'BALANCED' | 'AGGRESSIVE' =
+            profile.profile === 'HIGH' ? 'AGGRESSIVE'
+            : profile.profile === 'EASY' ? 'EASY' : 'BALANCED';
           const accent = profile.profile === 'HIGH' ? COLOR.gold.base
             : profile.profile === 'EASY' ? COLOR.success : tailColor;
           return (
@@ -276,15 +282,119 @@ function FounderMarketMap({ airports, tailColor, onPick }: FounderMarketMapProps
               onClick={(): void => onPick(a.iata)}
               style={fmmCard(accent)}
             >
-              <div style={fmmIata}>{a.iata}</div>
+              <div style={fmmCardHead}>
+                <span style={fmmIata}>{a.iata}</span>
+                <span style={{ ...fmmDifficulty, color: '#0B1120', background: accent }}>
+                  {difficulty}
+                </span>
+              </div>
               <div style={fmmCity}>{a.city || countryName(a.country)}</div>
-              <div style={{ ...fmmTag, color: accent }}>{profile.tag}</div>
-              <div style={fmmLine}>{profile.line}</div>
+              <div style={fmmReason}>{profile.tag}</div>
               <div style={fmmCta(accent)}>Found base →</div>
             </button>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function RegionalMapBackdrop({
+  ranked, tailColor, onPick,
+}: {
+  ranked: readonly Airport[];
+  tailColor: string;
+  onPick: (iata: string) => void;
+}) {
+  // Project each ranked airport into the map viewport. Lat/lon ranges
+  // are clamped to the Middle East window (15°N–40°N, 35°E–60°E) so
+  // the markers spread across the canvas.
+  const W = 320, H = 130;
+  const project = (lat: number, lon: number): { x: number; y: number } => {
+    const x = ((lon - 35) / 25) * W;
+    const y = H - ((lat - 12) / 30) * H;
+    return { x: Math.max(12, Math.min(W - 12, x)), y: Math.max(10, Math.min(H - 18, y)) };
+  };
+
+  return (
+    <div style={mapBackdropWrap}>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
+        style={{ display: 'block' }}>
+        <defs>
+          <radialGradient id="map-sea" cx="0.5" cy="0.5" r="0.7">
+            <stop offset="0" stopColor="#10172E" />
+            <stop offset="1" stopColor="#070A18" />
+          </radialGradient>
+          <linearGradient id="map-land" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#1A2347" />
+            <stop offset="1" stopColor="#0E1832" />
+          </linearGradient>
+          <radialGradient id="pin-glow" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0" stopColor={tailColor} stopOpacity="0.4" />
+            <stop offset="1" stopColor={tailColor} stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        {/* Sea backdrop */}
+        <rect x="0" y="0" width={W} height={H} fill="url(#map-sea)" />
+        {/* Stylised land masses — abstract blobs for the Middle East. */}
+        <path
+          d="M 10 30 Q 40 22 80 28 Q 120 18 165 24 L 200 32 Q 240 28 280 36 Q 310 44 318 60 Q 305 78 270 84 Q 230 90 195 78 Q 165 86 130 78 Q 100 88 75 80 Q 45 86 22 70 Q 8 50 10 30 Z"
+          fill="url(#map-land)"
+          stroke={tailColor}
+          strokeOpacity="0.15"
+          strokeWidth="0.5"
+        />
+        {/* Arabian peninsula tail (south) */}
+        <path
+          d="M 130 78 Q 145 100 170 110 Q 200 116 220 108 Q 220 96 200 90 Q 175 85 150 90 Q 138 86 130 78 Z"
+          fill="url(#map-land)"
+          stroke={tailColor}
+          strokeOpacity="0.15"
+          strokeWidth="0.5"
+        />
+        {/* Compass + label */}
+        <g transform={`translate(${W - 36} 18)`} opacity="0.5">
+          <circle cx="0" cy="0" r="9" fill="none" stroke={tailColor} strokeWidth="0.6" />
+          <path d="M 0 -7 L 2 0 L 0 7 L -2 0 Z" fill={tailColor} opacity="0.85" />
+          <text x="0" y="-10" textAnchor="middle" fontSize="6" fill={tailColor} letterSpacing="0.2em">N</text>
+        </g>
+        <text x="14" y="14" fontSize="8" fontWeight="800" letterSpacing="0.16em"
+          fill={tailColor} opacity="0.7">MIDDLE EAST</text>
+
+        {/* Faint scatter of smaller airports for atmosphere */}
+        {[
+          { lat: 26.5, lon: 50.6 }, { lat: 32.1, lon: 36.0 },
+          { lat: 33.3, lon: 44.4 }, { lat: 35.7, lon: 51.4 },
+          { lat: 24.9, lon: 67.0 }, { lat: 30.0, lon: 31.2 },
+        ].map((p, i) => {
+          const pt = project(p.lat, p.lon);
+          return <circle key={i} cx={pt.x} cy={pt.y} r="1.2" fill="#94A3B8" opacity="0.35" />;
+        })}
+
+        {/* Recommended base pins — clickable */}
+        {ranked.map((a) => {
+          const pt = project(a.lat, a.lon);
+          const profile = RECOMMENDED_PROFILES[a.iata];
+          const accent = profile?.profile === 'HIGH' ? COLOR.gold.base
+            : profile?.profile === 'EASY' ? COLOR.success : tailColor;
+          return (
+            <g key={a.iata} onClick={(): void => onPick(a.iata)} style={{ cursor: 'pointer' }}>
+              <circle cx={pt.x} cy={pt.y} r="14" fill="url(#pin-glow)" />
+              <circle cx={pt.x} cy={pt.y} r="5" fill={accent}
+                style={{ filter: `drop-shadow(0 0 4px ${accent})` }} />
+              <circle cx={pt.x} cy={pt.y} r="2" fill="#0B1120" />
+              <text x={pt.x} y={pt.y - 9} textAnchor="middle" fontSize="6"
+                fontWeight="800" letterSpacing="0.12em" fill={accent}>
+                {a.iata}
+              </text>
+              <text x={pt.x} y={pt.y + 13} textAnchor="middle" fontSize="5"
+                fontWeight="700" letterSpacing="0.06em" fill="#CBD5E1">
+                {(a.city || countryName(a.country)).toUpperCase().slice(0, 12)}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
     </div>
   );
 }
@@ -314,6 +424,34 @@ const fmmCards: React.CSSProperties = {
   gridTemplateColumns: 'repeat(3, 1fr)',
   gap: 6,
 };
+const mapBackdropWrap: React.CSSProperties = {
+  marginBottom: 8,
+  borderRadius: 12,
+  overflow: 'hidden',
+  background: 'linear-gradient(180deg, #0F1734, #050912)',
+  border: '1px solid rgba(255,255,255,0.06)',
+  padding: 4,
+};
+const fmmCardHead: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: 6,
+};
+const fmmDifficulty: React.CSSProperties = {
+  fontSize: 7,
+  fontWeight: 900,
+  letterSpacing: '0.16em',
+  padding: '2px 5px',
+  borderRadius: 3,
+};
+const fmmReason: React.CSSProperties = {
+  fontSize: 10,
+  color: '#CBD5E1',
+  marginTop: 4,
+  lineHeight: 1.4,
+  flex: 1,
+};
 const fmmCard = (accent: string): React.CSSProperties => ({
   background: `linear-gradient(180deg, ${accent}22, rgba(11,17,32,0.55))`,
   border: `1px solid ${accent}55`,
@@ -334,15 +472,6 @@ const fmmIata: React.CSSProperties = {
 const fmmCity: React.CSSProperties = {
   fontSize: 11, color: '#CBD5E1', marginTop: 2,
   letterSpacing: '0.04em',
-};
-const fmmTag: React.CSSProperties = {
-  fontSize: 10, fontWeight: 800, letterSpacing: '0.12em',
-  marginTop: 6,
-  textTransform: 'uppercase',
-};
-const fmmLine: React.CSSProperties = {
-  fontSize: 10, color: '#94A3B8', marginTop: 4, lineHeight: 1.4,
-  flex: 1,
 };
 const fmmCta = (accent: string): React.CSSProperties => ({
   marginTop: 6,
