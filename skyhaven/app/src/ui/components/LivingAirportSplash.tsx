@@ -185,7 +185,6 @@ function MotionLayer({ tailColor }: { tailColor: string }) {
   const heroProg = heroVisible ? (heroT - 0.05) / 0.65 : 0;
   const heroX = 78 - heroProg * 26;
   const heroY = 75 - heroProg * 57;
-  const heroRot = -32 + heroProg * 6;
   const heroScale = 0.9 + heroProg * 0.6;
   const heroOpacity = heroProg < 0.05 ? heroProg / 0.05
     : heroProg > 0.85 ? (1 - heroProg) / 0.15 : 1;
@@ -209,6 +208,26 @@ function MotionLayer({ tailColor }: { tailColor: string }) {
   return (
     <>
       <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" style={svgLayer} aria-hidden>
+        <defs>
+          {/* Luminance-keyed alpha filter — turns the white background
+              of the airplane JPG transparent. For each pixel, the new
+              alpha is computed as -3 * luminance + 3, clamped 0..1:
+                - pure white (luminance 1) → alpha 0
+                - 67% gray → alpha 1
+                - anything darker → alpha 1 (clamped)
+              So the white background drops out entirely while the
+              plane body and its accents stay opaque. */}
+          <filter id="splash-white-key">
+            <feColorMatrix
+              type="matrix"
+              values="1 0 0 0 0
+                      0 1 0 0 0
+                      0 0 1 0 0
+                      -0.897 -1.761 -0.342 0 3"
+            />
+          </filter>
+        </defs>
+
         {/* Stars */}
         {stars.map((s, i) => (
           <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#F8FAFC" opacity={s.o}>
@@ -232,38 +251,60 @@ function MotionLayer({ tailColor }: { tailColor: string }) {
           );
         })}
 
-        {/* Drifting aircraft */}
+        {/* Drifting aircraft — uses the /plane.jpg asset with a
+            luminance-keyed alpha filter so the JPG's white background
+            drops out. Right-going planes keep the natural orientation;
+            left-going planes are flipped horizontally. */}
         {drifters.map((d, i) => {
           const t = ((now / d.period) + d.phase) % 1;
           const x = d.dir > 0 ? -10 + t * 120 : 110 - t * 120;
-          const angle = d.dir > 0 ? -2 : 178;
+          const sz = 10 * d.scale; // viewBox units wide
+          const sx = d.dir > 0 ? 1 : -1;
           return (
-            <g key={`drift-${i}`} transform={`translate(${x} ${d.y}) rotate(${angle}) scale(${d.scale})`}>
-              <path d="M -7 0 L -1.5 0" stroke={d.accent} strokeWidth="0.45" opacity="0.55" strokeLinecap="round" />
-              <path d="M -2 0 L 1.8 -0.6 L 1.8 0.6 Z" fill={d.accent} />
-              <path d="M -0.5 -1.0 L 0.5 -1.0 L 0 0 Z" fill={d.accent} opacity="0.85" />
-              <path d="M -0.5 1.0 L 0.5 1.0 L 0 0 Z" fill={d.accent} opacity="0.85" />
-              <circle cx="1.8" cy="0" r="0.35" fill={tailColor} />
+            <g key={`drift-${i}`} transform={`translate(${x} ${d.y}) scale(${sx} 1)`}>
+              <image
+                href="/plane.jpg"
+                x={-sz / 2}
+                y={-sz / 2}
+                width={sz}
+                height={sz}
+                preserveAspectRatio="xMidYMid meet"
+                filter="url(#splash-white-key)"
+                opacity="0.92"
+              />
             </g>
           );
         })}
 
-        {/* Hero takeoff aircraft */}
+        {/* Hero takeoff aircraft — climbs from lower-right to upper-
+            left, so the JPG is flipped horizontally to point up-left.
+            Contrail is rendered as a separate stroked path that
+            trails behind it. */}
         {heroVisible && (
-          <g transform={`translate(${heroX} ${heroY}) rotate(${heroRot}) scale(${heroScale})`} opacity={heroOpacity}>
-            <path d="M -20 0 L -2.4 0" stroke="#F8FAFC" strokeWidth="0.55" strokeLinecap="round" opacity="0.55" />
-            <path d="M -28 0 L -16 0" stroke="#F8FAFC" strokeWidth="0.35" strokeLinecap="round" opacity="0.25" />
-            <path d="M -3 0 L 3 -1 L 3 1 Z" fill="#F8FAFC" />
-            <path d="M -1 -1.6 L 0.6 -1.6 L 0 0 Z" fill={tailColor} />
-            <path d="M -1 1.6 L 0.6 1.6 L 0 0 Z" fill={tailColor} />
-            <path d="M -3.5 -1 L -4.4 -1.6 L -3.8 0 L -4.4 1.6 L -3.5 1 Z" fill={tailColor} />
-            <circle cx="3" cy="0" r="0.55" fill={tailColor} />
-            <circle cx="-1" cy="-1.6" r="0.32" fill={COLOR.gold.base}>
-              <animate attributeName="opacity" values="0.4;1;0.4" dur="0.7s" repeatCount="indefinite" />
-            </circle>
-            <circle cx="-1" cy="1.6" r="0.32" fill="#F87171">
-              <animate attributeName="opacity" values="0.4;1;0.4" dur="0.7s" begin="0.35s" repeatCount="indefinite" />
-            </circle>
+          <g opacity={heroOpacity}>
+            {/* Contrail from the runway end up to the current aircraft
+                position. Two segments for a fading trail look. */}
+            <line
+              x1={78} y1={75}
+              x2={heroX + 2} y2={heroY + 2}
+              stroke="#F8FAFC" strokeWidth="0.55" opacity="0.45" strokeLinecap="round"
+            />
+            <line
+              x1={(78 + heroX) / 2} y1={(75 + heroY) / 2}
+              x2={heroX + 1} y2={heroY + 1}
+              stroke="#F8FAFC" strokeWidth="0.35" opacity="0.7" strokeLinecap="round"
+            />
+            <g transform={`translate(${heroX} ${heroY}) scale(${-heroScale * 2.4} ${heroScale * 2.4})`}>
+              <image
+                href="/plane.jpg"
+                x={-7}
+                y={-7}
+                width={14}
+                height={14}
+                preserveAspectRatio="xMidYMid meet"
+                filter="url(#splash-white-key)"
+              />
+            </g>
           </g>
         )}
 
