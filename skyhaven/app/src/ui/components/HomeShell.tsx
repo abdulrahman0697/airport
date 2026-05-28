@@ -246,7 +246,10 @@ const sceneImg: React.CSSProperties = {
   width: '100%',
   height: '100%',
   objectFit: 'cover',
-  objectPosition: 'center',
+  // Portrait scene — bias toward the upper section so the skyline +
+  // control tower stay visible after the cover-crop, which is where
+  // our hub/tower overlays anchor.
+  objectPosition: 'center 35%',
   display: 'block',
   pointerEvents: 'none',
   userSelect: 'none',
