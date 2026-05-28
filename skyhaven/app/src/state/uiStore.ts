@@ -1,8 +1,35 @@
 /**
- * UI-only state (not persisted). Lives separately from the game store
- * so its updates don't snake into the save file.
+ * UI-only state (mostly not persisted). Lives separately from the
+ * game store so its transient toggles don't snake into the save
+ * file.
+ *
+ * One exception: `cinematicSeen` is mirrored to localStorage under
+ * the CINEMATIC_KEY below, because the six-beat First-Flight Story
+ * is a once-per-install moment — replaying it on every cold start
+ * gets old fast.
  */
 import { create } from 'zustand';
+
+const CINEMATIC_KEY = 'skyhaven.cinematicSeen.v1';
+
+function readCinematicSeen(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(CINEMATIC_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeCinematicSeen(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(CINEMATIC_KEY, '1');
+  } catch {
+    /* Storage disabled (private mode, quota, etc.) — silently
+       drop. The cinematic just plays one more time. */
+  }
+}
 
 interface UiStore {
   introDismissed: boolean;
@@ -83,8 +110,11 @@ export const useUiStore = create<UiStore>((set) => ({
   launcherCollapsed: true,
   toggleLauncher: (): void => set((s) => ({ launcherCollapsed: !s.launcherCollapsed })),
   setLauncherCollapsed: (v): void => set({ launcherCollapsed: v }),
-  cinematicSeen: false,
-  markCinematicSeen: (): void => set({ cinematicSeen: true }),
+  cinematicSeen: readCinematicSeen(),
+  markCinematicSeen: (): void => {
+    writeCinematicSeen();
+    set({ cinematicSeen: true });
+  },
   mapMode: false,
   setMapMode: (v): void => set({ mapMode: v }),
   airportZoneFocus: null,
