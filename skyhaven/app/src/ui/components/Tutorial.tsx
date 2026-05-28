@@ -262,13 +262,28 @@ function TutorialCard({
 }) {
   const placement = useMemo(() => {
     if (current.kind !== 'wait-state' || !targetRect) return 'center' as const;
-    // Card-at-bottom is only safe when the target is firmly in the top
-    // ~30% of the screen (e.g. the fuel gauge). Anything below that —
-    // bottom tabs, modal selects, modal confirm buttons — places the
-    // card at the top so it never sits over content the player needs
-    // to read or tap.
-    if (targetRect.bottom < window.innerHeight * 0.30) return 'bottom' as const;
-    return 'top' as const;
+    // Geometric fit: pick the shell whose y-range does not intersect the
+    // target rect. Crude top/bottom heuristics fail mid-screen targets
+    // (e.g. a buy button on the third row of a list) — the card ends up
+    // sitting on top of the very control the player needs to tap.
+    const CARD_H = 320;
+    const GAP = 16;
+    const TOP_ANCHOR = 100;     // matches shellTop's `top` offset
+    const BOTTOM_ANCHOR = 144;  // matches shellBottom's `bottom` offset
+    const H = window.innerHeight;
+    const topShellBottomY = TOP_ANCHOR + CARD_H + GAP;
+    const bottomShellTopY = H - BOTTOM_ANCHOR - CARD_H - GAP;
+    const topSafe = targetRect.top >= topShellBottomY;
+    const bottomSafe = targetRect.bottom <= bottomShellTopY;
+    if (topSafe && bottomSafe) {
+      const targetMid = (targetRect.top + targetRect.bottom) / 2;
+      return targetMid > H / 2 ? 'top' as const : 'bottom' as const;
+    }
+    if (topSafe) return 'top' as const;
+    if (bottomSafe) return 'bottom' as const;
+    const topOverlap = Math.max(0, topShellBottomY - targetRect.top);
+    const bottomOverlap = Math.max(0, targetRect.bottom - bottomShellTopY);
+    return topOverlap < bottomOverlap ? 'top' as const : 'bottom' as const;
   }, [current.kind, targetRect]);
 
   return (
@@ -406,13 +421,16 @@ function StepDots({ step, total, tailColor }: { step: number; total: number; tai
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────
+// All three shells sit ABOVE the Spotlight blockers (z 200) and ring
+// (z 201) so the briefing card reads bright against the dimmed world
+// instead of being painted over by the click-blocker panels.
 const shellCenter: React.CSSProperties = {
   position: 'fixed',
   inset: 0,
   display: 'grid',
   placeItems: 'center',
   padding: 16,
-  zIndex: 202,
+  zIndex: 205,
   pointerEvents: 'none',
 };
 // Target is in the BOTTOM half (bottom-tab spotlights) → card at TOP.
@@ -421,7 +439,7 @@ const shellTop: React.CSSProperties = {
   top: 'calc(env(safe-area-inset-top, 0px) + 88px)',
   left: 12,
   right: 12,
-  zIndex: 62,
+  zIndex: 205,
   display: 'flex',
   justifyContent: 'center',
   pointerEvents: 'none',
@@ -433,7 +451,7 @@ const shellBottom: React.CSSProperties = {
   bottom: 'calc(64px + env(safe-area-inset-bottom, 0px) + 80px)',
   left: 12,
   right: 12,
-  zIndex: 62,
+  zIndex: 205,
   display: 'flex',
   justifyContent: 'center',
   pointerEvents: 'none',
