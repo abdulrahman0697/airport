@@ -20,7 +20,6 @@ import {
   useGameStore,
 } from '../../state/store';
 import { useUiStore } from '../../state/uiStore';
-import { AirportScene } from '../design/AirportScene';
 import { COLOR, RADIUS, SHADOW } from '../design/tokens';
 import { formatCash } from '../format';
 
@@ -110,11 +109,11 @@ export function EmpireJourney() {
                       opacity: reached || current ? 1 : 0.55,
                       filter: reached || current ? 'none' : 'grayscale(0.7)',
                     }}>
-                      <AirportScene
-                        tier={r.tier}
-                        tailColor={reached || current ? tailColor : '#475569'}
-                        width={220}
-                        passengerLoad={0}
+                      <img
+                        src={`/tier-${r.tier}.png`}
+                        alt={`Tier ${r.tier} airport`}
+                        style={tierImg}
+                        draggable={false}
                       />
                     </div>
                     <div style={muralTileTitle}>{r.label}</div>
@@ -302,6 +301,14 @@ const muralPreview: React.CSSProperties = {
   borderRadius: 8,
   overflow: 'hidden',
   background: '#050912',
+  // Square-ish frame for the player-supplied tier art (1.png … 8.png).
+  aspectRatio: '1 / 1',
+};
+const tierImg: React.CSSProperties = {
+  width: '100%',
+  height: '100%',
+  objectFit: 'cover',
+  display: 'block',
 };
 const muralTileTitle: React.CSSProperties = {
   fontSize: 12,
