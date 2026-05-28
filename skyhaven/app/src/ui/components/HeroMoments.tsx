@@ -13,6 +13,7 @@ import { Button } from '../design/Button';
 import { ConfettiBurst } from '../design/ConfettiBurst';
 import { AircraftIllustration } from '../design/SvgAircraft';
 import { haptics } from '../juice/haptics';
+import { sfx } from '../juice/sfx';
 
 /**
  * Hero moments (BRD §9.4).
@@ -69,6 +70,7 @@ export function HeroMoments() {
       };
       setQueue((q) => [...q, moment]);
       haptics.success();
+      sfx.success();
     }
     seenTier.current = tier;
   }, [tier, tailColor, tutorialCompleted]);
@@ -105,6 +107,7 @@ export function HeroMoments() {
       });
       setQueue((q) => [...q, ...newOnes]);
       haptics.success();
+      sfx.success();
     }
   }, [regions, tailColor, tutorialCompleted]);
 

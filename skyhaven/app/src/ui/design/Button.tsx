@@ -22,6 +22,7 @@
  */
 import { forwardRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { haptics } from '../juice/haptics';
+import { sfx } from '../juice/sfx';
 import { COLOR, MOTION, RADIUS, SPACE } from './tokens';
 
 export type ButtonVariant =
@@ -76,7 +77,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>): void => {
     if (disabled) return;
     setPressed(true);
-    if (hapticOnPress !== 'none') haptics[hapticOnPress]();
+    if (hapticOnPress !== 'none') {
+      haptics[hapticOnPress]();
+      // Pair the haptic with a matching SFX — UI feels twice as
+      // responsive with sound + touch firing in lockstep.
+      if (hapticOnPress === 'light') sfx.tick();
+      else sfx.confirm();
+    }
     onPointerDown?.(e);
   };
   const handlePointerUp = (): void => setPressed(false);

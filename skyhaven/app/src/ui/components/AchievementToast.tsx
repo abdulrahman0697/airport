@@ -11,6 +11,7 @@ import { getAchievement } from '../../data/achievements';
 import { selectAchievements, useGameStore } from '../../state/store';
 import { formatCash } from '../format';
 import { haptics } from '../juice/haptics';
+import { sfx } from '../juice/sfx';
 
 interface Toast { id: string; key: number }
 
@@ -34,6 +35,7 @@ export function AchievementToast() {
     const newToasts = added.map((id) => ({ id, key: keyRef.current++ }));
     setToasts((cur) => [...cur, ...newToasts]);
     haptics.success();
+    sfx.claim();
     const timer = setTimeout(() => {
       setToasts((cur) => cur.slice(newToasts.length));
     }, SHOW_MS);
