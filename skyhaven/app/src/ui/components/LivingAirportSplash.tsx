@@ -176,19 +176,6 @@ function MotionLayer({ tailColor }: { tailColor: string }) {
     { y: 32, scale: 0.4, period: 48000, phase: 0.10, dir:  1, accent: '#94A3B8' },
   ], []);
 
-  // Hero takeoff every ~20s. Path goes from (78, 75) — lower-right
-  // (runway departure end) — to (52, 18) — upper-left (into the
-  // clouds). Visible during 5–70% of the period.
-  const heroPeriod = 20000;
-  const heroT = (now / heroPeriod) % 1;
-  const heroVisible = heroT > 0.05 && heroT < 0.70;
-  const heroProg = heroVisible ? (heroT - 0.05) / 0.65 : 0;
-  const heroX = 78 - heroProg * 26;
-  const heroY = 75 - heroProg * 57;
-  const heroScale = 0.9 + heroProg * 0.6;
-  const heroOpacity = heroProg < 0.05 ? heroProg / 0.05
-    : heroProg > 0.85 ? (1 - heroProg) / 0.15 : 1;
-
   // Runway approach lights — perspective line from near end (52, 78)
   // toward vanishing point (58, 40). Each light strobes on its own
   // phase so the sequence reads as a wave racing to the horizon.
@@ -209,21 +196,30 @@ function MotionLayer({ tailColor }: { tailColor: string }) {
     <>
       <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" style={svgLayer} aria-hidden>
         <defs>
-          {/* Luminance-keyed alpha filter — turns the white background
-              of the airplane JPG transparent. For each pixel, the new
-              alpha is computed as -3 * luminance + 3, clamped 0..1:
-                - pure white (luminance 1) → alpha 0
-                - 67% gray → alpha 1
-                - anything darker → alpha 1 (clamped)
-              So the white background drops out entirely while the
-              plane body and its accents stay opaque. */}
-          <filter id="splash-white-key">
+          {/* Two-stage filter that turns the airplane JPG into a clean
+              black silhouette with a transparent background. First
+              feColorMatrix keys the white background out via luminance
+              (alpha = -3*luminance + 3, clamped). Second feColorMatrix
+              zeroes out R/G/B so every still-visible pixel becomes
+              pure black, while preserving the alpha computed above.
+              The net effect: a black silhouette of the airplane that
+              composites cleanly onto the sunset sky. */}
+          <filter id="splash-silhouette">
             <feColorMatrix
               type="matrix"
               values="1 0 0 0 0
                       0 1 0 0 0
                       0 0 1 0 0
                       -0.897 -1.761 -0.342 0 3"
+              result="keyed"
+            />
+            <feColorMatrix
+              in="keyed"
+              type="matrix"
+              values="0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 1 0"
             />
           </filter>
         </defs>
@@ -251,14 +247,16 @@ function MotionLayer({ tailColor }: { tailColor: string }) {
           );
         })}
 
-        {/* Drifting aircraft — uses the /plane.jpg asset with a
-            luminance-keyed alpha filter so the JPG's white background
-            drops out. Right-going planes keep the natural orientation;
-            left-going planes are flipped horizontally. */}
+        {/* Drifting aircraft — black silhouettes painted from the
+            plane.jpg asset via the silhouette filter. Right-going
+            planes use the natural orientation (image already points
+            up-right); left-going planes flip horizontally. Sized
+            small so they read as distant traffic, not foreground
+            elements. */}
         {drifters.map((d, i) => {
           const t = ((now / d.period) + d.phase) % 1;
-          const x = d.dir > 0 ? -10 + t * 120 : 110 - t * 120;
-          const sz = 10 * d.scale; // viewBox units wide
+          const x = d.dir > 0 ? -8 + t * 116 : 108 - t * 116;
+          const sz = 5 * d.scale; // smaller than before — viewBox units wide
           const sx = d.dir > 0 ? 1 : -1;
           return (
             <g key={`drift-${i}`} transform={`translate(${x} ${d.y}) scale(${sx} 1)`}>
@@ -269,44 +267,15 @@ function MotionLayer({ tailColor }: { tailColor: string }) {
                 width={sz}
                 height={sz}
                 preserveAspectRatio="xMidYMid meet"
-                filter="url(#splash-white-key)"
-                opacity="0.92"
+                filter="url(#splash-silhouette)"
+                opacity="0.78"
               />
             </g>
           );
         })}
 
-        {/* Hero takeoff aircraft — climbs from lower-right to upper-
-            left, so the JPG is flipped horizontally to point up-left.
-            Contrail is rendered as a separate stroked path that
-            trails behind it. */}
-        {heroVisible && (
-          <g opacity={heroOpacity}>
-            {/* Contrail from the runway end up to the current aircraft
-                position. Two segments for a fading trail look. */}
-            <line
-              x1={78} y1={75}
-              x2={heroX + 2} y2={heroY + 2}
-              stroke="#F8FAFC" strokeWidth="0.55" opacity="0.45" strokeLinecap="round"
-            />
-            <line
-              x1={(78 + heroX) / 2} y1={(75 + heroY) / 2}
-              x2={heroX + 1} y2={heroY + 1}
-              stroke="#F8FAFC" strokeWidth="0.35" opacity="0.7" strokeLinecap="round"
-            />
-            <g transform={`translate(${heroX} ${heroY}) scale(${-heroScale * 2.4} ${heroScale * 2.4})`}>
-              <image
-                href="/plane.jpg"
-                x={-7}
-                y={-7}
-                width={14}
-                height={14}
-                preserveAspectRatio="xMidYMid meet"
-                filter="url(#splash-white-key)"
-              />
-            </g>
-          </g>
-        )}
+        {/* Hero takeoff aircraft removed per design feedback — only
+            the small drifting silhouettes in the upper sky remain. */}
 
         {/* Runway approach-light sequence racing to vanishing point */}
         {lights.map((p, i) => (
