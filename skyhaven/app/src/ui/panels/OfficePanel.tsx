@@ -5,7 +5,6 @@ import { ACHIEVEMENT_COUNT, frameTier, FRAME_COLORS } from '../../data/achieveme
 import { FrameBadge } from '../components/AchievementFrame';
 import { AirlineCrest } from '../design/AirlineCrest';
 import { Button } from '../design/Button';
-import { DailyMissionsCard } from '../components/DailyMissionsCard';
 import { FriendsCard } from '../components/FriendsCard';
 import { usePanelStore } from '../components/PanelHost';
 import { ShareAirlineModal } from '../components/ShareAirlineModal';
@@ -125,8 +124,6 @@ export function OfficePanel() {
         <ShareAirlineModal open={shareOpen} onClose={(): void => setShareOpen(false)} />
 
         <CloudAccountCard />
-
-        <DailyMissionsCard />
 
         <FriendsCard />
 
