@@ -61,7 +61,10 @@ const STEPS: readonly Step[] = [
   {
     kind: 'wait-state',
     title: 'Secure your fuel pipeline',
-    tap: 'Open Fuel → Sign Local Refinery contract',
+    // Both targets live on the home screen now: the fuel gauge is
+    // embedded inside the airport scene (bottom-left), and the sign
+    // button lives inside the Fuel panel.
+    tap: 'Tap the FUEL gauge on the airport → Sign Local Refinery contract',
     reward: '+ steady fuel supply (lifts route gate)',
     targetFor: (panel) => panel === 'fuel' ? 'fuel-sign-contract' : 'fuel-gauge',
     check: (s) => s.fuel.contracts.length >= 2,
@@ -69,11 +72,14 @@ const STEPS: readonly Step[] = [
   {
     kind: 'wait-state',
     title: 'Buy your second aircraft',
-    tap: 'Open Hangar → Buy aircraft tab → ATR 42 → Buy + deliver ($25K)',
+    // The new home tile "Buy a New Aircraft" jumps straight into
+    // the Fleet panel's Buy tab, so the spotlight starts there
+    // instead of pointing at the bottom Hangar tab.
+    tap: 'Tap "Buy a New Aircraft" → ATR 42 → Buy + deliver ($25K)',
     reward: '+1 aircraft ready to fly',
     targetFor: (panel) => panel === 'fleet'
       ? ['buy-aircraft-atr42', 'fleet-buy-tab']
-      : 'fleet-tab',
+      : 'buy-aircraft-home',
     check: (s) => s.fleet.length >= 2,
   },
   {
@@ -133,9 +139,18 @@ export function Tutorial() {
     return () => clearTimeout(id);
   }, [current, advance]);
 
+  // When the last step lands, mark the tutorial complete AND drop
+  // the player on the home surface so they're not stranded on
+  // whatever panel / map view the last action opened.
+  const setMapMode = useUiStore((s) => s.setMapMode);
+  const closePanel = usePanelStore((s) => s.close);
   useEffect(() => {
-    if (!completed && step >= STEPS.length) complete();
-  }, [completed, step, complete]);
+    if (!completed && step >= STEPS.length) {
+      complete();
+      setMapMode(false);
+      closePanel();
+    }
+  }, [completed, step, complete, setMapMode, closePanel]);
 
   const introDismissed = useUiStore((s) => s.introDismissed);
   const pendingHubPick = useGameStore(selectPendingHubPickRegion);

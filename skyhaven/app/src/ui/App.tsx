@@ -13,7 +13,6 @@ import { FirstRouteCeremony } from './components/FirstRouteCeremony';
 import { FuelContractToast } from './components/FuelContractToast';
 import { EventBanner } from './components/EventBanner';
 import { EventPopup } from './components/EventPopup';
-import { FuelGauge } from './components/FuelGauge';
 import { GoalChainCard } from './components/GoalChainCard';
 import { HeroMoments } from './components/HeroMoments';
 import { HomeShell } from './components/HomeShell';
@@ -72,7 +71,6 @@ export function App() {
       <WorldView />
       <TopBar />
       <EventBanner />
-      <FuelGauge />
       <HomeShell />
       <MapLiveTicker />
       <MoneyTrailLayer />

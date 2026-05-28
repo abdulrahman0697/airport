@@ -30,7 +30,6 @@ import {
   selectHubs,
   selectRoutes,
   selectTailColor,
-  selectTutorialCompleted,
   useGameStore,
 } from '../../state/store';
 import { useUiStore } from '../../state/uiStore';
@@ -51,7 +50,6 @@ export function HomeShell() {
   const fleet = useGameStore(selectFleet);
   const hubs = useGameStore(selectHubs);
   const fuel = useGameStore((s) => s.state?.fuel);
-  const tutorialDone = useGameStore(selectTutorialCompleted);
   const dailyMissions = useGameStore(selectDailyMissions);
 
   const activePanel = usePanelStore((s) => s.active);
@@ -70,11 +68,12 @@ export function HomeShell() {
   // Wire-in so achievements ever surface an unread dot in the future.
   useGameStore(selectAchievements);
 
+  // HomeShell renders whenever the home view is "the screen" — no
+  // panel open, intro dismissed, not in map mode. We used to also
+  // hide it during the tutorial; now the tutorial spotlight points
+  // at the embedded fuel badge and the "Buy a New Aircraft" tile,
+  // so the home surface stays visible all the way through.
   const visible = introDismissed && activePanel === null && !mapMode;
-  const [hidden, setHidden] = useState(!tutorialDone);
-  useEffect(() => {
-    setHidden(!tutorialDone);
-  }, [tutorialDone]);
 
   const avgCondition = useMemo(() => {
     if (fleet.length === 0) return 100;
@@ -105,7 +104,7 @@ export function HomeShell() {
     openPanel(panel);
   };
 
-  if (!visible || hidden) return null;
+  if (!visible) return null;
 
   return (
     <div style={shell}>
@@ -154,6 +153,7 @@ export function HomeShell() {
           title="Buy a New Aircraft"
           subtitle={`${fleet.length} owned`}
           accent={COLOR.accent.cyan}
+          dataTutorial="buy-aircraft-home"
           onClick={(): void => go('fleet', () => setFleetTabIntent('buy'))}
         />
         <Tile
@@ -227,7 +227,7 @@ export function HomeShell() {
 }
 
 function Tile({
-  bg, title, subtitle, accent, subtitleColor, onClick,
+  bg, title, subtitle, accent, subtitleColor, onClick, dataTutorial,
 }: {
   bg: string;
   title: string;
@@ -235,10 +235,12 @@ function Tile({
   accent: string;
   subtitleColor?: string;
   onClick: () => void;
+  dataTutorial?: string;
 }) {
   return (
     <button
       onClick={onClick}
+      {...(dataTutorial ? { 'data-tutorial': dataTutorial } : {})}
       style={{
         ...tileBtn,
         backgroundImage: `linear-gradient(180deg, rgba(7,11,24,0.0) 0%, rgba(7,11,24,0.45) 45%, rgba(7,11,24,0.92) 100%), url('${bg}')`,
