@@ -47,10 +47,13 @@ export function WorldView() {
           stage.setHubs(s.hubs.map((h) => h.iata));
           stage.setRoutes(s.routes);
           stage.setCollectibles(s.collectibles);
-          // If exactly one region is unlocked, zoom in on it so the
-          // player isn't staring at an empty globe.
+          // If exactly one region is unlocked, gently zoom toward
+          // it so the player isn't staring at an empty globe — but
+          // not so close that they only see one country (player
+          // feedback). 1.15 puts the region in the middle of the
+          // view with most of its neighbours still visible.
           if (s.unlockedRegions.length === 1) {
-            stage.zoomToRegion(s.unlockedRegions[0]!);
+            stage.zoomToRegion(s.unlockedRegions[0]!, 1.15);
           }
         }
 

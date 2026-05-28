@@ -7,14 +7,18 @@
  * Uses the design-system Modal primitive so motion / dismiss
  * behaviour matches every future modal in the game.
  */
+import { useState } from 'react';
 import { conditionBand } from '../../engine/condition';
 import { getAircraftDef } from '../../data/aircraft';
 import type { OwnedAircraft } from '../../engine/types';
+import { upgradeCost, UPGRADE_SPECS, type UpgradeKind } from '../../engine/upgrades';
 import { Modal } from '../design/Modal';
 import { COLOR, RADIUS, SHADOW, SPACE, TYPE } from '../design/tokens';
 import { AircraftIllustration } from '../design/SvgAircraft';
-import { selectTailColor, useGameStore } from '../../state/store';
+import { selectCash, selectTailColor, useGameStore } from '../../state/store';
 import { formatCash } from '../format';
+import { haptics } from '../juice/haptics';
+import { sfx } from '../juice/sfx';
 
 export function AircraftDetailModal({
   aircraft,
@@ -24,7 +28,22 @@ export function AircraftDetailModal({
   onClose: () => void;
 }) {
   const tailColor = useGameStore(selectTailColor);
+  const cash = useGameStore(selectCash);
+  const applyUpgrade = useGameStore((s) => s.applyUpgrade);
   const def = aircraft ? getAircraftDef(aircraft.defId) : null;
+  const [error, setError] = useState<string | null>(null);
+
+  const tryUpgrade = (uid: string, kind: UpgradeKind): void => {
+    const res = applyUpgrade(uid, kind);
+    if (res.ok) {
+      haptics.heavy();
+      sfx.success();
+      setError(null);
+    } else {
+      haptics.warning();
+      setError(res.message);
+    }
+  };
 
   return (
     <Modal open={!!aircraft && !!def} onClose={onClose} maxWidth={460} accent={tailColor}>
@@ -58,30 +77,64 @@ export function AircraftDetailModal({
               <Stat label="Range" value={`${def.rangeKm.toLocaleString()} km`} accent={COLOR.accent.cyan} />
             </div>
 
-            <div style={sectionHead}>Upgrades</div>
+            <div style={sectionHead}>Upgrades — tap to install</div>
             <div style={upgradeGrid}>
-              {(['engine', 'cabin', 'fuelEff', 'marketing'] as const).map((k) => (
-                <div key={k} style={upgradeCell}>
-                  <div style={upgradeLabel}>{LABEL[k]}</div>
-                  <div style={upgradeDots}>
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <span
-                        key={i}
-                        style={{
-                          ...dot,
-                          background: i < aircraft.upgrades[k] ? tailColor : COLOR.border.medium,
-                          boxShadow: i < aircraft.upgrades[k] ? `0 0 6px ${tailColor}` : 'none',
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
+              {(['engine', 'cabin', 'fuelEff', 'marketing'] as const).map((k) => {
+                const lvl = aircraft.upgrades[k];
+                const max = UPGRADE_SPECS[k].maxLevel;
+                const atMax = lvl >= max;
+                const cost = atMax ? 0 : upgradeCost(aircraft, k);
+                const afford = cash >= cost;
+                const enabled = !atMax && afford;
+                return (
+                  <button
+                    key={k}
+                    onClick={(): void => tryUpgrade(aircraft.uid, k)}
+                    disabled={!enabled}
+                    style={{
+                      ...upgradeCard,
+                      borderColor: enabled ? `${tailColor}66` : COLOR.border.soft,
+                      opacity: atMax ? 0.55 : afford ? 1 : 0.75,
+                      cursor: enabled ? 'pointer' : 'default',
+                    }}
+                  >
+                    <div style={upgradeCardHead}>
+                      <span style={upgradeCardLabel}>{LABEL[k]}</span>
+                      <span style={upgradeCardLevel(tailColor)}>{lvl} / {max}</span>
+                    </div>
+                    <div style={upgradeDots}>
+                      {Array.from({ length: max }).map((_, i) => (
+                        <span
+                          key={i}
+                          style={{
+                            ...dot,
+                            background: i < lvl ? tailColor : COLOR.border.medium,
+                            boxShadow: i < lvl ? `0 0 4px ${tailColor}` : 'none',
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <div style={upgradeImpact}>{IMPACT[k]}</div>
+                    <div style={upgradeFootRow}>
+                      {atMax ? (
+                        <span style={{ ...upgradeMaxPill, color: COLOR.success, borderColor: `${COLOR.success}55` }}>Maxed</span>
+                      ) : (
+                        <>
+                          <span style={{ ...upgradeCost_, color: afford ? COLOR.gold.base : COLOR.danger }}>
+                            ${formatCash(cost, 1)}
+                          </span>
+                          <span style={upgradeCta(enabled ? tailColor : COLOR.ink.faint)}>
+                            {afford ? 'Install →' : 'Need more cash'}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
-            <div style={footnote}>
-              Tap any aircraft in the Fleet list to see its detail card. Upgrades, repairs and route assignments still happen from the Fleet panel.
-            </div>
+            {error && <div style={errorText}>{error}</div>}
           </div>
         </div>
       )}
@@ -112,11 +165,21 @@ function Stat({
   );
 }
 
-const LABEL: Record<'engine' | 'cabin' | 'fuelEff' | 'marketing', string> = {
+const LABEL: Record<UpgradeKind, string> = {
   engine: 'Engine',
   cabin: 'Cabin',
-  fuelEff: 'Fuel eff.',
-  marketing: 'Marketing',
+  fuelEff: 'Fuel Eff.',
+  marketing: 'Brand Mktg',
+};
+
+/* Per-level effect copy — short and concrete so the player can see
+   exactly what the next install buys them. Values track the engine
+   constants in src/engine/upgrades.ts (BRD §4.7). */
+const IMPACT: Record<UpgradeKind, string> = {
+  engine:    '+5% speed · faster legs, more revenue / sec',
+  cabin:     '+5% capacity · more revenue per leg',
+  fuelEff:   '−10% fuel burn · gentler on supply',
+  marketing: '+3 load factor · more seats sold',
 };
 
 // ─── Styles ──────────────────────────────────────────────────────────
@@ -197,29 +260,53 @@ const sectionHead: React.CSSProperties = {
 const upgradeGrid: React.CSSProperties = {
   display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: SPACE.s,
 };
-const upgradeCell: React.CSSProperties = {
+const upgradeCard: React.CSSProperties = {
   background: COLOR.bg.glass,
-  border: `1px solid ${COLOR.border.soft}`,
+  border: '1px solid',
   borderRadius: RADIUS.m,
   padding: '10px 12px',
-  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+  display: 'flex', flexDirection: 'column', gap: 6,
+  textAlign: 'left',
+  fontFamily: 'inherit',
+  color: COLOR.ink.primary,
 };
-const upgradeLabel: React.CSSProperties = {
-  fontSize: TYPE.small.size, color: COLOR.ink.secondary,
+const upgradeCardHead: React.CSSProperties = {
+  display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
 };
+const upgradeCardLabel: React.CSSProperties = {
+  fontSize: 12, fontWeight: 800, letterSpacing: '0.04em', color: COLOR.ink.primary,
+};
+const upgradeCardLevel = (tail: string): React.CSSProperties => ({
+  fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: tail,
+  fontFeatureSettings: '"tnum" 1',
+});
 const upgradeDots: React.CSSProperties = {
-  display: 'flex', gap: 4,
+  display: 'flex', gap: 3,
 };
 const dot: React.CSSProperties = {
-  width: 8, height: 8, borderRadius: RADIUS.pill,
+  width: 6, height: 6, borderRadius: RADIUS.pill,
 };
-const footnote: React.CSSProperties = {
+const upgradeImpact: React.CSSProperties = {
+  fontSize: 10, color: COLOR.ink.muted, lineHeight: 1.35,
+};
+const upgradeFootRow: React.CSSProperties = {
+  marginTop: 2,
+  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+};
+const upgradeCost_: React.CSSProperties = {
+  fontSize: 12, fontWeight: 800, fontFeatureSettings: '"tnum" 1',
+};
+const upgradeCta = (color: string): React.CSSProperties => ({
+  fontSize: 10, fontWeight: 800, letterSpacing: '0.08em',
+  color, textTransform: 'uppercase',
+});
+const upgradeMaxPill: React.CSSProperties = {
+  fontSize: 10, fontWeight: 800, letterSpacing: '0.1em',
+  padding: '2px 6px', borderRadius: 4, border: '1px solid',
+  textTransform: 'uppercase',
+};
+const errorText: React.CSSProperties = {
   marginTop: SPACE.s,
-  padding: SPACE.s,
-  background: COLOR.bg.glass,
-  border: `1px solid ${COLOR.border.soft}`,
-  borderRadius: RADIUS.m,
-  fontSize: 11,
-  color: COLOR.ink.faint,
-  lineHeight: 1.5,
+  padding: '8px 10px', fontSize: 11, color: COLOR.danger,
+  background: COLOR.dangerDim, borderRadius: 6,
 };

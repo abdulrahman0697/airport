@@ -187,7 +187,7 @@ function HangarSlot({
       {/* Actions */}
       <div style={actionRow}>
         <Button variant="secondary" size="sm" fullWidth onClick={onOpenDetail}>
-          Aircraft profile  →
+          Upgrade Aircraft  →
         </Button>
         {aircraft.condition < 100 ? (
           <Button variant="gold" size="sm" fullWidth hapticOnPress="medium" onClick={onMaintenance}>
