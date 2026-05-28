@@ -4,9 +4,11 @@ import { useAuth } from '../../backend/useAuth';
 import { ACHIEVEMENT_COUNT, frameTier, FRAME_COLORS } from '../../data/achievements';
 import { FrameBadge } from '../components/AchievementFrame';
 import { AirlineCrest } from '../design/AirlineCrest';
+import { Button } from '../design/Button';
 import { DailyMissionsCard } from '../components/DailyMissionsCard';
 import { FriendsCard } from '../components/FriendsCard';
 import { usePanelStore } from '../components/PanelHost';
+import { ShareAirlineModal } from '../components/ShareAirlineModal';
 import { AIRCRAFT_DEFS, getAircraftDef } from '../../data/aircraft';
 import { CLASSIC_DEFS } from '../../data/classics';
 import { getRegion, REGIONS } from '../../data/regions';
@@ -55,6 +57,7 @@ export function OfficePanel() {
   const achievements = useGameStore(selectAchievements);
   const activeEvents = useGameStore(selectActiveEvents);
   const openPanel = usePanelStore((s) => s.open);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const perMin = useMemo(() => {
     const fleetById = new Map(fleet.map((a) => [a.uid, a]));
@@ -109,8 +112,17 @@ export function OfficePanel() {
                 <FrameBadge unlockedCount={achievements.length} />
               </div>
             </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              accent={tailColor}
+              onClick={(): void => setShareOpen(true)}
+            >
+              Share
+            </Button>
           </div>
         </section>
+        <ShareAirlineModal open={shareOpen} onClose={(): void => setShareOpen(false)} />
 
         <CloudAccountCard />
 
