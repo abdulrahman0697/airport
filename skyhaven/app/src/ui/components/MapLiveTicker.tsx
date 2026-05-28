@@ -84,9 +84,11 @@ export function MapLiveTicker() {
     return () => window.clearInterval(id);
   }, [mapMode, items.length]);
 
-  // Only render in map mode and only after the tutorial finishes
-  // (so the spotlight has a clear canvas).
-  if (!mapMode || !tutorialDone) return null;
+  // Design Review v6 — point 18. The ticker now also runs on the
+  // home view (not just map mode) so the airport always reads as part
+  // of a live network. We still require the tutorial to be done so
+  // the spotlight has a clear canvas during onboarding.
+  if (!tutorialDone) return null;
 
   const current = items[now % items.length] ?? items[0]!;
   const kindIcon = current.kind === 'boarding' ? '🛫'

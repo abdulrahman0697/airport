@@ -20,6 +20,7 @@ import { getAircraftDef } from '../../data/aircraft';
 import { cashPerSecond } from '../../engine/economy';
 import type { Route, OwnedAircraft, Hub, ActiveEvent } from '../../engine/types';
 import { COLOR } from '../design/tokens';
+import { emitMoneyTrail } from './MoneyTrail';
 
 export interface NetworkSkyViewProps {
   width: number;
@@ -104,10 +105,24 @@ export function NetworkSkyView({
 
   // Income-burst floats triggered each time an aircraft completes an
   // outbound leg. Tracked locally so the strip can show "$+1.2K"
-  // floating up from the destination pin.
+  // floating up from the destination pin. Additionally we fire a
+  // global MoneyTrail so the cash physically flies from the pin to
+  // the top-bar cash counter (Design Review v6 — point 18).
   const [bursts, setBursts] = useState<Array<{ id: number; x: number; y: number; text: string }>>([]);
   const lastCompletionRef = useRef<Map<string, number>>(new Map());
   const burstIdRef = useRef(0);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+
+  // Translate an SVG coord into screen pixels using the current
+  // bounding rect. Used by the global money trail emitter.
+  const svgToScreen = (svgX: number, svgY: number): { x: number; y: number } => {
+    const el = svgRef.current;
+    if (!el) return { x: window.innerWidth / 2, y: 100 };
+    const rect = el.getBoundingClientRect();
+    const scaleX = rect.width / width;
+    const scaleY = rect.height / height;
+    return { x: rect.left + svgX * scaleX, y: rect.top + svgY * scaleY };
+  };
 
   useEffect(() => {
     for (const arc of arcs) {
@@ -116,7 +131,7 @@ export function NetworkSkyView({
       // Detect when an aircraft just crossed completion (0.99 → wrap).
       const last = lastCompletionRef.current.get(arc.routeId) ?? offset;
       if (last > 0.85 && offset < 0.2) {
-        // Arrival! Emit a burst.
+        // Arrival! Emit a local burst + a global money-trail token.
         const cash = arc.cps * (arc.period / 1000);
         const text = cash >= 1000
           ? `+$${(cash / 1000).toFixed(1)}K`
@@ -126,6 +141,10 @@ export function NetworkSkyView({
         window.setTimeout(() => {
           setBursts((cur) => cur.filter((b) => b.id !== id));
         }, 1400);
+        // Fire the global trail from the destination pin's screen
+        // coordinate. The MoneyTrail layer flies it to the top bar.
+        const screen = svgToScreen(arc.destX, arc.destY);
+        emitMoneyTrail({ fromX: screen.x, fromY: screen.y, amount: Math.max(1, cash) });
       }
       lastCompletionRef.current.set(arc.routeId, offset);
     }
@@ -134,6 +153,7 @@ export function NetworkSkyView({
 
   return (
     <svg
+      ref={svgRef}
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}

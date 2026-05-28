@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 import { useMemo, useState } from 'react';
 import { getAircraftDef } from '../../data/aircraft';
 import { loadTopAirports, type Airport } from '../../data/airports';
@@ -268,26 +269,42 @@ function PricingConsequenceStrip({ mode, hubLevel }: { mode: 'economy' | 'balanc
   const m = PRICING_MODES.find((x) => x.id === mode);
   if (!m) return null;
   const warn = m.warn?.({ hubLevel });
+  // Design Review v6 — point 16. Wrap the cabin + chip block with a
+  // key change so a strategy switch triggers a snap-animation: the
+  // new cabin fades in, chips re-slide. The player sees the forecast
+  // change, not just static numbers swapping.
   return (
     <div>
       <div style={pricingTagline}>{m.tagline}</div>
-      {/* Mini cabin graphic — Design Review v4, point 11. Each mode
-          shows a different seat density / passenger mix so the player
-          can see the strategy at a glance, not just read it. */}
-      <CabinPreview mode={mode} />
-      <div style={consequenceRow}>
-        {m.chips.map((c) => (
-          <span key={c.label} style={{
-            ...conseqChip,
-            color: c.tone === 'pos' ? '#34D399' : c.tone === 'neg' ? '#F87171' : '#94A3B8',
-            borderColor: c.tone === 'pos' ? 'rgba(52,211,153,0.4)'
-              : c.tone === 'neg' ? 'rgba(248,113,113,0.4)'
-              : 'rgba(148,163,184,0.3)',
-          }}>{c.label}</span>
-        ))}
-      </div>
-      <div style={paxStrip}>{m.pax}</div>
-      {warn && <div style={paxWarn}>⚠ {warn}</div>}
+      <motion.div
+        key={`forecast-${mode}`}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.32, ease: 'easeOut' }}
+      >
+        <CabinPreview mode={mode} />
+        <div style={consequenceRow}>
+          {m.chips.map((c, i) => (
+            <motion.span
+              key={c.label}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.04 * i + 0.08, type: 'spring', stiffness: 360, damping: 22 }}
+              style={{
+                ...conseqChip,
+                color: c.tone === 'pos' ? '#34D399' : c.tone === 'neg' ? '#F87171' : '#94A3B8',
+                borderColor: c.tone === 'pos' ? 'rgba(52,211,153,0.4)'
+                  : c.tone === 'neg' ? 'rgba(248,113,113,0.4)'
+                  : 'rgba(148,163,184,0.3)',
+              } as Record<string, unknown>}
+            >
+              {c.label}
+            </motion.span>
+          ))}
+        </div>
+        <div style={paxStrip}>{m.pax}</div>
+        {warn && <div style={paxWarn}>⚠ {warn}</div>}
+      </motion.div>
     </div>
   );
 }

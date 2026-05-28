@@ -554,7 +554,10 @@ const shell: React.CSSProperties = {
   top: 'calc(env(safe-area-inset-top, 0px) + 64px)',
   left: 0,
   right: 0,
-  bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+  // Leave 44px of headroom above the bottom tabs for the always-on
+  // MapLiveTicker so the home view never overlaps the live network
+  // ticker (Design Review v6 — point 18).
+  bottom: 'calc(108px + env(safe-area-inset-bottom, 0px))',
   zIndex: 14,
   display: 'flex',
   flexDirection: 'column',

@@ -18,6 +18,7 @@ import { GoalChainCard } from './components/GoalChainCard';
 import { HeroMoments } from './components/HeroMoments';
 import { HomeShell } from './components/HomeShell';
 import { MapLiveTicker } from './components/MapLiveTicker';
+import { MoneyTrailLayer } from './components/MoneyTrail';
 import { HubPicker } from './components/HubPicker';
 import { IntroSplash } from './components/IntroSplash';
 import { OfflineSummary } from './components/OfflineSummary';
@@ -76,6 +77,7 @@ export function App() {
       <NextUnlockBadge />
       <HomeShell />
       <MapLiveTicker />
+      <MoneyTrailLayer />
       <PanelHost />
       <GoalChainCard />
       <BottomTabs />
