@@ -351,10 +351,14 @@ function RunwayStreaks() {
       ))}
       <style>{`
         @keyframes runwayStreak {
+          /* Travel up the runway centreline from the bottom-right
+             foreground toward the vanishing point near the taking-off
+             plane. Drift slightly right as we recede to follow the
+             perspective lines marked in the screenshot. */
           0%   { transform: translate(-50%, 0)                  scale(1.0); opacity: 0; }
           15%  { opacity: 0.7; }
-          70%  { transform: translate(calc(-50% + 4px), -32vh)  scale(0.35); opacity: 0.7; }
-          100% { transform: translate(calc(-50% + 8px), -40vh)  scale(0.18); opacity: 0; }
+          70%  { transform: translate(calc(-50% + 6px), -40vh)  scale(0.32); opacity: 0.7; }
+          100% { transform: translate(calc(-50% + 10px), -50vh) scale(0.16); opacity: 0; }
         }
       `}</style>
     </div>
@@ -485,14 +489,16 @@ const radarSweep = (tail: string): React.CSSProperties => ({
 });
 
 // Runway streaks — small subtle dots that travel up the runway
-// centreline toward the vanishing point. Repositioned to sit on the
-// actual centre of the runway in the photo (~60% horizontal, 80%
-// vertical) and made smaller / dimmer so they read as distant
-// runway markers, not loading dots.
+// centreline toward the taking-off aircraft. The runway in the photo
+// runs along the RIGHT side of the frame, from the bottom-right
+// foreground up to the vanishing point near the departing plane,
+// not down the visual centre of the screen. Centreline measured from
+// the marked-up screenshot is roughly (78% horizontal, 92% vertical)
+// at the near end, drifting slightly right as it recedes.
 const streakWrap: React.CSSProperties = {
   position: 'absolute',
-  left: '60%',
-  top: '80%',
+  left: '78%',
+  top: '92%',
   width: 1,
   height: 1,
   pointerEvents: 'none',
