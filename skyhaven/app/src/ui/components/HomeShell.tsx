@@ -1,28 +1,24 @@
 /**
- * HomeShell — image-first redesign (player feedback Phase X).
+ * HomeShell — image-first home tab.
  *
- * The home tab now opens on a single hand-drawn airport scene with
- * action labels overlaid in their natural locations:
+ * Layout (top → bottom):
  *
- *   ┌────────────────────────────────────────┐
- *   │ [HUB IATA]                ┌────────┐    │
- *   │  Hub city                 │ Tower  │    │
- *   │                           └────────┘    │
- *   │                  ┌──────────────────┐   │
- *   │                  │ ● Boarding · N   │   │
- *   │                  └──────────────────┘   │
- *   ├──── 3 tiles below the main image ──────┤
- *   │  ✈ Buy │ 🛬 Manage │ 🏗 Upgrade        │
- *   │   fleet count · cond · hubs            │
- *   ├────────── Live Network ticker ─────────┤
- *   │              CEO Office                 │
- *   └────────────────────────────────────────┘
+ *   [ tiny gap under TopBar ]
+ *   ┌─────────────────────────────────────┐
+ *   │  Airport scene image                │
+ *   │  · Hub IATA tag (top-left)          │  ← flex-grows to fill the
+ *   │  · Control Tower pill (right)       │    available vertical space
+ *   │  · Boarding · N routes (right-bot)  │
+ *   └─────────────────────────────────────┘
+ *   [ Buy ]  [ Your Hangar ]  [ Upgrade ]   ← three tile cards
+ *   ── Live network strip ──
+ *   [ CEO Office                       › ]   ← pinned just above tabs
  *
- * The base image (/public/home-airport.jpg) already contains the
- * airport scene and three thumbnail "card" zones at the bottom; this
- * component just overlays interactive React buttons on the right
- * spots and keeps everything aligned via percentage coordinates so
- * the layout survives any phone width.
+ * Scene + 3 tiles use cropped pieces of the original mockup
+ * (public/home-scene.jpg and public/tile-*.jpg) so the assets stay
+ * consistent while each piece can size independently. The scene has
+ * `flex: 1` + `objectFit: cover` so it absorbs whatever vertical
+ * space is left between the TopBar and the CEO button.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { loadTopAirports } from '../../data/airports';
@@ -41,10 +37,10 @@ import { haptics } from '../juice/haptics';
 import { sfx } from '../juice/sfx';
 import { usePanelStore } from './PanelHost';
 
-const HOME_IMAGE = '/home-airport.jpg';
-// Source image aspect ratio (940 × 928) — used to keep the overlay
-// coordinates faithful no matter how wide the viewport is.
-const IMAGE_RATIO = 940 / 928;
+const SCENE_IMAGE = '/home-scene.jpg';
+const TILE_BUY = '/tile-buy.jpg';
+const TILE_HANGAR = '/tile-hangar.jpg';
+const TILE_AIRPORT = '/tile-airport.jpg';
 
 export function HomeShell() {
   const tailColor = useGameStore(selectTailColor);
@@ -61,14 +57,11 @@ export function HomeShell() {
   const setRoutesTabIntent = useUiStore((s) => s.setRoutesTabIntent);
 
   const visible = introDismissed && activePanel === null && !mapMode;
-  // Hide during the tutorial so the spotlight + Mission Control strip
-  // have a clear canvas. Returns once the tutorial finishes.
   const [hidden, setHidden] = useState(!tutorialDone);
   useEffect(() => {
     setHidden(!tutorialDone);
   }, [tutorialDone]);
 
-  // Fleet figures driving the tile sub-labels.
   const avgCondition = useMemo(() => {
     if (fleet.length === 0) return 100;
     let total = 0;
@@ -99,94 +92,88 @@ export function HomeShell() {
 
   return (
     <div style={shell}>
-      <div style={inner}>
-        {/* ── Main airport image with three overlays ─────────────── */}
-        <div style={imageWrap(tailColor)}>
-          <img src={HOME_IMAGE} alt="" style={image} draggable={false} />
+      {/* ── Main airport scene — flex-grows to fill ───────────────── */}
+      <div style={sceneWrap(tailColor)}>
+        <img src={SCENE_IMAGE} alt="" style={sceneImg} draggable={false} />
 
-          {/* Hub IATA (top-left) — informational, not clickable. */}
-          <div style={hubTag(tailColor)} aria-label={`Home hub ${hubIata}`}>
-            <div style={hubIataLine}>{hubIata}</div>
-            <div style={hubCityLine}>{hubCity}</div>
-          </div>
-
-          {/* Control Tower (right side, above the parked aircraft). */}
-          <button onClick={(): void => go('tower')} style={towerTag} aria-label="Open Control Tower">
-            <span style={towerGlyph}>◆</span>
-            <span>Control Tower</span>
-          </button>
-
-          {/* Boarding · N routes (bottom-right, by the plane tail). */}
-          <button
-            onClick={(): void => go('routes')}
-            style={boardingTag}
-            aria-label={`See routes — ${routes.length} active`}
-          >
-            <span style={boardingDot} />
-            <span style={boardingLabel}>Boarding</span>
-            <span style={boardingCount}>{routes.length} route{routes.length === 1 ? '' : 's'}</span>
-          </button>
-
-          {/* ── Three tile buttons overlaid on the bottom strip ──── */}
-          <div style={tileRow}>
-            <TileButton
-              onClick={(): void => go('fleet', () => setFleetTabIntent('buy'))}
-              left={5}
-              title="Buy a New Aircraft"
-              subtitle={`${fleet.length} owned`}
-              accent={COLOR.accent.cyan}
-            />
-            <TileButton
-              onClick={(): void => go('fleet', () => setFleetTabIntent('owned'))}
-              left={37.5}
-              title="Your Hangar"
-              subtitle={`${Math.round(avgCondition)}% avg condition`}
-              accent={tailColor}
-              subtitleColor={condColor}
-            />
-            <TileButton
-              onClick={(): void => go('routes', () => setRoutesTabIntent('hubs'))}
-              left={70}
-              title="Upgrade Your Airport"
-              subtitle={`${hubs.length} hub${hubs.length === 1 ? '' : 's'}`}
-              accent={COLOR.gold.base}
-            />
-          </div>
+        <div style={hubTag(tailColor)} aria-label={`Home hub ${hubIata}`}>
+          <div style={hubIataLine}>{hubIata}</div>
+          <div style={hubCityLine}>{hubCity}</div>
         </div>
 
-        {/* ── Live network strip — inline so it stays bound to the
-              home flow instead of floating over other panels. ────── */}
-        <LiveNetworkStrip tailColor={tailColor} />
+        <button onClick={(): void => go('tower')} style={towerTag} aria-label="Open Control Tower">
+          <span style={towerGlyph}>◆</span>
+          <span>Control Tower</span>
+        </button>
 
-        {/* ── CEO Office full-width button ─────────────────────── */}
-        <button onClick={(): void => go('office')} style={ceoBtn(tailColor)} aria-label="Open CEO Office">
-          <span style={ceoGlyph(tailColor)}>CEO</span>
-          <span style={ceoTitle}>CEO Office</span>
-          <span style={ceoChev}>›</span>
+        <button
+          onClick={(): void => go('routes')}
+          style={boardingTag}
+          aria-label={`See routes — ${routes.length} active`}
+        >
+          <span style={boardingDot} />
+          <span style={boardingLabel}>Boarding</span>
+          <span style={boardingCount}>{routes.length} route{routes.length === 1 ? '' : 's'}</span>
         </button>
       </div>
+
+      {/* ── Three action tiles ───────────────────────────────────── */}
+      <div style={tilesRow}>
+        <Tile
+          bg={TILE_BUY}
+          title="Buy a New Aircraft"
+          subtitle={`${fleet.length} owned`}
+          accent={COLOR.accent.cyan}
+          onClick={(): void => go('fleet', () => setFleetTabIntent('buy'))}
+        />
+        <Tile
+          bg={TILE_HANGAR}
+          title="Your Hangar"
+          subtitle={`${Math.round(avgCondition)}% avg cond`}
+          accent={tailColor}
+          subtitleColor={condColor}
+          onClick={(): void => go('fleet', () => setFleetTabIntent('owned'))}
+        />
+        <Tile
+          bg={TILE_AIRPORT}
+          title="Upgrade Your Airport"
+          subtitle={`${hubs.length} hub${hubs.length === 1 ? '' : 's'}`}
+          accent={COLOR.gold.base}
+          onClick={(): void => go('routes', () => setRoutesTabIntent('hubs'))}
+        />
+      </div>
+
+      {/* ── Live network strip ───────────────────────────────────── */}
+      <LiveNetworkStrip tailColor={tailColor} />
+
+      {/* ── CEO Office (anchored at the bottom of the home flow) ──── */}
+      <button onClick={(): void => go('office')} style={ceoBtn(tailColor)} aria-label="Open CEO Office">
+        <span style={ceoGlyph(tailColor)}>CEO</span>
+        <span style={ceoTitle}>CEO Office</span>
+        <span style={ceoChev}>›</span>
+      </button>
     </div>
   );
 }
 
-function TileButton({
-  onClick, left, title, subtitle, accent, subtitleColor,
+function Tile({
+  bg, title, subtitle, accent, subtitleColor, onClick,
 }: {
-  onClick: () => void;
-  left: number;
+  bg: string;
   title: string;
   subtitle: string;
   accent: string;
   subtitleColor?: string;
+  onClick: () => void;
 }) {
   return (
     <button
       onClick={onClick}
       style={{
         ...tileBtn,
-        left: `${left}%`,
-        borderColor: `${accent}55`,
-        boxShadow: `0 0 18px ${accent}22, inset 0 -2px 0 ${accent}33`,
+        backgroundImage: `linear-gradient(180deg, rgba(7,11,24,0.0) 0%, rgba(7,11,24,0.45) 45%, rgba(7,11,24,0.92) 100%), url('${bg}')`,
+        borderColor: `${accent}66`,
+        boxShadow: `0 6px 16px rgba(0,0,0,0.5), 0 0 14px ${accent}26, inset 0 -2px 0 ${accent}44`,
       }}
     >
       <span style={tileTitle}>{title}</span>
@@ -226,55 +213,50 @@ function LiveNetworkStrip({ tailColor }: { tailColor: string }) {
 
 const shell: React.CSSProperties = {
   position: 'fixed',
-  top: 'calc(env(safe-area-inset-top, 0px) + 64px)',
+  // Small breathing gap under TopBar.
+  top: 'calc(env(safe-area-inset-top, 0px) + 70px)',
   left: 0,
   right: 0,
   bottom: 'calc(72px + env(safe-area-inset-bottom, 0px))',
   zIndex: 14,
-  background: 'linear-gradient(180deg, rgba(11,17,32,0.92), rgba(7,11,24,0.99) 30%)',
-  overflowY: 'auto',
-  WebkitOverflowScrolling: 'touch',
-};
-
-const inner: React.CSSProperties = {
-  // Enlarged home (player feedback) — let the image breathe on
-  // bigger phones / tablets too. Side padding is zero so the picture
-  // runs edge-to-edge; the strip + CEO button keep their own breathing
-  // room via marginInline.
-  maxWidth: 760,
-  margin: '0 auto',
-  padding: 0,
   display: 'flex',
   flexDirection: 'column',
   gap: 8,
+  padding: '6px 8px 8px',
+  background: 'linear-gradient(180deg, rgba(11,17,32,0.92), rgba(7,11,24,0.99) 30%)',
 };
 
-const imageWrap = (tail: string): React.CSSProperties => ({
+/* Scene grows to fill the available space between the top gap and
+   the tiles below. objectFit: cover lets the artwork breathe into
+   any vertical room it's given without losing aspect-faithful pixels. */
+const sceneWrap = (tail: string): React.CSSProperties => ({
   position: 'relative',
   width: '100%',
-  aspectRatio: `${IMAGE_RATIO}`,
-  borderRadius: 0,
+  flex: 1,
+  minHeight: 220,
+  borderRadius: RADIUS.l,
   overflow: 'hidden',
-  borderBottom: `1px solid ${tail}33`,
+  border: `1px solid ${tail}33`,
   boxShadow: `${SHADOW.card}, 0 0 32px ${tail}22`,
 });
 
-const image: React.CSSProperties = {
+const sceneImg: React.CSSProperties = {
   position: 'absolute',
   inset: 0,
   width: '100%',
   height: '100%',
   objectFit: 'cover',
+  objectPosition: 'center',
   display: 'block',
   pointerEvents: 'none',
   userSelect: 'none',
 };
 
-/* Hub identity — top-left of the image. Informational only. */
+/* Hub identity — top-left. */
 const hubTag = (tail: string): React.CSSProperties => ({
   position: 'absolute',
-  top: '4%',
-  left: '4%',
+  top: 12,
+  left: 12,
   background: 'rgba(11,17,32,0.55)',
   backdropFilter: 'blur(6px)',
   border: `1px solid ${tail}66`,
@@ -299,13 +281,11 @@ const hubCityLine: React.CSSProperties = {
   marginTop: 3,
 };
 
-/* Control tower — right side of image, above the parked plane.
-   Sits a little higher than the boarding tag and is smaller now
-   that the player has confirmed the location reads. */
+/* Control tower — right side, smaller compact pill. */
 const towerTag: React.CSSProperties = {
   position: 'absolute',
-  top: '30%',
-  right: '5%',
+  top: '26%',
+  right: 12,
   background: 'rgba(15,23,47,0.78)',
   backdropFilter: 'blur(6px)',
   border: '1px solid rgba(244,199,91,0.6)',
@@ -328,11 +308,11 @@ const towerGlyph: React.CSSProperties = {
   color: COLOR.gold.base,
 };
 
-/* Boarding — bottom-right area of image, by the plane tail. */
+/* Boarding — bottom-right of the scene, by the plane tail. */
 const boardingTag: React.CSSProperties = {
   position: 'absolute',
-  top: '58%',
-  right: '6%',
+  bottom: 12,
+  right: 12,
   background: 'rgba(11,17,32,0.78)',
   backdropFilter: 'blur(6px)',
   border: `1px solid ${COLOR.success}66`,
@@ -371,26 +351,21 @@ const boardingCount: React.CSSProperties = {
   marginLeft: 12,
 };
 
-/* Three tiles overlaid on the bottom card row of the image.
-   The image's own card art (plane / hangar / construction) shows
-   through; our labels sit on the CTA pill at the bottom of each card. */
-const tileRow: React.CSSProperties = {
-  position: 'absolute',
-  // Each tile sits in the bottom ~22% of the image, vertically
-  // anchored on the CTA pill area of the art beneath.
-  bottom: '2%',
-  left: 0,
-  right: 0,
-  height: '21%',
-  pointerEvents: 'none',
+/* Tile row — three cards laid out across the row.
+   Tiles take a fixed height so the picture above keeps the rest. */
+const tilesRow: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, 1fr)',
+  gap: 8,
+  flexShrink: 0,
 };
 
 const tileBtn: React.CSSProperties = {
-  position: 'absolute',
-  width: '25%',
-  height: '78%',
-  bottom: '4%',
-  background: 'linear-gradient(180deg, rgba(11,17,32,0.32) 0%, rgba(11,17,32,0.85) 70%)',
+  position: 'relative',
+  height: 100,
+  background: '#0B1120',
+  backgroundSize: 'cover',
+  backgroundPosition: 'center',
   border: '1px solid',
   borderRadius: RADIUS.m,
   cursor: 'pointer',
@@ -401,25 +376,25 @@ const tileBtn: React.CSSProperties = {
   justifyContent: 'flex-end',
   padding: '8px 10px',
   textAlign: 'left',
-  pointerEvents: 'auto',
-  backdropFilter: 'blur(2px)',
 };
 const tileTitle: React.CSSProperties = {
-  fontSize: 9,
+  fontSize: 13,
   fontWeight: 900,
   color: COLOR.ink.primary,
-  letterSpacing: '0.03em',
-  lineHeight: 1.2,
+  letterSpacing: '0.02em',
+  lineHeight: 1.15,
+  textShadow: '0 2px 6px rgba(0,0,0,0.8)',
 };
 const tileSubtitle: React.CSSProperties = {
-  fontSize: 8,
+  fontSize: 11,
   fontWeight: 700,
-  letterSpacing: '0.04em',
-  marginTop: 2,
+  letterSpacing: '0.03em',
+  marginTop: 3,
   fontFeatureSettings: '"tnum" 1',
+  textShadow: '0 1px 4px rgba(0,0,0,0.8)',
 };
 
-/* Live network strip — embedded directly so the home flow owns it. */
+/* Live network strip. */
 const liveStrip: React.CSSProperties = {
   background: 'linear-gradient(90deg, rgba(11,17,32,0.92), rgba(15,23,42,0.92), rgba(11,17,32,0.92))',
   border: '1px solid rgba(90,200,250,0.25)',
@@ -430,7 +405,7 @@ const liveStrip: React.CSSProperties = {
   alignItems: 'center',
   gap: 12,
   minWidth: 0,
-  margin: '0 8px',
+  flexShrink: 0,
 };
 const liveKicker = (tail: string): React.CSSProperties => ({
   fontSize: 9,
@@ -456,12 +431,12 @@ const liveLine: React.CSSProperties = {
   minWidth: 0,
 };
 
-/* CEO Office full-width button. */
+/* CEO Office — sits at the very bottom of the home flow. */
 const ceoBtn = (tail: string): React.CSSProperties => ({
   display: 'flex',
   alignItems: 'center',
   gap: 12,
-  padding: '14px 18px',
+  padding: '12px 16px',
   background: `linear-gradient(160deg, ${tail}22, rgba(11,17,32,0.85))`,
   border: `1px solid ${tail}55`,
   borderRadius: RADIUS.l,
@@ -470,10 +445,10 @@ const ceoBtn = (tail: string): React.CSSProperties => ({
   color: COLOR.ink.primary,
   boxShadow: `${SHADOW.card}, 0 0 22px ${tail}26`,
   minHeight: 56,
-  margin: '0 8px 4px',
+  flexShrink: 0,
 });
 const ceoGlyph = (tail: string): React.CSSProperties => ({
-  width: 42, height: 42,
+  width: 40, height: 40,
   borderRadius: 12,
   display: 'grid', placeItems: 'center',
   background: `linear-gradient(160deg, ${tail}44, rgba(15,23,47,0.6))`,
