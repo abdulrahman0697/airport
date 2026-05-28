@@ -711,7 +711,7 @@ function CertCell({ label, value, accent }: { label: string; value: string; acce
   return (
     <div style={certCell}>
       <div style={certCellLabel}>{label}</div>
-      <div style={{ ...certCellValue, color: accent ?? COLOR.ink.primary }}>{value}</div>
+      <div style={{ ...certCellValue, color: accent ?? '#0B1120' }}>{value}</div>
     </div>
   );
 }
