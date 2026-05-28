@@ -9,6 +9,9 @@ import {
   selectUnlockedRegions,
   useGameStore,
 } from '../../state/store';
+import { Button } from '../design/Button';
+import { ConfettiBurst } from '../design/ConfettiBurst';
+import { AircraftIllustration } from '../design/SvgAircraft';
 import { haptics } from '../juice/haptics';
 
 /**
@@ -30,6 +33,8 @@ interface QueuedMoment {
   secondary: string;   // subtitle
   accent: string;      // accent color (defaults to tail)
   bodyLines: string[]; // bullet/explanatory lines
+  /** For tier unlocks: a representative aircraft def id for the hero. */
+  heroDefId?: string;
 }
 
 export function HeroMoments() {
@@ -50,15 +55,19 @@ export function HeroMoments() {
     if (!tutorialCompleted) { seenTier.current = tier; return; }
     if (tier > seenTier.current) {
       const newTier = tier;
-      const examples = aircraftByTier(newTier).slice(0, 3).map((a) => a.displayName);
-      setQueue((q) => [...q, {
+      const planes = aircraftByTier(newTier);
+      const examples = planes.slice(0, 3).map((a) => a.displayName);
+      const heroDefId = planes[0]?.id;
+      const moment: QueuedMoment = {
         id: `tier-${newTier}-${Date.now()}`,
         kind: 'tier',
         primary: `Tier ${newTier} unlocked`,
         secondary: tierLabel(newTier),
         accent: tailColor,
         bodyLines: examples.length ? [`New aircraft available:`, examples.join(' · ')] : [],
-      }]);
+        ...(heroDefId ? { heroDefId } : {}),
+      };
+      setQueue((q) => [...q, moment]);
       haptics.success();
     }
     seenTier.current = tier;
@@ -114,6 +123,7 @@ export function HeroMoments() {
           style={backdrop(top.accent) as Record<string, unknown>}
           onClick={dismiss}
         >
+          <ConfettiBurst seed={top.id.length * 7} palette={[top.accent, '#F4C75B', '#FCE9A5', '#FFFFFF']} />
           <motion.div
             initial={{ scale: 0.7, y: 30, opacity: 0, rotate: -2 }}
             animate={{ scale: 1, y: 0, opacity: 1, rotate: 0 }}
@@ -123,6 +133,20 @@ export function HeroMoments() {
             style={card(top.accent) as Record<string, unknown>}
           >
             <div style={{ ...accentBar, background: top.accent }} />
+            {top.kind === 'tier' && top.heroDefId && (
+              <motion.div
+                initial={{ x: -120, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ delay: 0.18, type: 'spring', stiffness: 240, damping: 22 }}
+                style={heroIllustration as Record<string, unknown>}
+              >
+                <AircraftIllustration
+                  defId={top.heroDefId}
+                  tailColor={top.accent}
+                  width={320}
+                />
+              </motion.div>
+            )}
             <div style={inner}>
               <div style={{ ...kicker, color: top.accent }}>{top.secondary}</div>
               <h1 style={{ ...primary, textShadow: `0 0 32px ${top.accent}55` }}>{top.primary}</h1>
@@ -133,9 +157,15 @@ export function HeroMoments() {
                   ))}
                 </div>
               )}
-              <button onClick={dismiss} style={{ ...btn, background: top.accent }}>
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                accent={top.accent}
+                onClick={dismiss}
+              >
                 Onwards
-              </button>
+              </Button>
             </div>
           </motion.div>
         </motion.div>
@@ -198,15 +228,9 @@ const body: React.CSSProperties = {
   fontSize: 13,
   lineHeight: 1.5,
 };
-const btn: React.CSSProperties = {
-  width: '100%',
-  padding: '12px 14px',
-  borderRadius: 10,
-  border: 0,
-  color: '#0B1120',
-  fontWeight: 800,
-  fontSize: 14,
-  cursor: 'pointer',
-  fontFamily: 'inherit',
-  minHeight: 44,
+const heroIllustration: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  padding: '14px 0 0',
 };
