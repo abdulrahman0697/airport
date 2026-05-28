@@ -351,14 +351,15 @@ function RunwayStreaks() {
       ))}
       <style>{`
         @keyframes runwayStreak {
-          /* Travel up the runway centreline from the bottom-right
-             foreground toward the vanishing point near the taking-off
-             plane. Drift slightly right as we recede to follow the
-             perspective lines marked in the screenshot. */
-          0%   { transform: translate(-50%, 0)                  scale(1.0); opacity: 0; }
+          /* Travel up the runway centreline from the foreground (87%
+             horizontal, 80% vertical) toward the vanishing point near
+             the departing plane (~85% horizontal, 38% vertical). The
+             user's yellow markers angle slightly LEFT going up, so we
+             drift x negative as the streak recedes. */
+          0%   { transform: translate(-50%, 0)                   scale(1.0); opacity: 0; }
           15%  { opacity: 0.7; }
-          70%  { transform: translate(calc(-50% + 6px), -40vh)  scale(0.32); opacity: 0.7; }
-          100% { transform: translate(calc(-50% + 10px), -50vh) scale(0.16); opacity: 0; }
+          70%  { transform: translate(calc(-50% - 4px), -28vh)   scale(0.32); opacity: 0.7; }
+          100% { transform: translate(calc(-50% - 8px), -40vh)   scale(0.16); opacity: 0; }
         }
       `}</style>
     </div>
@@ -489,16 +490,16 @@ const radarSweep = (tail: string): React.CSSProperties => ({
 });
 
 // Runway streaks — small subtle dots that travel up the runway
-// centreline toward the taking-off aircraft. The runway in the photo
-// runs along the RIGHT side of the frame, from the bottom-right
-// foreground up to the vanishing point near the departing plane,
-// not down the visual centre of the screen. Centreline measured from
-// the marked-up screenshot is roughly (78% horizontal, 92% vertical)
-// at the near end, drifting slightly right as it recedes.
+// centreline toward the taking-off aircraft. Aligned to the user's
+// yellow markup: the dots run vertically along the right side of the
+// frame at ~87% horizontal, starting at the foreground threshold
+// (~80% vertical) and trailing up to just below the departing plane
+// (~38% vertical). The line angles slightly LEFT as it recedes so
+// we drift x negative during the climb.
 const streakWrap: React.CSSProperties = {
   position: 'absolute',
-  left: '78%',
-  top: '92%',
+  left: '87%',
+  top: '80%',
   width: 1,
   height: 1,
   pointerEvents: 'none',
