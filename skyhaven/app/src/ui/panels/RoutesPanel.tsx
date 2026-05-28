@@ -142,22 +142,85 @@ function RouteRow({ route }: { route: Route }) {
               </button>
             ))}
           </div>
-          <div style={pricingTradeoff}>
-            {PRICING_MODES.find((m) => m.id === route.pricing)?.tradeoff}
-          </div>
+          <PricingConsequenceStrip mode={route.pricing} hubLevel={hubLevelFor(route, hubs)} />
         </div>
       )}
-      <button
-        onClick={(): void => {
+      {/* Design Review v3 — point 11. Destructive actions move into a
+          three-dot Advanced menu so the main card prompts growth, not
+          cancellation. */}
+      <RouteAdvancedMenu
+        onClose={(): void => {
           const res = closeRoute(route.id);
           setError(res.ok ? null : res.message);
         }}
-        style={closeBtn}
-      >
-        Close route
-      </button>
+      />
       {error && <div style={errorText}>{error}</div>}
     </li>
+  );
+}
+
+function hubLevelFor(route: Route, hubs: readonly { iata: string; level: number }[]): number {
+  for (const h of hubs) if (h.iata === route.originIata || h.iata === route.destIata) return h.level;
+  return 0;
+}
+
+function PricingConsequenceStrip({ mode, hubLevel }: { mode: 'economy' | 'balanced' | 'premium'; hubLevel: number }) {
+  const m = PRICING_MODES.find((x) => x.id === mode);
+  if (!m) return null;
+  const warn = m.warn?.({ hubLevel });
+  return (
+    <div>
+      <div style={pricingTagline}>{m.tagline}</div>
+      <div style={consequenceRow}>
+        {m.chips.map((c) => (
+          <span key={c.label} style={{
+            ...conseqChip,
+            color: c.tone === 'pos' ? '#34D399' : c.tone === 'neg' ? '#F87171' : '#94A3B8',
+            borderColor: c.tone === 'pos' ? 'rgba(52,211,153,0.4)'
+              : c.tone === 'neg' ? 'rgba(248,113,113,0.4)'
+              : 'rgba(148,163,184,0.3)',
+          }}>{c.label}</span>
+        ))}
+      </div>
+      <div style={paxStrip}>{m.pax}</div>
+      {warn && <div style={paxWarn}>⚠ {warn}</div>}
+    </div>
+  );
+}
+
+function RouteAdvancedMenu({ onClose }: { onClose: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4, position: 'relative' }}>
+      <button
+        onClick={(): void => { setOpen((v) => !v); setConfirm(false); }}
+        style={dotsBtn}
+        aria-label="Route options"
+        aria-expanded={open}
+      >
+        ⋯ Advanced
+      </button>
+      {open && (
+        <div style={menuPop}>
+          {!confirm ? (
+            <button onClick={(): void => setConfirm(true)} style={menuItemDanger}>
+              Close route
+            </button>
+          ) : (
+            <div style={confirmBox}>
+              <div style={confirmText}>
+                Closing frees the aircraft and stops income from this lane.
+              </div>
+              <div style={confirmRow}>
+                <button onClick={(): void => { setOpen(false); setConfirm(false); }} style={confirmCancel}>Keep</button>
+                <button onClick={(): void => { setOpen(false); setConfirm(false); onClose(); }} style={confirmDanger}>Confirm close</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -664,14 +727,157 @@ const tabBtn: React.CSSProperties = {
 };
 const tabActive: React.CSSProperties = { background: 'rgba(90,200,250,0.18)', color: '#5AC8FA' };
 
-/** Pricing-mode catalogue (Design Review v2 — point 12). Each mode
- *  shows a one-line trade-off below the toggle so the player sees the
- *  strategic consequence of the pick at a glance. */
-const PRICING_MODES = [
-  { id: 'economy'  as const, label: 'Economy',  tradeoff: 'High volume · lower margin · friendly to short legs.' },
-  { id: 'balanced' as const, label: 'Balanced', tradeoff: 'Stable demand · moderate margin · low risk.' },
-  { id: 'premium'  as const, label: 'Premium',  tradeoff: 'Fewer passengers · higher revenue · rewards strong hubs.' },
+/** Pricing-mode catalogue (Design Review v3 — point 10). Each mode now
+ *  exposes concrete deltas: load, revenue/passenger, reputation, fuel.
+ *  The UI renders these as small chips so the strategic consequence is
+ *  visible at a glance rather than buried in prose. */
+interface PricingMode {
+  readonly id: 'economy' | 'balanced' | 'premium';
+  readonly label: string;
+  readonly tagline: string;
+  readonly chips: readonly { label: string; tone: 'pos' | 'neg' | 'neutral' }[];
+  readonly pax: string;
+  readonly warn?: (ctx: { hubLevel: number }) => string | null;
+}
+const PRICING_MODES: readonly PricingMode[] = [
+  { id: 'economy', label: 'Economy',
+    tagline: 'Pack the cabin, move the volume.',
+    chips: [
+      { label: 'Load +20%', tone: 'pos' },
+      { label: 'Rev/pax −15%', tone: 'neg' },
+      { label: 'Reputation +2', tone: 'pos' },
+      { label: 'Fuel pressure +0', tone: 'neutral' },
+    ],
+    pax: '••••• economy',
+  },
+  { id: 'balanced', label: 'Balanced',
+    tagline: 'Steady demand, steady margin.',
+    chips: [
+      { label: 'Load +0%', tone: 'neutral' },
+      { label: 'Rev/pax +0%', tone: 'neutral' },
+      { label: 'Reputation +0', tone: 'neutral' },
+      { label: 'Fuel pressure +0', tone: 'neutral' },
+    ],
+    pax: '••• economy · •• business',
+  },
+  { id: 'premium', label: 'Premium',
+    tagline: 'Fewer seats sold, but each one pays.',
+    chips: [
+      { label: 'Load −25%', tone: 'neg' },
+      { label: 'Rev/pax +60%', tone: 'pos' },
+      { label: 'Reputation +5', tone: 'pos' },
+      { label: 'Fuel pressure −10%', tone: 'pos' },
+    ],
+    pax: '★ ★ ★ premium · business',
+    warn: ({ hubLevel }) => hubLevel < 1 ? 'Premium yield capped — build a Lounge to unlock full uplift.' : null,
+  },
 ];
+const pricingTagline: React.CSSProperties = {
+  fontSize: 11,
+  color: '#CBD5E1',
+  marginTop: 8,
+  fontStyle: 'italic',
+};
+const consequenceRow: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 6,
+  marginTop: 6,
+};
+const conseqChip: React.CSSProperties = {
+  fontSize: 10,
+  fontWeight: 800,
+  letterSpacing: '0.04em',
+  padding: '3px 7px',
+  borderRadius: 999,
+  border: '1px solid',
+  background: 'rgba(11,17,32,0.55)',
+  fontFeatureSettings: '"tnum" 1',
+};
+const paxStrip: React.CSSProperties = {
+  marginTop: 6,
+  fontSize: 11,
+  letterSpacing: '0.12em',
+  color: '#94A3B8',
+};
+const paxWarn: React.CSSProperties = {
+  marginTop: 6,
+  fontSize: 11,
+  color: '#F4C75B',
+  background: 'rgba(244,199,91,0.08)',
+  border: '1px solid rgba(244,199,91,0.3)',
+  borderRadius: 6,
+  padding: '6px 8px',
+};
+const dotsBtn: React.CSSProperties = {
+  background: 'transparent',
+  border: '1px solid rgba(148,163,184,0.25)',
+  color: '#94A3B8',
+  borderRadius: 6,
+  padding: '4px 10px',
+  fontSize: 11,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  letterSpacing: '0.06em',
+};
+const menuPop: React.CSSProperties = {
+  position: 'absolute',
+  right: 0,
+  bottom: 'calc(100% + 4px)',
+  background: '#0B1426',
+  border: '1px solid rgba(148,163,184,0.25)',
+  borderRadius: 8,
+  padding: 4,
+  minWidth: 200,
+  boxShadow: '0 10px 24px rgba(0,0,0,0.5)',
+  zIndex: 5,
+};
+const menuItemDanger: React.CSSProperties = {
+  width: '100%',
+  background: 'transparent',
+  border: 0,
+  color: '#F87171',
+  textAlign: 'left',
+  padding: '8px 10px',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  fontSize: 12,
+  fontWeight: 700,
+  borderRadius: 6,
+};
+const confirmBox: React.CSSProperties = {
+  padding: 8,
+};
+const confirmText: React.CSSProperties = {
+  fontSize: 11,
+  color: '#CBD5E1',
+  lineHeight: 1.45,
+  marginBottom: 8,
+};
+const confirmRow: React.CSSProperties = {
+  display: 'flex', justifyContent: 'flex-end', gap: 6,
+};
+const confirmCancel: React.CSSProperties = {
+  background: 'transparent',
+  border: '1px solid rgba(148,163,184,0.3)',
+  color: '#94A3B8',
+  borderRadius: 6,
+  padding: '6px 10px',
+  fontSize: 11,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+};
+const confirmDanger: React.CSSProperties = {
+  background: '#F87171',
+  color: '#0B1120',
+  border: 0,
+  borderRadius: 6,
+  padding: '6px 10px',
+  fontSize: 11,
+  fontWeight: 800,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+};
 const body: React.CSSProperties = { flex: 1, overflowY: 'auto', padding: 12 };
 const list: React.CSSProperties = { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 };
 const sectionTitle: React.CSSProperties = {
@@ -695,22 +901,6 @@ const pricingBtn: React.CSSProperties = {
 const pricingActive: React.CSSProperties = {
   background: 'rgba(90,200,250,0.18)', color: '#5AC8FA',
   borderColor: 'rgba(90,200,250,0.5)',
-};
-const pricingTradeoff: React.CSSProperties = {
-  marginTop: 6,
-  padding: '6px 10px',
-  background: 'rgba(11,17,32,0.55)',
-  border: '1px solid rgba(255,255,255,0.06)',
-  borderRadius: 6,
-  fontSize: 11,
-  color: '#CBD5E1',
-  lineHeight: 1.5,
-};
-const closeBtn: React.CSSProperties = {
-  width: '100%', marginTop: 8, background: 'transparent',
-  color: '#F87171', border: '1px solid rgba(248,113,113,0.4)',
-  padding: '8px', borderRadius: 6, cursor: 'pointer', minHeight: 36,
-  fontSize: 12, fontFamily: 'inherit',
 };
 const primaryBtn: React.CSSProperties = {
   width: '100%', marginTop: 10, padding: 10, borderRadius: 8,

@@ -122,26 +122,142 @@ export function OfficePanel() {
         </section>
         <ShareAirlineModal open={shareOpen} onClose={(): void => setShareOpen(false)} />
 
-        {/* Strategic Decisions — replaces the friends/cloud/etc. clutter that
-            used to live here. Cloud save + friends moved to Settings panel
-            (Design Review v2 — point 8). */}
+        {/* Design Review v3 — point 21. CEO Boardroom replaces the
+            static dashboard. Three derived parts: Advisor Briefing
+            (one situational warning/opportunity), Board Agenda (three
+            strategic decisions the player can act on now), Strategic
+            Projects (long-term unlockable infrastructure). */}
         <section style={card}>
-          <div style={sectionHead}>Strategic Decisions</div>
+          <div style={sectionHead}>Advisor Briefing</div>
+          <div style={advisorList}>
+            {(() => {
+              // Pick the most urgent advisory based on live state.
+              if (conditionSummary.needsAttention > 0) {
+                return (
+                  <AdvisorCard
+                    kicker="Maintenance chief"
+                    title={`${conditionSummary.needsAttention} aircraft below safe condition`}
+                    body="Avg condition slipping in the fleet. Schedule repairs before condition-decay events knock revenue."
+                    accent="#F59E0B"
+                    cta="Open Hangar"
+                    onCta={(): void => openPanel('fleet')}
+                  />
+                );
+              }
+              if (routes.length === 0) {
+                return (
+                  <AdvisorCard
+                    kicker="CFO"
+                    title="No active routes — no income/min"
+                    body="Open the first route from your hub. Income starts the second the route goes live."
+                    accent="#5AC8FA"
+                    cta="Open Operations"
+                    onCta={(): void => openPanel('routes')}
+                  />
+                );
+              }
+              if (fleet.length === 1) {
+                return (
+                  <AdvisorCard
+                    kicker="Ops director"
+                    title="Single aircraft, single point of failure"
+                    body="Buy a second aircraft so a maintenance window or a fuel event can't ground the airline."
+                    accent="#F4C75B"
+                    cta="Open Hangar"
+                    onCta={(): void => openPanel('fleet')}
+                  />
+                );
+              }
+              if (tier >= 4 && !routes.some((r) => r.pricing === 'premium')) {
+                return (
+                  <AdvisorCard
+                    kicker="Revenue management"
+                    title="Premium yield is on the table"
+                    body="Tier 4+ unlocks premium pricing. Try it on a hub-to-hub route — even at lower load, per-seat revenue jumps."
+                    accent="#A78BFA"
+                    cta="Open Operations"
+                    onCta={(): void => openPanel('routes')}
+                  />
+                );
+              }
+              return (
+                <AdvisorCard
+                  kicker="Board chair"
+                  title="Steady cruise"
+                  body="No urgent operational issue today. Use the slack to push lifetime earnings toward the next tier."
+                  accent="#34D399"
+                />
+              );
+            })()}
+          </div>
+        </section>
+
+        <section style={card}>
+          <div style={sectionHead}>Board Agenda · Today’s Decisions</div>
           <div style={advisorList}>
             <AdvisorCard
-              title="Approve new terminal"
-              body="A new terminal unlocks at the next tier. Stay on the lifetime-earnings curve to lift it."
-              accent="#5AC8FA"
-            />
-            <AdvisorCard
-              title="Negotiate fuel contract"
-              body="Sign higher-supply contracts in Fuel to weather price spikes without grounding routes."
+              kicker="Decision 1"
+              title="Sign Fuel Hedge Contract"
+              body="Lock in fuel at a fixed price to weather price spikes during the next 24h. Open Fuel to sign higher-supply contracts."
               accent="#F4C75B"
+              cta="Open Fuel"
+              onCta={(): void => openPanel('fuel')}
             />
             <AdvisorCard
-              title="Launch a premium route"
-              body="Try Premium pricing on a route from a Tier-4+ hub to capture higher-yield passengers."
+              kicker="Decision 2"
+              title={tier < 4 ? 'Approve new hub' : 'Launch Premium Campaign'}
+              body={tier < 4
+                ? 'Reach a new region and create a second hub. Routes from new hubs collect a hub-bonus + open fresh demand pools.'
+                : 'Switch one hub-to-hub route to Premium pricing. Higher per-passenger revenue at the cost of load factor.'}
+              accent="#5AC8FA"
+              cta={tier < 4 ? 'Open Operations' : 'Open Operations'}
+              onCta={(): void => openPanel('routes')}
+            />
+            <AdvisorCard
+              kicker="Decision 3"
+              title={hubs.length === 0 ? 'Hire your first hub manager' : 'Strengthen the bench'}
+              body={hubs.length === 0
+                ? 'After your first hub goes online, hire a Logistics Director — cuts hub-scoped fuel demand by 25%.'
+                : 'Each hub supports six manager slots. Logistics + Maintenance pay back the fastest.'}
               accent="#34D399"
+              cta="Open Staff HQ"
+              onCta={(): void => openPanel('crew')}
+            />
+          </div>
+        </section>
+
+        <section style={card}>
+          <div style={sectionHead}>Strategic Projects</div>
+          <div style={advisorList}>
+            <AdvisorCard
+              kicker="Long-term"
+              title="Control Tower"
+              body={tier >= 3
+                ? 'Operational. Coordinates traffic and unlocks weather alerts.'
+                : 'Unlocks at Tier 3. Coordinates traffic and unlocks weather alerts.'}
+              accent={tier >= 3 ? '#34D399' : '#94A3B8'}
+            />
+            <AdvisorCard
+              kicker="Long-term"
+              title="Premium Lounge"
+              body={tier >= 5
+                ? 'Built. Premium pricing yields full uplift on every route.'
+                : 'Unlocks at Tier 5. Required to capture VIP yield on every route.'}
+              accent={tier >= 5 ? '#34D399' : '#94A3B8'}
+            />
+            <AdvisorCard
+              kicker="Long-term"
+              title="Cargo Hub Expansion"
+              body={tier >= 5
+                ? 'Cargo lane open. Belly + freighter revenue runs parallel to passenger lines.'
+                : 'Unlocks at Tier 5 alongside the cargo aircraft category.'}
+              accent={tier >= 5 ? '#34D399' : '#94A3B8'}
+            />
+            <AdvisorCard
+              kicker="Long-term"
+              title="Loyalty Program"
+              body="Stretch goal. Soft launch in the late-game roadmap — keeps your premium pax coming back."
+              accent="#94A3B8"
             />
           </div>
         </section>
@@ -314,7 +430,10 @@ export function OfficePanel() {
  * take next. Pure copy for now — the next iteration ties them to
  * actual gameplay actions ("Approve" → opens the relevant panel).
  */
-function AdvisorCard({ title, body, accent }: { title: string; body: string; accent: string }) {
+function AdvisorCard({ title, body, accent, kicker, cta, onCta }: {
+  title: string; body: string; accent: string; kicker?: string;
+  cta?: string; onCta?: () => void;
+}) {
   return (
     <div style={{
       background: 'rgba(11,17,32,0.55)',
@@ -323,8 +442,30 @@ function AdvisorCard({ title, body, accent }: { title: string; body: string; acc
       borderRadius: 10,
       padding: 12,
     }}>
+      {kicker && (
+        <div style={{
+          fontSize: 9, fontWeight: 800, letterSpacing: '0.18em',
+          color: accent, textTransform: 'uppercase', marginBottom: 4,
+        }}>{kicker}</div>
+      )}
       <div style={{ fontSize: 13, fontWeight: 700, color: '#F8FAFC' }}>{title}</div>
       <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 4, lineHeight: 1.5 }}>{body}</div>
+      {cta && onCta && (
+        <button
+          onClick={onCta}
+          style={{
+            marginTop: 8,
+            background: `${accent}1a`,
+            border: `1px solid ${accent}55`,
+            color: accent,
+            fontSize: 11, fontWeight: 800, letterSpacing: '0.08em',
+            padding: '6px 10px', borderRadius: 6,
+            cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          {cta} →
+        </button>
+      )}
     </div>
   );
 }

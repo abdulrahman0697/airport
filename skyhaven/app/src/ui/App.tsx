@@ -2,7 +2,9 @@ import { useEffect, useRef } from 'react';
 import { createGameLoop } from '../state/gameLoop';
 import { selectTutorialCompleted, useGameStore } from '../state/store';
 import { AchievementToast } from './components/AchievementToast';
+import { AircraftDeliveryRitual } from './components/AircraftDeliveryRitual';
 import { CashTickToast } from './components/CashTickToast';
+import { EmpireJourney } from './components/EmpireJourney';
 import { BottomTabs } from './components/BottomTabs';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { DailyReward } from './components/DailyReward';
@@ -14,6 +16,7 @@ import { FuelGauge } from './components/FuelGauge';
 import { GoalChainCard } from './components/GoalChainCard';
 import { HeroMoments } from './components/HeroMoments';
 import { HomeShell } from './components/HomeShell';
+import { MapLiveTicker } from './components/MapLiveTicker';
 import { HubPicker } from './components/HubPicker';
 import { IntroSplash } from './components/IntroSplash';
 import { OfflineSummary } from './components/OfflineSummary';
@@ -70,6 +73,7 @@ export function App() {
       <SideLauncher />
       <NextUnlockBadge />
       <HomeShell />
+      <MapLiveTicker />
       <PanelHost />
       <GoalChainCard />
       <BottomTabs />
@@ -77,6 +81,8 @@ export function App() {
       <VintageDropPopup />
       <HeroMoments />
       <AchievementToast />
+      <AircraftDeliveryRitual />
+      <EmpireJourney />
       <CashTickToast />
       <OfflineSummary />
       <DailyReward />

@@ -97,6 +97,20 @@ export function FirstTakeoffCinematic() {
         {/* Aircraft animated through stages */}
         <Aircraft stage={stage} tailColor={tailColor} />
 
+        {/* Destination plate appears just before the money burst —
+            grounds the player: this wasn't a number out of nowhere,
+            this was a flight that flew somewhere and earned. */}
+        {stage >= 3 && stage < 4 && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.6 }}
+            style={routePlate as Record<string, unknown>}
+          >
+            DXB  →  MCT  ·  348 KM  ·  ATR 42
+          </motion.div>
+        )}
+
         {/* Money burst at peak */}
         {stage >= 4 && (
           <>
@@ -107,6 +121,14 @@ export function FirstTakeoffCinematic() {
               style={moneyBurst as Record<string, unknown>}
             >
               +$5 000
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4, duration: 0.4 }}
+              style={moneyCaption as Record<string, unknown>}
+            >
+              First Flight Revenue · DXB → MCT
             </motion.div>
             <ConfettiBurst seed={42} count={60} palette={[tailColor, COLOR.gold.base, COLOR.gold.light, '#FFFFFF']} />
           </>
@@ -143,7 +165,7 @@ export function FirstTakeoffCinematic() {
                 The world map is waiting — pick your first hub, open more routes, and watch the empire grow.
               </p>
               <Button variant="gold" size="lg" fullWidth onClick={skip} hapticOnPress="heavy">
-                Enter the Map  →
+                Open Your Network  →
               </Button>
             </motion.div>
           )}
@@ -430,6 +452,37 @@ const statusDot: React.CSSProperties = {
   background: COLOR.accent.cyan,
   boxShadow: `0 0 10px ${COLOR.accent.cyan}`,
   animation: 'breathe 1.4s ease-in-out infinite',
+};
+
+const routePlate: React.CSSProperties = {
+  position: 'absolute',
+  top: '36%',
+  left: '50%',
+  transform: 'translateX(-50%)',
+  fontSize: 14,
+  fontWeight: 800,
+  letterSpacing: '0.28em',
+  color: COLOR.accent.cyan,
+  background: 'rgba(11,17,32,0.78)',
+  border: `1px solid ${COLOR.accent.cyan}55`,
+  padding: '6px 14px',
+  borderRadius: 999,
+  fontFeatureSettings: '"tnum" 1',
+  zIndex: 10,
+};
+
+const moneyCaption: React.CSSProperties = {
+  position: 'absolute',
+  top: '34%',
+  right: '8%',
+  fontSize: 11,
+  fontWeight: 800,
+  letterSpacing: '0.20em',
+  color: COLOR.gold.base,
+  textTransform: 'uppercase',
+  zIndex: 10,
+  maxWidth: 220,
+  textAlign: 'right',
 };
 
 const moneyBurst: React.CSSProperties = {

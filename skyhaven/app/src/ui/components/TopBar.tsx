@@ -14,6 +14,7 @@ import {
   selectTier,
   useGameStore,
 } from '../../state/store';
+import { useUiStore } from '../../state/uiStore';
 import { TierRing } from '../design/TierRing';
 import { formatRate } from '../format';
 import { EcoBadge } from './EcoBadge';
@@ -31,6 +32,7 @@ export function TopBar() {
   const routes = useGameStore(selectRoutes);
   const state = useGameStore((s) => s.state);
   const open = usePanelStore((s) => s.open);
+  const openJourney = useUiStore((s) => s.setEmpireJourneyOpen);
 
   const [perSec, setPerSec] = useState(0);
   useEffect(() => {
@@ -90,7 +92,11 @@ export function TopBar() {
 
   return (
     <header style={shell} aria-label="airline header">
-      <button onClick={(): void => open('office')} style={brandBtn} aria-label="Open office dashboard">
+      <button
+        onClick={(): void => openJourney(true)}
+        style={brandBtn}
+        aria-label="Open Empire Journey"
+      >
         <TierRing pct={pct} tier={tier} color={tailColor} size={42} />
         <div style={brandCol}>
           <div style={brandText}>{airlineName.toUpperCase()}</div>

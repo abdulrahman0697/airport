@@ -14,6 +14,7 @@ import {
   frameTier,
   FRAME_COLORS,
   type AchievementCategory,
+  type AchievementDef,
 } from '../../data/achievements';
 import { selectAchievements, useGameStore } from '../../state/store';
 import { Chip } from '../design/Chip';
@@ -26,15 +27,35 @@ const CATEGORY_ORDER: readonly AchievementCategory[] = [
   'milestone', 'network', 'fleet', 'economy', 'operations', 'mastery',
 ];
 
+type TabId = AchievementCategory | 'pilotlog';
+
 export function AchievementsPanel() {
   const unlocked = useGameStore(selectAchievements);
   const unlockedSet = useMemo(() => new Set(unlocked), [unlocked]);
   const grouped = useMemo(() => achievementsByCategory(), []);
-  const [tab, setTab] = useState<AchievementCategory>('milestone');
+  // Design Review v3 — point 19. Default to the Pilot Log so the
+  // player sees their collected badges first, with a "next stripe to
+  // earn" cue at the bottom — a chronicle, not a checklist.
+  const [tab, setTab] = useState<TabId>('pilotlog');
 
   const tier = frameTier(unlocked.length);
   const frame = FRAME_COLORS[tier];
-  const list = grouped[tab];
+
+  // Build the "log" view: unlocked-only, newest first by display order.
+  const allDefs = useMemo<readonly AchievementDef[]>(() => {
+    const out: AchievementDef[] = [];
+    for (const c of CATEGORY_ORDER) for (const d of grouped[c]) out.push(d);
+    return out;
+  }, [grouped]);
+  const pilotLogList = useMemo<readonly AchievementDef[]>(
+    () => allDefs.filter((d) => unlockedSet.has(d.id)),
+    [allDefs, unlockedSet],
+  );
+  const nextTargets = useMemo<readonly AchievementDef[]>(
+    () => allDefs.filter((d) => !unlockedSet.has(d.id)).slice(0, 3),
+    [allDefs, unlockedSet],
+  );
+  const list: readonly AchievementDef[] = tab === 'pilotlog' ? pilotLogList : grouped[tab];
 
   return (
     <div style={shell}>
@@ -47,6 +68,13 @@ export function AchievementsPanel() {
         }
         tabs={
           <div role="tablist" style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            <button
+              role="tab"
+              onClick={(): void => setTab('pilotlog')}
+              style={{ ...tabBtn, ...(tab === 'pilotlog' ? tabActive : {}) }}
+            >
+              ✦ Pilot Log {unlocked.length}
+            </button>
             {CATEGORY_ORDER.map((c) => {
               const total = grouped[c].length;
               const here = grouped[c].reduce((n, a) => n + (unlockedSet.has(a.id) ? 1 : 0), 0);
@@ -65,6 +93,17 @@ export function AchievementsPanel() {
         }
       />
       <div style={body}>
+        {tab === 'pilotlog' && list.length === 0 && (
+          <div style={emptyLog}>
+            <div style={{ fontSize: 28 }}>✦</div>
+            <div style={{ marginTop: 6, fontWeight: 800, color: COLOR.ink.primary }}>
+              Your Pilot Log is empty
+            </div>
+            <div style={{ marginTop: 4, fontSize: 12, color: COLOR.ink.muted, maxWidth: 280, lineHeight: 1.5 }}>
+              Open your first route, buy a second aircraft, and earn your first badges. The chronicle starts the moment your airline does.
+            </div>
+          </div>
+        )}
         <ul style={listStyle}>
           {list.map((def) => {
             const isUnlocked = unlockedSet.has(def.id);
@@ -92,6 +131,27 @@ export function AchievementsPanel() {
             );
           })}
         </ul>
+        {tab === 'pilotlog' && nextTargets.length > 0 && (
+          <section style={nextStripes}>
+            <div style={nextStripesHead}>NEXT STRIPES TO EARN</div>
+            <ul style={listStyle}>
+              {nextTargets.map((def) => (
+                <HeroCard
+                  key={`next-${def.id}`}
+                  accent={COLOR.gold.base}
+                  title={
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 14, color: COLOR.gold.base }}>◇</span>
+                      {def.name}
+                    </span>
+                  }
+                  subtitle={def.description}
+                  right={<Chip tone="gold" size="sm">+${formatCash(def.reward)}</Chip>}
+                />
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     </div>
   );
@@ -111,6 +171,21 @@ const tabBtn: React.CSSProperties = {
   padding: '6px 10px', borderRadius: RADIUS.xs, cursor: 'pointer',
   fontSize: 11, fontFamily: 'inherit',
   letterSpacing: '0.04em',
+};
+const emptyLog: React.CSSProperties = {
+  textAlign: 'center',
+  padding: '24px 16px 16px',
+  color: COLOR.ink.muted,
+};
+const nextStripes: React.CSSProperties = {
+  marginTop: SPACE.l,
+  borderTop: `1px solid ${COLOR.border.soft}`,
+  paddingTop: SPACE.m,
+};
+const nextStripesHead: React.CSSProperties = {
+  fontSize: 9, letterSpacing: '0.22em',
+  color: COLOR.gold.base, fontWeight: 800,
+  marginBottom: SPACE.s,
 };
 const tabActive: React.CSSProperties = {
   background: 'rgba(90,200,250,0.18)', color: COLOR.accent.cyan,

@@ -14,9 +14,11 @@ import { subscribeFriendships, type Friendship } from '../../backend/friends';
 import { useAuth } from '../../backend/useAuth';
 import { getAircraftDef } from '../../data/aircraft';
 import { BOARDS, getBoard, type BoardId } from '../../data/leaderboards';
+import { buildRivalBoard, nextTarget } from '../../data/rivals';
 import { cashPerSecond } from '../../engine/economy';
 import { EmptyState } from '../design/EmptyState';
 import { Skeleton } from '../design/Skeleton';
+import { COLOR, RADIUS, SPACE } from '../design/tokens';
 import {
   selectActiveEvents,
   selectAirlineName,
@@ -94,6 +96,16 @@ export function LeaderboardsPanel() {
 
   if (!board) return null;
 
+  // Design Review v3 — point 20. When the real global board is empty
+  // (cold start, low player density), surface a Rival Airlines simulation
+  // so the player always has a target instead of staring at "—".
+  const showRivalSim = scope === 'global' && !loading && rows.length === 0;
+  const rivalBoard = useMemo(
+    () => showRivalSim ? buildRivalBoard(myScore, tab) : [],
+    [showRivalSim, myScore, tab],
+  );
+  const rivalTarget = useMemo(() => nextTarget(myScore, rivalBoard), [myScore, rivalBoard]);
+
   return (
     <div style={shell}>
       <div style={header}>
@@ -147,12 +159,57 @@ export function LeaderboardsPanel() {
             ))}
           </div>
         )}
-        {!loading && error && (
+        {!loading && error && scope === 'friends' && (
           <EmptyState
             icon="🏆"
-            title={scope === 'friends' ? 'Friends-only board' : 'No entries yet'}
+            title="Friends-only board"
             body={error}
           />
+        )}
+
+        {/* Rival Airlines simulation board — shown only when the real
+            global board is empty. Disappears the moment real entries
+            arrive. */}
+        {showRivalSim && (
+          <>
+            {rivalTarget && (
+              <div style={rivalTargetCard}>
+                <div style={rivalTargetKicker}>NEXT TO BEAT</div>
+                <div style={rivalTargetRow}>
+                  <div style={{ ...rivalChip, background: `${rivalTarget.rival.tail}1c`, borderColor: `${rivalTarget.rival.tail}55` }}>
+                    <span style={{ color: rivalTarget.rival.tail, fontWeight: 800 }}>{rivalTarget.rival.code}</span>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={rivalTargetName}>{rivalTarget.rival.name}</div>
+                    <div style={rivalTargetMotto}>{rivalTarget.rival.motto}</div>
+                  </div>
+                  <div style={rivalTargetGap}>
+                    <span style={rivalTargetGapLabel}>NEED</span>
+                    <span style={rivalTargetGapValue}>+{board.format(rivalTarget.need)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div style={rivalsNotice}>
+              No public entries on this board yet. Until other founders
+              join, you're competing against simulated rivals.
+            </div>
+            <ol style={list}>
+              {rivalBoard.map((entry, idx) => (
+                <li key={entry.rival.id} style={{ ...row, borderColor: `${entry.rival.tail}33` }}>
+                  <span style={rank}>{idx + 1}</span>
+                  <span style={who}>
+                    <span style={{ ...rivalChipSm, background: `${entry.rival.tail}1c`, borderColor: `${entry.rival.tail}55`, color: entry.rival.tail }}>
+                      {entry.rival.code}
+                    </span>
+                    {entry.rival.name}
+                    <span style={simPill}>sim</span>
+                  </span>
+                  <span style={score}>{board.format(entry.score)}</span>
+                </li>
+              ))}
+            </ol>
+          </>
         )}
         {!loading && !error && (
           <ol style={list}>
@@ -304,4 +361,72 @@ const youPill: React.CSSProperties = {
 const score: React.CSSProperties = {
   fontSize: 13, fontWeight: 700, color: '#F4C75B',
   fontFeatureSettings: '"tnum" 1',
+};
+
+// Rival simulation styles
+const rivalTargetCard: React.CSSProperties = {
+  background: 'linear-gradient(135deg, rgba(244,199,91,0.10), rgba(11,17,32,0.6))',
+  border: `1px solid ${COLOR.gold.base}55`,
+  borderRadius: RADIUS.m,
+  padding: '12px 14px',
+};
+const rivalTargetKicker: React.CSSProperties = {
+  fontSize: 10, letterSpacing: '0.22em', fontWeight: 800,
+  color: COLOR.gold.base,
+};
+const rivalTargetRow: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: SPACE.m,
+  marginTop: SPACE.s,
+};
+const rivalChip: React.CSSProperties = {
+  width: 38, height: 38,
+  borderRadius: 999,
+  border: '1px solid',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  fontSize: 13,
+  letterSpacing: '0.04em',
+  flexShrink: 0,
+};
+const rivalChipSm: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  width: 28, height: 22,
+  borderRadius: 5,
+  border: '1px solid',
+  fontSize: 10, fontWeight: 800, letterSpacing: '0.04em',
+  marginRight: 8,
+};
+const rivalTargetName: React.CSSProperties = {
+  fontSize: 14, fontWeight: 800, color: COLOR.ink.primary,
+};
+const rivalTargetMotto: React.CSSProperties = {
+  fontSize: 11, color: COLOR.ink.muted, marginTop: 2, fontStyle: 'italic',
+};
+const rivalTargetGap: React.CSSProperties = {
+  textAlign: 'right', flexShrink: 0,
+};
+const rivalTargetGapLabel: React.CSSProperties = {
+  display: 'block', fontSize: 9, letterSpacing: '0.18em',
+  color: COLOR.ink.faint, fontWeight: 800,
+};
+const rivalTargetGapValue: React.CSSProperties = {
+  display: 'block', fontSize: 14, fontWeight: 800,
+  color: COLOR.gold.base, fontFeatureSettings: '"tnum" 1',
+};
+const rivalsNotice: React.CSSProperties = {
+  fontSize: 11,
+  color: COLOR.ink.muted,
+  background: 'rgba(11,17,32,0.5)',
+  border: `1px solid ${COLOR.border.soft}`,
+  borderRadius: RADIUS.s,
+  padding: '8px 10px',
+  lineHeight: 1.5,
+};
+const simPill: React.CSSProperties = {
+  fontSize: 8, letterSpacing: '0.16em', textTransform: 'uppercase',
+  color: COLOR.ink.faint,
+  background: 'rgba(148,163,184,0.10)',
+  padding: '2px 6px', borderRadius: 4, fontWeight: 700,
+  marginLeft: 6,
 };

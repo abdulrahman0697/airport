@@ -19,6 +19,7 @@
 import { useState } from 'react';
 import type { AircraftDef } from '../../engine/types';
 import { selectCash, selectTailColor, useGameStore } from '../../state/store';
+import { useUiStore } from '../../state/uiStore';
 import { Button } from '../design/Button';
 import { Chip } from '../design/Chip';
 import { AircraftIllustration } from '../design/SvgAircraft';
@@ -44,6 +45,7 @@ export function HangarShowroomCard({
   const cash = useGameStore(selectCash);
   const tailColor = useGameStore(selectTailColor);
   const buy = useGameStore((s) => s.buyAircraft);
+  const setPendingDelivery = useUiStore((s) => s.setPendingDelivery);
   const [error, setError] = useState<string | null>(null);
   const [justBought, setJustBought] = useState(false);
 
@@ -60,6 +62,11 @@ export function HangarShowroomCard({
       setError(null);
       setJustBought(true);
       onDelivered?.(def);
+      // Trigger the three-stage Aircraft Delivery Ritual modal
+      // (Design Review v3 — point 12). The newly created aircraft's
+      // uid is computed by the store action; we look up the most-recent
+      // entry. The component reads it post-mount.
+      setPendingDelivery({ defId: def.id, uid: null });
       window.setTimeout(() => setJustBought(false), 1800);
     } else {
       haptics.warning();

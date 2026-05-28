@@ -31,6 +31,20 @@ interface UiStore {
   /** Quick "operation stat drill-down" — null when nothing focused. */
   opsDrillDown: 'flights' | 'boarding' | 'baggage' | 'passengers' | null;
   setOpsDrillDown: (v: UiStore['opsDrillDown']) => void;
+  /**
+   * Aircraft delivery ritual (Design Review v3 — point 12). When an
+   * aircraft is bought, set this to the def id; the
+   * AircraftDeliveryRitual component listens and plays the three-beat
+   * Contract → Hangar → Assign / Park ceremony.
+   */
+  pendingDelivery: { defId: string; uid: string | null } | null;
+  setPendingDelivery: (v: UiStore['pendingDelivery']) => void;
+  /**
+   * Empire Journey screen visibility (Design Review v3 — point 24).
+   * Surfaced from the TierRing tap and the Office panel.
+   */
+  empireJourneyOpen: boolean;
+  setEmpireJourneyOpen: (v: boolean) => void;
 }
 
 export const useUiStore = create<UiStore>((set) => ({
@@ -46,4 +60,8 @@ export const useUiStore = create<UiStore>((set) => ({
   setAirportZoneFocus: (zone): void => set({ airportZoneFocus: zone }),
   opsDrillDown: null,
   setOpsDrillDown: (v): void => set({ opsDrillDown: v }),
+  pendingDelivery: null,
+  setPendingDelivery: (v): void => set({ pendingDelivery: v }),
+  empireJourneyOpen: false,
+  setEmpireJourneyOpen: (v): void => set({ empireJourneyOpen: v }),
 }));
