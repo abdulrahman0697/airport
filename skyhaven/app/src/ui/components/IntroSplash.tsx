@@ -1,30 +1,44 @@
-import { motion, AnimatePresence } from 'framer-motion';
+/**
+ * IntroSplash (Design pass DC — full rewrite).
+ *
+ * The new start page. Goes for "command-deck title screen of a
+ * flagship game", not "loading screen of an app." Layered scene:
+ *
+ *  1. Hex-grid navy background with a soft radial light at top-right
+ *     evoking sunrise over the horizon.
+ *  2. Orbital arc rings behind the wordmark (slow rotation, breathing
+ *     opacity).
+ *  3. Skyline silhouette at the bottom with deterministic random
+ *     blinking windows — gives the page a "city below" feel.
+ *  4. Hero aircraft (uses the SvgAircraft variant for tier-4) drifts
+ *     across the horizon on a long contrail.
+ *  5. Wordmark: large display kinetic-letterspaced "SKYHAVEN" with
+ *     animated underline, plus "TYCOON" sub-mark in gold.
+ *  6. Status pill "READY FOR DEPARTURE" with a breathing cyan dot.
+ *  7. Tagline carousel below the wordmark — fades through 3 lines.
+ *  8. Oversized "BEGIN BOARDING" CTA — gold gradient + breathing glow.
+ *  9. Phase / version chip in bottom-left.
+ *
+ * Dismissal still flips `introDismissed` in uiStore so the Tutorial
+ * waits for the splash to clear.
+ */
+import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import { selectTailColor, useGameStore } from '../../state/store';
 import { useUiStore } from '../../state/uiStore';
+import { AircraftIllustration } from '../design/SvgAircraft';
+import { Button } from '../design/Button';
+import { COLOR, MOTION, RADIUS, SPACE, TYPE } from '../design/tokens';
 import { haptics } from '../juice/haptics';
+import { sfx } from '../juice/sfx';
 
-/**
- * Introduction splash (BRD §2.6 / §5.1 — branded motion beat).
- *
- * Premium-feeling pre-game screen with layered motion:
- *  - deep multi-stop gradient background with drifting aurora
- *  - parallax star/light particles (twinkling on different cycles)
- *  - large title with a continuous gold→cyan→violet shimmer sweep
- *  - foreground scene: 4 aircraft cruising on staggered trails,
- *    runway with strobing approach lights, terminal silhouettes
- *    with blinking gates, moon with halo
- *  - tagline carousel cycling 3 lines
- *  - bottom-corner "v0.1.0 · Phase 10" build tag
- *
- * Dismissal flips `introDismissed` in the UI store; Tutorial waits
- * for it.
- */
 const TAGLINES = [
   'Build the airline that owns the sky.',
-  'Routes earn around the clock.',
-  'Choose your hub. Plot the world. Lift off.',
+  'Hubs, regions, vintage classics — all yours to chart.',
+  'Tap. Earn. Expand. Repeat — forever.',
 ];
+
+const WORDMARK = 'SKYHAVEN';
 
 export function IntroSplash() {
   const introDismissed = useUiStore((s) => s.introDismissed);
@@ -38,421 +52,455 @@ export function IntroSplash() {
   }, [introDismissed]);
 
   useEffect(() => {
-    const id = setInterval(() => setTaglineIdx((n) => (n + 1) % TAGLINES.length), 3200);
-    return () => clearInterval(id);
-  }, []);
+    if (exiting) return;
+    const id = window.setInterval(() => {
+      setTaglineIdx((i) => (i + 1) % TAGLINES.length);
+    }, 4200);
+    return () => window.clearInterval(id);
+  }, [exiting]);
 
-  // Deterministic particle layer — different sizes, twinkle cycles.
-  const particles = useMemo(() => {
-    const out: { cx: number; cy: number; r: number; delay: number; dur: number; }[] = [];
-    let s = 1234;
-    const rand = (): number => { s = (s * 1664525 + 1013904223) >>> 0; return s / 0xFFFFFFFF; };
-    for (let i = 0; i < 80; i++) {
-      out.push({
-        cx: rand() * 100,
-        cy: rand() * 60,
-        r: 0.4 + rand() * 1.4,
-        delay: rand() * 3,
-        dur: 2 + rand() * 3,
-      });
-    }
-    return out;
-  }, []);
-
-  const start = (): void => {
-    haptics.medium();
-    setExiting(true);
-    setTimeout(() => dismissIntro(), 280);
+  const onBegin = (): void => {
+    haptics.success();
+    sfx.confirm();
+    dismissIntro();
   };
+
+  // Skyline buildings — deterministic per-mount so they twinkle the same
+  // across the carousel cycles. Done in JS so SSR-safe.
+  const skyline = useMemo(() => buildSkyline(28), []);
 
   return (
     <AnimatePresence>
-      {!exiting && (
+      {!introDismissed && (
         <motion.div
-          key="intro-splash"
           initial={{ opacity: 1 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0, scale: 1.04 }}
-          transition={{ duration: 0.4 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: MOTION.duration.medium / 1000 }}
           style={shell as Record<string, unknown>}
         >
-          {/* Animated sky backdrop — a slowly drifting aurora. */}
-          <div style={skyAurora as React.CSSProperties} aria-hidden />
+          {/* Background layers */}
+          <div style={hexGrid} aria-hidden />
+          <div style={sunriseGlow(tailColor)} aria-hidden />
 
-          {/* Twinkling particle field (CSS-driven). */}
-          <svg
-            viewBox="0 0 100 60"
-            preserveAspectRatio="none"
-            style={particleLayer as React.CSSProperties}
-            aria-hidden
-          >
-            {particles.map((p, i) => (
-              <circle
-                key={i}
-                cx={p.cx}
-                cy={p.cy}
-                r={p.r / 4}
-                fill="#C4ECFF"
-              >
-                <animate
-                  attributeName="opacity"
-                  values="0.15;0.95;0.15"
-                  dur={`${p.dur}s`}
-                  begin={`-${p.delay}s`}
-                  repeatCount="indefinite"
-                />
-              </circle>
-            ))}
-          </svg>
-
-          {/* Glow flares behind the wordmark. */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 1.0 }}
-            style={glow(tailColor) as Record<string, unknown>}
-            aria-hidden
-          />
-
-          {/* Premium decorative top-bar with the studio mark. */}
-          <div style={studioBar as React.CSSProperties}>
-            <span style={studioMark as React.CSSProperties} />
-            <span style={studioName as React.CSSProperties}>SKYHAVEN STUDIOS</span>
+          {/* Orbital arc rings behind the wordmark */}
+          <div style={orbitWrap} aria-hidden>
+            <OrbitRing color={tailColor} radius={140} dur={42} reverse={false} />
+            <OrbitRing color={tailColor} radius={210} dur={64} reverse />
+            <OrbitRing color={COLOR.gold.base} radius={280} dur={88} reverse={false} />
           </div>
 
-          {/* Build tag bottom-right. */}
-          <div style={buildTag as React.CSSProperties}>v0.1.0 · Phase 10</div>
+          {/* Hero aircraft + contrail crossing the lower-mid horizon */}
+          <motion.div
+            style={heroAircraftWrap as Record<string, unknown>}
+            initial={{ x: '-40%' }}
+            animate={{ x: '40%' }}
+            transition={{ duration: 14, ease: 'linear', repeat: Infinity }}
+          >
+            <ContrailTrack tailColor={tailColor} />
+            <AircraftIllustration
+              defId="t4.a321xlr"
+              tailColor={tailColor}
+              width={140}
+              style={{ filter: `drop-shadow(0 4px 18px ${tailColor}88)` }}
+            />
+          </motion.div>
 
-          <div style={inner}>
+          {/* Foreground content */}
+          <div style={content}>
             <motion.div
               initial={{ y: 12, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.05, duration: 0.4 }}
-              style={kicker as Record<string, unknown>}
+              transition={{ delay: 0.12, duration: 0.5, ease: 'easeOut' }}
+              style={statusPill(tailColor) as Record<string, unknown>}
+
             >
-              ✦ A SkyHaven Studios Original ✦
+              <span style={{
+                ...breathingDot,
+                background: tailColor,
+                boxShadow: `0 0 10px ${tailColor}`,
+              }} />
+              READY FOR DEPARTURE
             </motion.div>
 
-            <motion.h1
-              initial={{ scale: 0.94, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.18, type: 'spring', stiffness: 280, damping: 22 }}
-              className="title-shimmer"
-              style={{ ...title, textShadow: `0 0 50px ${tailColor}88, 0 4px 16px rgba(0,0,0,0.6)` } as Record<string, unknown>}
-            >
-              SKYHAVEN
-              <br />
-              <span style={{ ...titleSub, color: tailColor }}>TYCOON</span>
-            </motion.h1>
+            <Wordmark text={WORDMARK} tailColor={tailColor} />
 
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5, duration: 0.5 }}
-              style={tagline as Record<string, unknown>}
-            >
-              · WINGS OF THE WORLD ·
-            </motion.div>
-
-            {/* Decorative scene with multiple animated aircraft + runway. */}
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.65, duration: 0.6 }}
-              style={sceneWrap as Record<string, unknown>}
+              transition={{ delay: 0.65, duration: 0.4 }}
+              style={subMark as Record<string, unknown>}
             >
-              <svg viewBox="0 0 320 220" width="100%" height="220" aria-hidden>
-                <defs>
-                  <linearGradient id="trail1" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor={tailColor} stopOpacity="0" />
-                    <stop offset="100%" stopColor={tailColor} stopOpacity="1" />
-                  </linearGradient>
-                  <linearGradient id="trail2" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#F4C75B" stopOpacity="0" />
-                    <stop offset="100%" stopColor="#F4C75B" stopOpacity="0.95" />
-                  </linearGradient>
-                  <linearGradient id="trail3" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0" />
-                    <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0.95" />
-                  </linearGradient>
-                  <radialGradient id="moon" cx="0.3" cy="0.3" r="0.8">
-                    <stop offset="0%" stopColor="#FCE9A5" />
-                    <stop offset="100%" stopColor="#F4C75B" stopOpacity="0.7" />
-                  </radialGradient>
-                  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#1A2C5E" />
-                    <stop offset="55%" stopColor="#2F5193" />
-                    <stop offset="100%" stopColor="#0B1120" />
-                  </linearGradient>
-                  <linearGradient id="runway" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#1B254A" />
-                    <stop offset="50%" stopColor="#2A3A7A" />
-                    <stop offset="100%" stopColor="#1B254A" />
-                  </linearGradient>
-                </defs>
-
-                {/* Sky band */}
-                <rect x="0" y="0" width="320" height="160" fill="url(#sky)" />
-
-                {/* Stars */}
-                {[...Array(60)].map((_, i) => {
-                  const cx = (i * 17 + 11) % 320;
-                  const cy = (i * 23 + 4) % 130;
-                  const r = (i % 4) * 0.4 + 0.4;
-                  return <circle key={i} cx={cx} cy={cy} r={r} fill="#C4ECFF" opacity={0.6 - (i % 5) * 0.08} />;
-                })}
-
-                {/* Moon */}
-                <circle cx="262" cy="44" r="22" fill="url(#moon)" />
-                <circle cx="262" cy="44" r="32" fill="#FCE9A5" opacity="0.08" />
-
-                {/* Aircraft 1 — cyan, high altitude, moves left → right */}
-                <motion.g
-                  animate={{ x: [-90, 380] }}
-                  transition={{ duration: 9, ease: 'linear', repeat: Infinity }}
-                  style={{ y: 38 } as Record<string, unknown>}
-                >
-                  <line x1="-90" y1="0" x2="0" y2="0" stroke="url(#trail1)" strokeWidth="2" strokeLinecap="round" />
-                  <polygon points="-4,-3 28,-3 38,0 28,3 -4,3" fill={tailColor} />
-                  <polygon points="6,-3 16,-13 19,-13 13,-3" fill={tailColor} />
-                  <polygon points="6,3 16,13 19,13 13,3" fill={tailColor} />
-                </motion.g>
-
-                {/* Aircraft 2 — gold, mid altitude, moves right → left */}
-                <motion.g
-                  animate={{ x: [380, -90] }}
-                  transition={{ duration: 11, ease: 'linear', repeat: Infinity, delay: 1.5 }}
-                  style={{ y: 84 } as Record<string, unknown>}
-                >
-                  <line x1="0" y1="0" x2="90" y2="0" stroke="url(#trail2)" strokeWidth="2" strokeLinecap="round" />
-                  <polygon points="4,-3 -28,-3 -38,0 -28,3 4,3" fill="#F4C75B" />
-                  <polygon points="-6,-3 -16,-13 -19,-13 -13,-3" fill="#F4C75B" />
-                  <polygon points="-6,3 -16,13 -19,13 -13,3" fill="#F4C75B" />
-                </motion.g>
-
-                {/* Aircraft 3 — violet, low altitude, slower */}
-                <motion.g
-                  animate={{ x: [-60, 380] }}
-                  transition={{ duration: 14, ease: 'linear', repeat: Infinity, delay: 3 }}
-                  style={{ y: 122 } as Record<string, unknown>}
-                >
-                  <line x1="-60" y1="0" x2="0" y2="0" stroke="url(#trail3)" strokeWidth="2" strokeLinecap="round" />
-                  <polygon points="-3,-2 20,-2 26,0 20,2 -3,2" fill="#8B5CF6" />
-                </motion.g>
-
-                {/* Horizon line */}
-                <line x1="0" y1="160" x2="320" y2="160" stroke={tailColor} strokeOpacity="0.45" strokeWidth="0.8" />
-
-                {/* Ground / runway band */}
-                <rect x="0" y="160" width="320" height="60" fill="#0B1120" />
-
-                {/* Runway */}
-                <rect x="40" y="172" width="240" height="14" rx="2" fill="url(#runway)" />
-                {[...Array(7)].map((_, i) => (
-                  <rect key={i} x={56 + i * 36} y="178" width="20" height="2" fill="#5AC8FA" opacity="0.85" />
-                ))}
-
-                {/* Terminal buildings */}
-                <polygon points="22,196 38,180 88,180 120,196" fill="#1A2244" />
-                <polygon points="200,196 232,178 282,178 304,196" fill="#1A2244" />
-                <rect x="148" y="166" width="8" height="30" fill="#1A2244" />
-                {/* Terminal lights */}
-                <motion.circle
-                  cx="152" cy="165" r="2.5" fill={tailColor}
-                  animate={{ opacity: [0.5, 1, 0.5] }}
-                  transition={{ duration: 1.8, repeat: Infinity }}
-                />
-                <rect x="50" y="188" width="2" height="2" fill={tailColor} opacity="0.7" />
-                <rect x="64" y="186" width="2" height="2" fill="#F4C75B" opacity="0.85" />
-                <rect x="76" y="188" width="2" height="2" fill={tailColor} opacity="0.7" />
-                <rect x="92" y="186" width="2" height="2" fill="#F4C75B" opacity="0.85" />
-                <rect x="218" y="186" width="2" height="2" fill={tailColor} opacity="0.7" />
-                <rect x="240" y="184" width="2" height="2" fill="#F4C75B" opacity="0.85" />
-                <rect x="258" y="186" width="2" height="2" fill={tailColor} opacity="0.7" />
-                <rect x="274" y="184" width="2" height="2" fill="#F4C75B" opacity="0.85" />
-
-                {/* Runway approach lights pulse */}
-                <motion.circle
-                  cx="36" cy="179" r="2.4" fill="#F4C75B"
-                  animate={{ opacity: [0.3, 1, 0.3], r: [2, 3, 2] }}
-                  transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-                />
-                <motion.circle
-                  cx="284" cy="179" r="2.4" fill="#F4C75B"
-                  animate={{ opacity: [0.3, 1, 0.3], r: [2, 3, 2] }}
-                  transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut', delay: 0.7 }}
-                />
-              </svg>
+              <span style={subMarkText}>TYCOON</span>
+              <span style={{ ...subMarkUnderline, background: COLOR.gold.base }} />
             </motion.div>
 
-            <motion.button
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.95, duration: 0.4 }}
-              onClick={start}
-              style={{ ...btn, background: tailColor, boxShadow: `0 12px 30px ${tailColor}45, 0 0 0 1px rgba(255,255,255,0.1) inset` } as Record<string, unknown>}
-            >
-              Start
-            </motion.button>
-
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.75 }}
-              transition={{ delay: 1.3, duration: 0.6 }}
-              style={footer as Record<string, unknown>}
-            >
+            <div style={taglineWrap}>
               <AnimatePresence mode="wait">
-                <motion.span
+                <motion.div
                   key={taglineIdx}
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.4 }}
+                  transition={{ duration: 0.45 }}
+                  style={tagline as Record<string, unknown>}
                 >
                   {TAGLINES[taglineIdx]}
-                </motion.span>
+                </motion.div>
               </AnimatePresence>
+            </div>
+
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.95, type: 'spring', stiffness: 360, damping: 22 }}
+              style={ctaWrap as Record<string, unknown>}
+            >
+              <div style={ctaGlow(tailColor)} aria-hidden />
+              <Button
+                variant="gold"
+                size="lg"
+                onClick={onBegin}
+                hapticOnPress="heavy"
+                style={ctaButton}
+              >
+                ▶  BEGIN BOARDING
+              </Button>
+              <div style={ctaHint}>Tap to launch your airline</div>
             </motion.div>
           </div>
+
+          {/* Skyline silhouette at the bottom */}
+          <div style={skylineWrap} aria-hidden>
+            <svg width="100%" height="120" viewBox="0 0 1000 120" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="splash-skyline-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor="#1A2244" />
+                  <stop offset="1" stopColor="#070A18" />
+                </linearGradient>
+              </defs>
+              <path d={skyline.path} fill="url(#splash-skyline-fill)" />
+              {skyline.windows.map((w, i) => (
+                <rect
+                  key={i}
+                  x={w.x}
+                  y={w.y}
+                  width={w.w}
+                  height={w.h}
+                  fill={w.lit ? tailColor : COLOR.gold.base}
+                  opacity={w.lit ? 0.85 : 0.55}
+                >
+                  <animate
+                    attributeName="opacity"
+                    values={`${w.opaA};${w.opaB};${w.opaA}`}
+                    dur={`${w.dur}s`}
+                    repeatCount="indefinite"
+                  />
+                </rect>
+              ))}
+            </svg>
+          </div>
+
+          <div style={versionChip}>v0.1.0 · Pre-launch build</div>
         </motion.div>
       )}
     </AnimatePresence>
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────
+/* ─── Sub-components ──────────────────────────────────────────────── */
+
+function Wordmark({ text, tailColor }: { text: string; tailColor: string }) {
+  return (
+    <div style={wordmarkRow}>
+      {text.split('').map((ch, i) => (
+        <motion.span
+          key={i}
+          initial={{ y: 32, opacity: 0, filter: 'blur(8px)' }}
+          animate={{ y: 0, opacity: 1, filter: 'blur(0px)' }}
+          transition={{ delay: 0.20 + i * 0.06, duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+          style={{
+            ...wordmarkChar,
+            textShadow: `0 0 24px ${tailColor}66, 0 0 60px ${tailColor}33`,
+          } as Record<string, unknown>}
+        >
+          {ch}
+        </motion.span>
+      ))}
+    </div>
+  );
+}
+
+function OrbitRing({
+  color, radius, dur, reverse,
+}: {
+  color: string;
+  radius: number;
+  dur: number;
+  reverse: boolean;
+}) {
+  return (
+    <motion.div
+      style={{
+        position: 'absolute',
+        width: radius * 2,
+        height: radius * 2,
+        marginLeft: -radius,
+        marginTop: -radius,
+        left: '50%',
+        top: '50%',
+        borderRadius: '50%',
+        border: `1px solid ${color}40`,
+        borderTopColor: `${color}AA`,
+        borderRightColor: `${color}33`,
+      }}
+      animate={{ rotate: reverse ? -360 : 360 }}
+      transition={{ duration: dur, ease: 'linear', repeat: Infinity }}
+    />
+  );
+}
+
+function ContrailTrack({ tailColor }: { tailColor: string }) {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: '-140%',
+        top: '50%',
+        marginTop: -1,
+        width: '140%',
+        height: 2,
+        background: `linear-gradient(90deg, ${tailColor}00 0%, ${tailColor}55 60%, ${tailColor}AA 100%)`,
+        borderRadius: 2,
+        filter: 'blur(0.5px)',
+      }}
+      aria-hidden
+    />
+  );
+}
+
+/* ─── Skyline generator ──────────────────────────────────────────── */
+
+interface Window {
+  x: number; y: number; w: number; h: number;
+  lit: boolean; opaA: number; opaB: number; dur: number;
+}
+interface Skyline { path: string; windows: Window[] }
+
+function buildSkyline(buildings: number): Skyline {
+  let seed = 0xCAFE;
+  const rand = (): number => {
+    seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
+    return ((seed >>> 0) % 100000) / 100000;
+  };
+  // Build a stepped skyline across viewBox width 1000, descending into 120.
+  const w = 1000;
+  const minY = 30;
+  const maxY = 110;
+  const widthBase = w / buildings;
+  let x = 0;
+  let path = `M 0 120`;
+  const windows: Window[] = [];
+  for (let i = 0; i < buildings; i++) {
+    const bw = widthBase * (0.7 + rand() * 0.7);
+    const top = minY + rand() * (maxY - minY) * 0.85;
+    path += ` L ${x} ${top} L ${x + bw} ${top}`;
+    // Windows on this building
+    const winCols = Math.max(1, Math.round(bw / 14));
+    const winRows = Math.max(1, Math.round((120 - top) / 14));
+    for (let row = 0; row < winRows; row++) {
+      for (let col = 0; col < winCols; col++) {
+        if (rand() < 0.45) continue;
+        const wx = x + 3 + col * 14;
+        const wy = top + 6 + row * 14;
+        if (wy > 116 || wx + 6 > x + bw) continue;
+        const lit = rand() < 0.6;
+        const opaA = 0.25 + rand() * 0.25;
+        const opaB = opaA + 0.35 + rand() * 0.2;
+        const dur = 2 + rand() * 5;
+        windows.push({ x: wx, y: wy, w: 6, h: 6, lit, opaA, opaB, dur });
+      }
+    }
+    x += bw;
+  }
+  path += ` L ${w} 120 Z`;
+  return { path, windows };
+}
+
+/* ─── Styles ──────────────────────────────────────────────────────── */
+
 const shell: React.CSSProperties = {
   position: 'fixed',
   inset: 0,
-  background: 'radial-gradient(ellipse at center top, #2A4087 0%, #182143 45%, #0B1120 100%)',
-  display: 'grid',
-  placeItems: 'center',
-  overflow: 'hidden',
   zIndex: 90,
+  background: `radial-gradient(ellipse at top right, #1B2348 0%, ${COLOR.bg.canvas} 40%, ${COLOR.bg.deep} 80%)`,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  overflow: 'hidden',
+  paddingTop: 'env(safe-area-inset-top, 0)',
+  paddingBottom: 'env(safe-area-inset-bottom, 0)',
 };
-const skyAurora: React.CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  background: `
-    radial-gradient(ellipse at 25% 25%, rgba(90,200,250,0.20), transparent 55%),
-    radial-gradient(ellipse at 75% 60%, rgba(139,92,246,0.18), transparent 50%),
-    radial-gradient(ellipse at 50% 90%, rgba(244,199,91,0.10), transparent 50%)
-  `,
-  animation: 'aurora-drift 14s ease-in-out infinite alternate',
-  pointerEvents: 'none',
+
+const hexGrid: React.CSSProperties = {
+  position: 'absolute', inset: 0,
+  // SVG hex pattern via background-image
+  backgroundImage:
+    "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='46' viewBox='0 0 40 46'><path d='M20 0 L40 11 L40 34 L20 45 L0 34 L0 11 Z' fill='none' stroke='%2394A3B833' stroke-width='1'/></svg>\")",
+  backgroundSize: '40px 46px',
+  opacity: 0.15,
 };
-const glow = (color: string): React.CSSProperties => ({
+
+const sunriseGlow = (tail: string): React.CSSProperties => ({
   position: 'absolute',
-  top: '18%',
-  left: '50%',
-  width: 480,
-  height: 280,
-  transform: 'translate(-50%, -50%)',
-  background: `radial-gradient(ellipse at center, ${color}33, transparent 65%)`,
+  top: '-30%', right: '-20%',
+  width: '85%', height: '85%',
+  background: `radial-gradient(ellipse at center, ${tail}44 0%, ${tail}11 30%, transparent 60%)`,
   filter: 'blur(40px)',
   pointerEvents: 'none',
 });
-const inner: React.CSSProperties = {
+
+const orbitWrap: React.CSSProperties = {
+  position: 'absolute',
+  left: '50%', top: '38%',
+  width: 1, height: 1,
+  pointerEvents: 'none',
+};
+
+const heroAircraftWrap: React.CSSProperties = {
+  position: 'absolute',
+  left: '30%', top: '64%',
+  width: 140,
+  pointerEvents: 'none',
+};
+
+const content: React.CSSProperties = {
   position: 'relative',
-  width: '100%',
-  maxWidth: 440,
-  padding: '0 24px',
-  textAlign: 'center',
+  zIndex: 2,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: SPACE.s,
+  padding: SPACE.l,
 };
-const kicker: React.CSSProperties = {
+
+const statusPill = (tail: string): React.CSSProperties => ({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: SPACE.s,
   fontSize: 10,
+  fontWeight: 800,
   letterSpacing: '0.32em',
-  textTransform: 'uppercase',
-  color: '#C4ECFF',
-  opacity: 0.85,
+  color: tail,
+  background: `${tail}14`,
+  border: `1px solid ${tail}55`,
+  padding: '6px 14px',
+  borderRadius: RADIUS.pill,
+});
+
+const breathingDot: React.CSSProperties = {
+  width: 7, height: 7, borderRadius: RADIUS.pill,
+  animation: 'breathe 1.6s ease-in-out infinite',
 };
-const title: React.CSSProperties = {
-  margin: '14px 0 8px',
+
+const wordmarkRow: React.CSSProperties = {
+  display: 'flex',
+  marginTop: SPACE.m,
+};
+
+const wordmarkChar: React.CSSProperties = {
   fontSize: 64,
   fontWeight: 900,
-  letterSpacing: '0.04em',
-  color: '#F8FAFC',
-  lineHeight: 0.92,
+  letterSpacing: '0.06em',
+  color: COLOR.ink.primary,
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+  display: 'inline-block',
 };
-const titleSub: React.CSSProperties = {
-  fontSize: 36,
-  fontWeight: 800,
-  letterSpacing: '0.36em',
-};
-const particleLayer: React.CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  width: '100%',
-  height: '100%',
-  pointerEvents: 'none',
-};
-const studioBar: React.CSSProperties = {
-  position: 'absolute',
-  top: 18,
-  left: 0,
-  right: 0,
+
+const subMark: React.CSSProperties = {
   display: 'flex',
-  justifyContent: 'center',
+  flexDirection: 'column',
   alignItems: 'center',
-  gap: 8,
-  pointerEvents: 'none',
+  marginTop: -4,
 };
-const studioMark: React.CSSProperties = {
-  width: 10,
-  height: 10,
-  borderRadius: 5,
-  background: 'linear-gradient(135deg, #5AC8FA, #8B5CF6)',
-  boxShadow: '0 0 12px rgba(90,200,250,0.6)',
-};
-const studioName: React.CSSProperties = {
-  fontSize: 9,
-  letterSpacing: '0.42em',
-  color: '#C4ECFF',
-  fontWeight: 700,
-};
-const buildTag: React.CSSProperties = {
-  position: 'absolute',
-  bottom: 14,
-  right: 18,
-  fontSize: 9,
-  letterSpacing: '0.16em',
-  color: '#94A3B8',
-  opacity: 0.65,
-  pointerEvents: 'none',
-};
-const tagline: React.CSSProperties = {
-  fontSize: 12,
-  letterSpacing: '0.26em',
-  textTransform: 'uppercase',
-  color: '#C4ECFF',
-  marginBottom: 18,
-  opacity: 0.8,
-};
-const sceneWrap: React.CSSProperties = {
-  margin: '8px 0 22px',
-  borderRadius: 16,
-  overflow: 'hidden',
-  border: '1px solid rgba(196,236,255,0.15)',
-  boxShadow: '0 20px 60px rgba(0,0,0,0.5), inset 0 0 80px rgba(196,236,255,0.05)',
-};
-const btn: React.CSSProperties = {
-  width: '100%',
-  maxWidth: 260,
-  padding: '14px 18px',
-  borderRadius: 14,
-  border: 0,
-  fontFamily: 'inherit',
-  fontSize: 14,
+const subMarkText: React.CSSProperties = {
+  fontSize: 22,
   fontWeight: 800,
-  letterSpacing: '0.2em',
-  textTransform: 'uppercase',
-  color: '#0B1120',
-  cursor: 'pointer',
-  minHeight: 52,
+  letterSpacing: '0.42em',
+  color: COLOR.gold.base,
 };
-const footer: React.CSSProperties = {
-  marginTop: 14,
-  fontSize: 11,
-  color: '#94A3B8',
-  letterSpacing: '0.08em',
+const subMarkUnderline: React.CSSProperties = {
+  width: 64, height: 2, marginTop: 6,
+  borderRadius: 1,
+  boxShadow: `0 0 12px ${COLOR.gold.base}`,
+};
+
+const taglineWrap: React.CSSProperties = {
+  height: 24,
+  display: 'grid', placeItems: 'center',
+  marginTop: SPACE.l,
+};
+
+const tagline: React.CSSProperties = {
+  fontSize: TYPE.body.size,
+  color: COLOR.ink.secondary,
+  letterSpacing: '0.05em',
+  fontWeight: 500,
+  textAlign: 'center',
+};
+
+const ctaWrap: React.CSSProperties = {
+  position: 'relative',
+  marginTop: SPACE.xl,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: SPACE.s,
+};
+
+const ctaGlow = (tail: string): React.CSSProperties => ({
+  position: 'absolute',
+  top: -8, left: -16, right: -16, bottom: 28,
+  borderRadius: RADIUS.pill,
+  background: `radial-gradient(ellipse at center, ${COLOR.gold.base}33 0%, ${tail}11 50%, transparent 75%)`,
+  filter: 'blur(12px)',
+  animation: 'breathe 2.4s ease-in-out infinite',
+  zIndex: -1,
+  pointerEvents: 'none',
+});
+
+const ctaButton: React.CSSProperties = {
+  paddingLeft: 28,
+  paddingRight: 28,
+  fontSize: 14,
+  height: 52,
+  letterSpacing: '0.14em',
+};
+
+const ctaHint: React.CSSProperties = {
+  fontSize: 10,
+  color: COLOR.ink.faint,
+  letterSpacing: '0.16em',
+  textTransform: 'uppercase',
+};
+
+const skylineWrap: React.CSSProperties = {
+  position: 'absolute',
+  left: 0, right: 0, bottom: 0,
+  pointerEvents: 'none',
+};
+
+const versionChip: React.CSSProperties = {
+  position: 'absolute',
+  left: 14, bottom: 14,
+  fontSize: 9,
+  color: COLOR.ink.faint,
+  letterSpacing: '0.18em',
+  textTransform: 'uppercase',
+  background: COLOR.bg.glass,
+  padding: '4px 8px',
+  borderRadius: RADIUS.xs,
+  border: `1px solid ${COLOR.border.soft}`,
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
 };
