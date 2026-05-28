@@ -35,6 +35,26 @@ export type AirportZone =
   | 'hotel'
   | 'metro';
 
+/**
+ * Passenger mix per pricing strategy (Design Review v4 — point 17).
+ * The four-segment system makes the player's strategy visible without
+ * reading stats: route mix shifts the dot colours, route problems
+ * shift the dot speed/queue.
+ *
+ *   economy  → blue  (#5AC8FA)
+ *   business → gold  (#F4C75B)
+ *   tourist  → green (#34D399)
+ *   vip      → white (#FFFFFF)
+ */
+export type PaxSegment = 'economy' | 'business' | 'tourist' | 'vip';
+
+export interface PaxMix {
+  readonly economy: number;
+  readonly business: number;
+  readonly tourist: number;
+  readonly vip: number;
+}
+
 export interface AirportSceneProps {
   /** Player tier 1..8 — drives which layers render. */
   tier: number;
@@ -42,9 +62,11 @@ export interface AirportSceneProps {
   tailColor: string;
   /** Optional width override (px). Height auto from 16:9-ish aspect. */
   width?: number;
-  /** Number of passenger silhouettes to animate (0..8). */
+  /** Number of passenger silhouettes to animate (0..12). */
   passengerLoad?: number;
-  /** Render a few gold-tinted dots — premium pax. */
+  /** Mix shown — counts per segment (sums close to passengerLoad). */
+  paxMix?: PaxMix;
+  /** Legacy hint: any premium routes → adds gold dots. Kept for back compat. */
   premium?: boolean;
   /** Cargo crates pile up + slower truck. */
   cargoBacklog?: boolean;
@@ -57,6 +79,7 @@ export interface AirportSceneProps {
 export function AirportScene({
   tier, tailColor, width = 360,
   passengerLoad = 3,
+  paxMix,
   premium = false,
   cargoBacklog = false,
   onZoneTap,
@@ -302,8 +325,14 @@ export function AirportScene({
       {showNextGhost && <NextTierGhost tier={tier} tailColor={tailColor} />}
 
       {/* Passenger streams — coloured dots walking from terminal to gates.
-          Number scales with passengerLoad. Premium adds 1–2 gold dots. */}
-      <PassengerStreams count={passengerLoad} premium={premium} tailColor={tailColor} />
+          Each dot carries a segment colour: economy/business/tourist/vip.
+          The strategy is visible without reading stats. */}
+      <PassengerStreams
+        count={passengerLoad}
+        {...(paxMix ? { mix: paxMix } : {})}
+        premium={premium}
+        tailColor={tailColor}
+      />
 
       {/* A small plane parked at gate 1, gently taxiing */}
       <g style={{ animation: 'plane-taxi 6s ease-in-out infinite' }}>
@@ -322,34 +351,57 @@ function Gate({ x, tail }: { x: number; tail: string }) {
   );
 }
 
-function PassengerStreams({ count, premium, tailColor }: { count: number; premium: boolean; tailColor: string }) {
-  // Each passenger walks left-to-right from the terminal entrance
-  // toward the gate row. Stagger them with delay so it's a stream,
-  // not a clump. Premium pax are gold-tinted for the lounge fantasy.
-  const n = Math.max(0, Math.min(8, count));
-  const seq = Array.from({ length: n }, (_, i) => i);
+const SEGMENT_COLOR: Record<PaxSegment, string> = {
+  economy: '#5AC8FA',
+  business: '#F4C75B',
+  tourist: '#34D399',
+  vip: '#F8FAFC',
+};
+
+function PassengerStreams({
+  count, mix, premium, tailColor,
+}: {
+  count: number;
+  mix?: PaxMix;
+  premium: boolean;
+  tailColor: string;
+}) {
+  // Build a deterministic ordered list of segments based on the mix.
+  // If no mix is provided, default to mostly economy with a sprinkle of
+  // business when `premium` is set (legacy behaviour).
+  const n = Math.max(0, Math.min(12, count));
+  const segments = buildSegmentSequence(n, mix, premium);
+
+  const hasBusiness = segments.includes('business');
+  const hasVip = segments.includes('vip');
+
   return (
     <g aria-hidden>
-      {seq.map((i) => {
-        const isPremium = premium && (i % 4 === 3);
-        const color = isPremium ? COLOR.gold.base : '#94A3B8';
+      {segments.map((seg, i) => {
+        const color = SEGMENT_COLOR[seg];
         const startY = 140 + (i % 3) - 1;
+        // VIP pax move slower (premium feel); tourist groups walk in pairs.
+        const speed = seg === 'vip' ? 5.5 : seg === 'business' ? 3.6 : 4 + (i % 3);
         return (
           <g
             key={i}
             style={{
-              animation: `drift-passenger ${4 + (i % 4)}s linear ${i * 0.55}s infinite`,
+              animation: `drift-passenger ${speed}s linear ${i * 0.55}s infinite`,
               transformOrigin: '60px 140px',
             }}
           >
-            <Passenger x={60} y={startY} color={color} />
+            <Passenger x={60} y={startY} color={color} accent={seg === 'vip'} />
           </g>
         );
       })}
-      {/* Glow if there's a premium stream */}
-      {premium && (
-        <text x={120} y={114} fill={COLOR.gold.base} fontSize="3" fontWeight="800" letterSpacing="0.16em" opacity="0.7">
-          ★ PREMIUM PAX
+      {hasVip && (
+        <text x={120} y={108} fill={SEGMENT_COLOR.vip} fontSize="3" fontWeight="800" letterSpacing="0.16em" opacity="0.85">
+          ★ VIP ARRIVAL
+        </text>
+      )}
+      {hasBusiness && !hasVip && (
+        <text x={120} y={114} fill={SEGMENT_COLOR.business} fontSize="3" fontWeight="800" letterSpacing="0.16em" opacity="0.75">
+          BUSINESS CLASS BOARDING
         </text>
       )}
       {/* Subtle accent on the entrance */}
@@ -358,11 +410,45 @@ function PassengerStreams({ count, premium, tailColor }: { count: number; premiu
   );
 }
 
-function Passenger({ x, y, color = '#94A3B8' }: { x: number; y?: number; color?: string }) {
+function buildSegmentSequence(n: number, mix: PaxMix | undefined, premium: boolean): PaxSegment[] {
+  if (n === 0) return [];
+  const effective: PaxMix = mix ?? {
+    economy: Math.max(1, n - (premium ? 2 : 0)),
+    business: premium ? 1 : 0,
+    tourist: 0,
+    vip: premium ? 1 : 0,
+  };
+  const total = Math.max(1, effective.economy + effective.business + effective.tourist + effective.vip);
+  // Allocate slots proportionally; round to ints and pad with economy.
+  const econ = Math.round(n * (effective.economy / total));
+  const biz = Math.round(n * (effective.business / total));
+  const tour = Math.round(n * (effective.tourist / total));
+  const vip = Math.round(n * (effective.vip / total));
+  const arr: PaxSegment[] = [];
+  for (let i = 0; i < econ; i++) arr.push('economy');
+  for (let i = 0; i < biz; i++) arr.push('business');
+  for (let i = 0; i < tour; i++) arr.push('tourist');
+  for (let i = 0; i < vip; i++) arr.push('vip');
+  while (arr.length < n) arr.push('economy');
+  while (arr.length > n) arr.pop();
+  // Interleave so dots don't clump by segment — feels organic.
+  const ordered: PaxSegment[] = [];
+  let i = 0;
+  while (arr.length > 0) {
+    const idx = i % arr.length;
+    ordered.push(arr[idx]!);
+    arr.splice(idx, 1);
+    i = (i + 3) % Math.max(1, arr.length);
+  }
+  return ordered;
+}
+
+function Passenger({ x, y, color = '#94A3B8', accent }: { x: number; y?: number; color?: string; accent?: boolean }) {
   return (
     <g transform={`translate(${x}, ${y ?? 138})`}>
-      <circle cx="0" cy="0" r="1.3" fill={color} />
+      <circle cx="0" cy="0" r={accent ? 1.5 : 1.3} fill={color} />
       <rect x={-1} y={1.2} width="2" height="3" rx="0.5" fill={color} />
+      {accent && <circle cx="0" cy="0" r="2.4" fill="none" stroke={color} strokeWidth="0.5" opacity="0.6" />}
     </g>
   );
 }

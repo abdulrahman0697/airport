@@ -40,6 +40,7 @@ import { Button } from '../design/Button';
 import { COLOR, RADIUS, SHADOW, SPACE } from '../design/tokens';
 import { formatCash } from '../format';
 import { haptics } from '../juice/haptics';
+import { NetworkSkyView } from './NetworkSkyView';
 import { usePanelStore } from './PanelHost';
 
 const ZONE_LABELS: Record<AirportZone, { name: string; body: string; cta?: string; ctaPanel?: 'fleet' | 'routes' | 'fuel' | 'crew' }> = {
@@ -125,9 +126,22 @@ export function HomeShell() {
     return total;
   }, [routes, fleet, hubs, activeEvents]);
 
-  // Passenger stream scales with active route load + premium presence.
-  const passengerLoad = Math.min(8, 1 + routes.length * 2);
+  // Passenger stream — Design Review v4, point 17. The mix carries
+  // the player's pricing strategy: economy routes → mostly blue dots,
+  // balanced → blue + a few gold, premium → blue + business gold +
+  // white VIP halo. Tourist green dots appear when traffic is up.
+  const passengerLoad = Math.min(12, 2 + routes.length * 2);
   const premiumPax = routes.some((r) => r.pricing === 'premium');
+  const paxMix = useMemo(() => {
+    if (routes.length === 0) return { economy: 2, business: 0, tourist: 0, vip: 0 };
+    let econ = 0, biz = 0, tour = 0, vip = 0;
+    for (const r of routes) {
+      if (r.pricing === 'economy') { econ += 3; tour += 1; }
+      else if (r.pricing === 'balanced') { econ += 2; biz += 1; tour += 1; }
+      else { econ += 1; biz += 2; vip += 1; }
+    }
+    return { economy: econ, business: biz, tourist: tour, vip };
+  }, [routes]);
 
   // What grows next (for the Upgrade Airport card + ghost overlay).
   const nextGrowth = AIRPORT_GROWTH[tier];
@@ -183,6 +197,24 @@ export function HomeShell() {
         )}
       </div>
 
+      {/* Living Airport + Global Network Split View (Design Review v4 — point 25).
+          A sky strip above the airport diorama shows the active route
+          arcs with aircraft sprites traveling from this airport to
+          their destinations. Forms the signature visual loop of the
+          game: watch your airport, planes take off into the sky,
+          empire grows, cash comes back. */}
+      <div style={skyStripWrap}>
+        <NetworkSkyView
+          width={Math.min(560, window.innerWidth - 16)}
+          height={130}
+          routes={routes}
+          fleet={fleet}
+          hubs={hubs}
+          activeEvents={activeEvents}
+          tailColor={tailColor}
+        />
+      </div>
+
       {/* Big interactive diorama */}
       <div style={dioramaWrap}>
         <div style={dioramaInner}>
@@ -191,6 +223,7 @@ export function HomeShell() {
             tailColor={tailColor}
             width={Math.min(560, window.innerWidth - 16)}
             passengerLoad={passengerLoad}
+            paxMix={paxMix}
             premium={premiumPax}
             cargoBacklog={false}
             onZoneTap={onZoneTap}
@@ -478,9 +511,16 @@ const topSubtitle: React.CSSProperties = {
   fontSize: 11, color: COLOR.ink.muted, marginTop: 2, letterSpacing: '0.06em',
 };
 
+const skyStripWrap: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'center',
+  padding: '0 8px',
+  background: 'transparent',
+  marginBottom: -4,
+};
 const dioramaWrap: React.CSSProperties = {
   position: 'relative',
-  padding: '8px 8px',
+  padding: '4px 8px 8px',
 };
 const dioramaInner: React.CSSProperties = {
   display: 'flex',
