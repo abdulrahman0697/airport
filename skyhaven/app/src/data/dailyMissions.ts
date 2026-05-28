@@ -36,24 +36,24 @@ export interface DailyMissionTemplate {
 export const DAILY_MISSION_TEMPLATES: readonly DailyMissionTemplate[] = [
   {
     id: 'open_routes',
-    label: 'Network Builder',
-    description: 'Open %target% routes today.',
+    label: 'Open the Skies',
+    description: 'Launch %target% new routes today — expand the network.',
     targets: [1, 2, 3],
     reward: (t) => 15_000 * t,
     progress: (now, start) => Math.max(0, now.routes.length - start.routes.length),
   },
   {
     id: 'earn_cash',
-    label: 'Cash Cow',
-    description: 'Earn $%target% today.',
+    label: 'Morning Rush Revenue',
+    description: 'Clear $%target% in revenue today — feed the empire.',
     targets: [100_000, 500_000, 2_000_000],
     reward: (t) => Math.round(t * 0.05),
     progress: (now, start) => Math.max(0, now.lifetimeEarnings - start.lifetimeEarnings),
   },
   {
     id: 'repair_aircraft',
-    label: 'Wrench Day',
-    description: 'Repair %target% aircraft today.',
+    label: 'Hangar Maintenance',
+    description: 'Restore %target% aircraft to top condition today.',
     targets: [1, 2, 3],
     reward: (t) => 8_000 * t,
     progress: (now, start) => {
@@ -70,8 +70,8 @@ export const DAILY_MISSION_TEMPLATES: readonly DailyMissionTemplate[] = [
   },
   {
     id: 'claim_collectibles',
-    label: 'Tap Tap',
-    description: 'Tap %target% roaming collectibles today.',
+    label: 'Cargo Sweep',
+    description: 'Catch %target% loose cargo crates on the world map today.',
     targets: [1, 2, 3],
     reward: (t) => 5_000 * t,
     progress: (now, start) => {
@@ -85,8 +85,8 @@ export const DAILY_MISSION_TEMPLATES: readonly DailyMissionTemplate[] = [
   },
   {
     id: 'hire_managers',
-    label: 'Build the Team',
-    description: 'Hire %target% managers today.',
+    label: 'Strategic Hires',
+    description: 'Sign %target% new managers today — strengthen your hubs.',
     targets: [1, 2],
     reward: (t) => 20_000 * t,
     progress: (now, start) => {
@@ -100,8 +100,8 @@ export const DAILY_MISSION_TEMPLATES: readonly DailyMissionTemplate[] = [
   },
   {
     id: 'upgrade_aircraft',
-    label: 'Tune Up',
-    description: 'Apply %target% aircraft upgrade levels today.',
+    label: 'Fleet Tune-Up',
+    description: 'Spec up your aircraft with %target% upgrade levels today.',
     targets: [1, 3, 5],
     reward: (t) => 12_000 * t,
     progress: (now, start) => {
