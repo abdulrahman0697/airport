@@ -352,8 +352,12 @@ function RegionalMapBackdrop({
       <svg
         width="100%"
         viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}
-        preserveAspectRatio="xMidYMid slice"
-        style={{ display: 'block', aspectRatio: `${MAP_W} / ${MAP_H}` }}
+        preserveAspectRatio="xMidYMid meet"
+        style={{
+          display: 'block',
+          aspectRatio: `${MAP_W} / ${MAP_H}`,
+          background: 'radial-gradient(ellipse at center, #10172E 0%, #070A18 100%)',
+        }}
       >
         <defs>
           <radialGradient id={`map-sea-${regionId}`} cx="0.5" cy="0.5" r="0.85">
