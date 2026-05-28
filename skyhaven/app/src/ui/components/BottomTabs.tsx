@@ -1,20 +1,42 @@
 import { useGameStore } from '../../state/store';
 import { conditionBand } from '../../engine/condition';
+import {
+  DealsIcon,
+  HangarIcon,
+  NetworkIcon,
+  OperationsIcon,
+  StaffIcon,
+  TowerIcon,
+  type IconProps,
+} from '../design/icons';
 import { usePanelStore, type PanelId } from './PanelHost';
 
 interface TabSpec {
   id: Exclude<PanelId, null> | 'map';
   label: string;
-  icon: string;
+  Icon: React.FC<IconProps>;
 }
 
+/**
+ * Aviation-themed tab labels (Design Review v2 — point 9).
+ *  Map → Network (radar)
+ *  Routes → Operations (paper-plane launch arrow)
+ *  Fleet → Hangar (boxy hangar with plane silhouette)
+ *  Crew → Staff HQ (two-person)
+ *  Leaders → Control Tower (tower with antenna)
+ *  Store → Executive Deals (briefcase)
+ *
+ * Achievements + Missions live on the SideLauncher (Phase DA), so
+ * the bottom row stays at 6 columns and reads as the airport
+ * operations bar.
+ */
 const TABS: readonly TabSpec[] = [
-  { id: 'map', label: 'Map', icon: '◯' },
-  { id: 'routes', label: 'Routes', icon: '↗' },
-  { id: 'fleet', label: 'Fleet', icon: '✈' },
-  { id: 'crew', label: 'Crew', icon: '◆' },
-  { id: 'leaders', label: 'Leaders', icon: '🏆' },
-  { id: 'store', label: 'Store', icon: '$' },
+  { id: 'map',     label: 'Network',         Icon: NetworkIcon },
+  { id: 'routes',  label: 'Operations',      Icon: OperationsIcon },
+  { id: 'fleet',   label: 'Hangar',          Icon: HangarIcon },
+  { id: 'crew',    label: 'Staff HQ',        Icon: StaffIcon },
+  { id: 'leaders', label: 'Control Tower',   Icon: TowerIcon },
+  { id: 'store',   label: 'Executive Deals', Icon: DealsIcon },
 ];
 
 export function BottomTabs() {
@@ -22,7 +44,8 @@ export function BottomTabs() {
   const open = usePanelStore((s) => s.open);
   const close = usePanelStore((s) => s.close);
 
-  // "Needs attention" badge on the Fleet tab.
+  // "Needs attention" badge on the Hangar tab when an aircraft
+  // condition has slipped into degraded / critical.
   const needsAttention = useGameStore((s) =>
     (s.state?.fleet ?? []).reduce((n, a) => n + (conditionBand(a.condition) !== 'normal' ? 1 : 0), 0),
   );
@@ -44,7 +67,7 @@ export function BottomTabs() {
             aria-label={t.label}
             aria-current={isActive ? 'page' : undefined}
           >
-            <span style={icon}>{t.icon}</span>
+            <t.Icon size={20} color={isActive ? '#5AC8FA' : '#94A3B8'} />
             <span style={label}>{t.label}</span>
             {showBadge && <span style={badge}>{needsAttention}</span>}
           </button>
@@ -78,29 +101,26 @@ const btn: React.CSSProperties = {
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: 2,
+  gap: 3,
   cursor: 'pointer',
   fontFamily: 'inherit',
+  padding: 0,
 };
 
 const btnActive: React.CSSProperties = {
   color: '#5AC8FA',
 };
 
-const icon: React.CSSProperties = {
-  fontSize: 18,
-  lineHeight: 1,
-};
-
 const label: React.CSSProperties = {
-  fontSize: 10,
-  letterSpacing: '0.08em',
+  fontSize: 9,
+  letterSpacing: '0.06em',
   textTransform: 'uppercase',
+  fontWeight: 700,
 };
 
 const badge: React.CSSProperties = {
   position: 'absolute',
-  top: 8,
+  top: 6,
   right: 'calc(50% - 20px)',
   minWidth: 16,
   height: 16,
@@ -113,4 +133,5 @@ const badge: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
+  border: '2px solid rgba(11,17,32,0.92)',
 };

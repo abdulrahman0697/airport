@@ -33,9 +33,9 @@ import { haptics } from '../juice/haptics';
 import { sfx } from '../juice/sfx';
 
 const TAGLINES = [
-  'Build the airline that owns the sky.',
-  'Hubs, regions, vintage classics — all yours to chart.',
-  'Tap. Earn. Expand. Repeat — forever.',
+  'Build the world’s most beautiful airport empire.',
+  'One gate. One plane. A global network ahead.',
+  'Routes, terminals, hubs — your tycoon empire awaits.',
 ];
 
 const WORDMARK = 'SKYHAVEN';
