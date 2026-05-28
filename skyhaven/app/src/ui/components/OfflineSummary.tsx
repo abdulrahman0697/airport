@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { selectPendingOfflineSummary, useGameStore } from '../../state/store';
+import { useUiStore } from '../../state/uiStore';
 import { formatCash } from '../format';
 
 /**
@@ -20,8 +21,24 @@ function formatDuration(ms: number): string {
 
 export function OfflineSummary() {
   const summary = useGameStore(selectPendingOfflineSummary);
-  const ack = useGameStore((s) => s.acknowledgeOfflineSummary);
+  const ackBase = useGameStore((s) => s.acknowledgeOfflineSummary);
   const tailColor = useGameStore((s) => s.state?.tailColor ?? '#5AC8FA');
+  const setStayInTouchCard = useUiStore((s) => s.setStayInTouchCard);
+
+  // Design Review v4 — point 1. The first time the player completes
+  // an offline summary, fire the in-game "stay-in-touch" card *after*
+  // dismiss. This is when the value of notifications is concrete —
+  // the player has just experienced offline earning. The OS permission
+  // popup never fires before this moment.
+  const ack = (): void => {
+    const wasFirst = summary && summary.earnings > 0;
+    ackBase();
+    if (wasFirst) {
+      // Defer one tick so the OfflineSummary unmounts before the
+      // permission card mounts; otherwise the player sees a stack.
+      window.setTimeout(() => setStayInTouchCard(true), 220);
+    }
+  };
 
   return (
     <AnimatePresence>

@@ -59,7 +59,7 @@ interface GameStore {
   closeRoute: (routeId: string) => ActionResult;
   setRoutePricing: (routeId: string, pricing: RoutePricing) => ActionResult;
   applyUpgrade: (aircraftUid: string, kind: UpgradeKind) => ActionResult;
-  repairAircraft: (aircraftUid: string) => ActionResult;
+  repairAircraft: (aircraftUid: string, mode?: 'quick' | 'full' | 'premium') => ActionResult;
   signFuelContract: (contractId: string) => ActionResult;
   upgradeFuelCapacity: () => ActionResult;
   unlockRegion: (regionId: number) => ActionResult;
@@ -135,8 +135,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     runAction(set, get, (s) => setRoutePricingAction(s, routeId, pricing)),
   applyUpgrade: (aircraftUid, kind) =>
     runAction(set, get, (s) => applyUpgradeAction(s, aircraftUid, kind)),
-  repairAircraft: (aircraftUid) =>
-    runAction(set, get, (s) => repairAircraftAction(s, aircraftUid)),
+  repairAircraft: (aircraftUid, mode) =>
+    runAction(set, get, (s) => repairAircraftAction(s, aircraftUid, mode)),
   signFuelContract: (contractId) =>
     runAction(set, get, (s) => signFuelContractAction(s, contractId)),
   upgradeFuelCapacity: () =>

@@ -328,19 +328,41 @@ export function applyUpgrade(state: SaveState, aircraftUid: string, kind: Upgrad
 }
 
 // ─── Repair aircraft ─────────────────────────────────────────────────
-export function repairAircraft(state: SaveState, aircraftUid: string): SaveState {
+/**
+ * Design Review v4 — point 21. Three maintenance modes so repair
+ * reads as optimisation, not punishment.
+ *
+ *   quick   restores +40 condition for 35% of full repair cost
+ *   full    restores to 100% at full repair cost (legacy default)
+ *   premium restores to 100% at 1.4× cost (UI badges it as a
+ *           Premium Check — premium-check bonuses are tracked at the
+ *           UI layer until we ship a per-aircraft service ledger)
+ */
+export type RepairMode = 'quick' | 'full' | 'premium';
+
+export function repairAircraft(
+  state: SaveState,
+  aircraftUid: string,
+  mode: RepairMode = 'full',
+): SaveState {
   const aIdx = state.fleet.findIndex((a) => a.uid === aircraftUid);
   if (aIdx < 0) throw new ActionError('NO_AIRCRAFT', `No aircraft ${aircraftUid}`);
   const aircraft = state.fleet[aIdx]!;
   if (aircraft.condition >= 100) return state;
-  const cost = repairCost(aircraft);
+  const baseCost = repairCost(aircraft);
+  const cost = mode === 'quick'
+    ? Math.max(1, Math.round(baseCost * 0.35))
+    : mode === 'premium'
+      ? Math.round(baseCost * 1.4)
+      : baseCost;
   if (state.cash < cost) {
     throw new ActionError('INSUFFICIENT_CASH', `Need $${cost.toLocaleString()} to repair`);
   }
+  const restored = mode === 'quick'
+    ? Math.min(100, aircraft.condition + 40)
+    : 100;
   const fleet = state.fleet.slice();
-  fleet[aIdx] = { ...aircraft, condition: 100 };
-  // A repaired aircraft can resume flight, so demand may need refresh
-  // (a previously condition-0 aircraft no longer contributes 0 demand).
+  fleet[aIdx] = { ...aircraft, condition: restored };
   return withRecomputedDemand({ ...state, cash: state.cash - cost, fleet });
 }
 

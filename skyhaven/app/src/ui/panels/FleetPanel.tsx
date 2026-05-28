@@ -1,28 +1,18 @@
 import { useMemo, useState } from 'react';
-import { AIRCRAFT_DEFS, getAircraftDef } from '../../data/aircraft';
-import { conditionBand, repairCost } from '../../engine/condition';
+import { AIRCRAFT_DEFS } from '../../data/aircraft';
 import { MAX_TIER } from '../../engine/tierUnlocks';
 import { AircraftDetailModal } from '../components/AircraftDetailModal';
+import { HangarBay } from '../components/HangarBay';
 import { HangarShowroomCard } from '../components/HangarShowroomCard';
 import { PanelHeader } from '../design/PanelHeader';
-import {
-  UPGRADE_LABELS,
-  UPGRADE_SPECS,
-  romanLevel,
-  upgradeCost,
-  type UpgradeKind,
-} from '../../engine/upgrades';
 import type { AircraftDef, OwnedAircraft } from '../../engine/types';
 import {
-  selectCash,
   selectFleet,
   selectTier,
   selectTutorialCompleted,
   selectVintage,
   useGameStore,
 } from '../../state/store';
-import { formatCash } from '../format';
-import { haptics } from '../juice/haptics';
 import { VintageHangar } from './VintageHangar';
 
 type BuyCategoryFilter = 'passenger' | 'cargo';
@@ -75,114 +65,19 @@ export function FleetPanel() {
   );
 }
 
-// ──── Owned tab ──────────────────────────────────────────────────────
+// ──── Owned tab — Design Review v4, point 20: Hangar Bay ────────────
 function OwnedList() {
-  const fleet = useGameStore(selectFleet);
   const [detail, setDetail] = useState<OwnedAircraft | null>(null);
-  if (fleet.length === 0) return <div style={empty}>No aircraft. Switch to "Buy aircraft" to start your fleet.</div>;
   return (
     <>
-      <ul style={list}>
-        {fleet.map((a) => (
-          <FleetRow key={a.uid} aircraft={a} onOpenDetail={(): void => setDetail(a)} />
-        ))}
-      </ul>
+      <HangarBay onOpenDetail={setDetail} />
       <AircraftDetailModal aircraft={detail} onClose={(): void => setDetail(null)} />
     </>
   );
 }
 
-function FleetRow({ aircraft, onOpenDetail }: { aircraft: OwnedAircraft; onOpenDetail: () => void }) {
-  const def = getAircraftDef(aircraft.defId);
-  const cash = useGameStore(selectCash);
-  const applyUpgrade = useGameStore((s) => s.applyUpgrade);
-  const repair = useGameStore((s) => s.repairAircraft);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  if (!def) return null;
-
-  const band = conditionBand(aircraft.condition);
-  const condColor = band === 'normal' ? '#34D399' : band === 'degraded' ? '#F59E0B' : '#F87171';
-  const repCost = repairCost(aircraft);
-  const isCargo = def.category === 'cargo';
-  const tierLabel = isCargo ? 'Cargo' : `T${def.tier}`;
-  const capLabel = isCargo ? `${def.capacity} units` : `${def.capacity} pax`;
-
-  const tryUpgrade = (kind: UpgradeKind): void => {
-    const res = applyUpgrade(aircraft.uid, kind);
-    if (res.ok) haptics.light();
-    else haptics.warning();
-    setErrorMsg(res.ok ? null : res.message);
-  };
-  const tryRepair = (): void => {
-    const res = repair(aircraft.uid);
-    if (res.ok) haptics.medium();
-    else haptics.warning();
-    setErrorMsg(res.ok ? null : res.message);
-  };
-
-  return (
-    <li style={card}>
-      <div style={cardHeader}>
-        <button
-          onClick={onOpenDetail}
-          style={cardTitleBtn}
-          aria-label={`Open details for ${def.displayName}`}
-        >
-          <div style={cardTitle}>
-            {def.displayName}
-            {isCargo && <span style={cargoBadge}>CARGO</span>}
-            <span style={detailArrow}>→</span>
-          </div>
-          <div style={cardSubtitle}>
-            {tierLabel} · {capLabel} · {def.rangeKm.toLocaleString()} km
-            {aircraft.routeId ? ' · in service' : ' · in hangar'}
-          </div>
-        </button>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ color: condColor, fontSize: 13, fontWeight: 600 }}>
-            {aircraft.condition.toFixed(0)}%
-          </div>
-          <div style={{ color: '#94A3B8', fontSize: 10 }}>{band}</div>
-        </div>
-      </div>
-
-      <div style={upgradeGrid}>
-        {(['engine', 'cabin', 'fuelEff', 'marketing'] as const).map((kind) => {
-          const level = aircraft.upgrades[kind];
-          const max = UPGRADE_SPECS[kind].maxLevel;
-          const cost = upgradeCost(aircraft, kind);
-          const can = level < max;
-          const afford = cash >= cost;
-          return (
-            <button
-              key={kind}
-              disabled={!can || !afford}
-              onClick={(): void => tryUpgrade(kind)}
-              style={{ ...upgradeBtn, opacity: !can ? 0.4 : afford ? 1 : 0.6 }}
-              title={can ? `Upgrade ${UPGRADE_LABELS[kind]} → ${romanLevel(level + 1)}` : 'Maxed'}
-            >
-              <div style={upgradeName}>{UPGRADE_LABELS[kind]}</div>
-              <div style={upgradeLevel}>{romanLevel(level)} / {romanLevel(max)}</div>
-              {can && <div style={upgradeCostText}>${formatCash(cost, 1)}</div>}
-            </button>
-          );
-        })}
-      </div>
-
-      {aircraft.condition < 100 && (
-        <button
-          disabled={cash < repCost}
-          onClick={tryRepair}
-          style={{ ...repairBtn, opacity: cash >= repCost ? 1 : 0.5 }}
-        >
-          Repair to 100% · ${formatCash(repCost, 1)}
-        </button>
-      )}
-
-      {errorMsg && <div style={errorText}>{errorMsg}</div>}
-    </li>
-  );
-}
+// FleetRow removed in Design Review v4 — replaced by HangarBay (see
+// components/HangarBay.tsx).
 
 // ──── Buy aircraft tab ───────────────────────────────────────────────
 function BuyList() {
@@ -263,60 +158,6 @@ const tabBtn: React.CSSProperties = {
 };
 const tabActive: React.CSSProperties = { background: 'rgba(90,200,250,0.12)', color: '#5AC8FA' };
 const body: React.CSSProperties = { flex: 1, overflowY: 'auto', padding: 12 };
-const list: React.CSSProperties = { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 };
-const card: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 12,
-  border: '1px solid rgba(255,255,255,0.06)',
-};
-const cardHeader: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 };
-const cardTitleBtn: React.CSSProperties = {
-  display: 'block',
-  textAlign: 'left',
-  background: 'transparent',
-  border: 0,
-  padding: 0,
-  cursor: 'pointer',
-  color: 'inherit',
-  fontFamily: 'inherit',
-  flex: 1,
-  minWidth: 0,
-};
-const detailArrow: React.CSSProperties = {
-  marginLeft: 6,
-  fontSize: 12,
-  color: '#5AC8FA',
-  opacity: 0.7,
-};
-const cardTitle: React.CSSProperties = {
-  color: '#F8FAFC', fontSize: 15, fontWeight: 600,
-  display: 'inline-flex', alignItems: 'center', gap: 8,
-};
-const cardSubtitle: React.CSSProperties = { color: '#94A3B8', fontSize: 11, marginTop: 2 };
-const upgradeGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginTop: 10 };
-const upgradeBtn: React.CSSProperties = {
-  background: 'rgba(11,17,32,0.6)', border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: 8, padding: '8px 10px', textAlign: 'left', color: '#F8FAFC',
-  cursor: 'pointer', minHeight: 56, fontFamily: 'inherit',
-};
-const upgradeName: React.CSSProperties = { fontSize: 11, color: '#94A3B8', letterSpacing: '0.04em' };
-const upgradeLevel: React.CSSProperties = { fontSize: 14, fontWeight: 600, marginTop: 2 };
-const upgradeCostText: React.CSSProperties = { fontSize: 10, color: '#F4C75B', marginTop: 2, fontFeatureSettings: '"tnum" 1' };
-const repairBtn: React.CSSProperties = {
-  width: '100%', marginTop: 10, padding: '10px 12px', borderRadius: 8,
-  background: 'rgba(245,158,11,0.18)', color: '#F59E0B',
-  border: '1px solid rgba(245,158,11,0.45)', minHeight: 44, cursor: 'pointer',
-  fontWeight: 600, fontFamily: 'inherit', fontFeatureSettings: '"tnum" 1',
-};
-const cargoBadge: React.CSSProperties = {
-  fontSize: 9, letterSpacing: '0.1em', fontWeight: 700,
-  color: '#F4C75B', background: 'rgba(244,199,91,0.14)',
-  border: '1px solid rgba(244,199,91,0.4)',
-  padding: '2px 6px', borderRadius: 4,
-};
-const errorText: React.CSSProperties = {
-  marginTop: 8, padding: '6px 10px', fontSize: 11, color: '#F87171',
-  background: 'rgba(248,113,113,0.08)', borderRadius: 6,
-};
 const empty: React.CSSProperties = { padding: 32, textAlign: 'center', color: '#94A3B8' };
 const categoryRow: React.CSSProperties = {
   display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12,

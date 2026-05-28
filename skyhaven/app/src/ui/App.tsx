@@ -21,6 +21,7 @@ import { MapLiveTicker } from './components/MapLiveTicker';
 import { HubPicker } from './components/HubPicker';
 import { IntroSplash } from './components/IntroSplash';
 import { OfflineSummary } from './components/OfflineSummary';
+import { StayInTouchCard } from './components/StayInTouchCard';
 import { Tutorial } from './components/Tutorial';
 import { VintageDropPopup } from './components/VintageDropPopup';
 import { PanelHost } from './components/PanelHost';
@@ -86,6 +87,7 @@ export function App() {
       <EmpireJourney />
       <CashTickToast />
       <OfflineSummary />
+      <StayInTouchCard />
       <DailyReward />
       <HubPicker />
       <Tutorial />
