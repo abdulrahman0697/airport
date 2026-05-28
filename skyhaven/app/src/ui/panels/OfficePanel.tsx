@@ -3,6 +3,7 @@ import { signInWithGoogle, signOut } from '../../backend/auth';
 import { useAuth } from '../../backend/useAuth';
 import { ACHIEVEMENT_COUNT, frameTier, FRAME_COLORS } from '../../data/achievements';
 import { FrameBadge } from '../components/AchievementFrame';
+import { AirlineCrest } from '../design/AirlineCrest';
 import { DailyMissionsCard } from '../components/DailyMissionsCard';
 import { FriendsCard } from '../components/FriendsCard';
 import { usePanelStore } from '../components/PanelHost';
@@ -100,7 +101,7 @@ export function OfficePanel() {
         {/* Airline identity card */}
         <section style={identityCard(tailColor, frameTier(achievements.length))}>
           <div style={identityRow}>
-            <div style={identityChip(tailColor)} />
+            <AirlineCrest name={airlineName} tailColor={tailColor} size={48} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={airlineLabel}>{airlineName.toUpperCase()}</div>
               <div style={airlineSubRow}>
@@ -411,11 +412,6 @@ const identityCard = (color: string, tier: import('../../data/achievements').Fra
   };
 };
 const identityRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 12 };
-const identityChip = (color: string): React.CSSProperties => ({
-  width: 32, height: 32, borderRadius: 8,
-  background: color,
-  boxShadow: `0 0 12px ${color}AA`,
-});
 const airlineLabel: React.CSSProperties = {
   fontSize: 18, fontWeight: 700, color: '#F8FAFC', letterSpacing: '0.14em',
 };

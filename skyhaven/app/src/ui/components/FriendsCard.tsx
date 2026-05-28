@@ -29,6 +29,7 @@ import {
 } from '../../backend/gifts';
 import { fetchProfile, type PublicProfile } from '../../backend/profiles';
 import { useGameStore } from '../../state/store';
+import { AirlineCrest } from '../design/AirlineCrest';
 import { formatCash } from '../format';
 import { haptics } from '../juice/haptics';
 
@@ -364,7 +365,7 @@ function Row({
   const name = profile?.airlineName ?? friendship.otherUid.slice(0, 8);
   return (
     <li style={row}>
-      <span style={chip(tail)} aria-hidden />
+      <AirlineCrest name={name} tailColor={tail} size={26} />
       <div style={rowMain}>
         <div style={rowName}>{name}</div>
         {profile && (
@@ -434,7 +435,7 @@ const groupLabel: React.CSSProperties = {
   color: '#5AC8FA', fontWeight: 700, marginTop: 6, marginBottom: 4,
 };
 const row: React.CSSProperties = {
-  display: 'grid', gridTemplateColumns: '14px 1fr auto auto', gap: 10,
+  display: 'grid', gridTemplateColumns: '26px 1fr auto auto', gap: 10,
   alignItems: 'center', padding: '10px 12px',
   background: 'rgba(11,17,32,0.5)', borderRadius: 8,
   border: '1px solid rgba(255,255,255,0.06)',
