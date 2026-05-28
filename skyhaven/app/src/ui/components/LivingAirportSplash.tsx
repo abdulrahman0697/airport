@@ -1,31 +1,27 @@
 /**
- * LivingAirportSplash — opening screen using the photographic
- * airport sunset image as the background.
+ * LivingAirportSplash — photographic airport sunset background with a
+ * live motion layer overlaid on top.
  *
- * Layout (top → bottom):
- *   - Background photo: a man looking out over a runway at sunset.
- *     We apply a vertical darkening gradient at both ends so the
- *     wordmark up top and the CTA at the bottom always read clearly.
- *   - SKYHAVEN TYCOON logo at the top with the gold plane glyph
- *     between two gradient lines — same brand mark as before.
- *   - A short slogan beneath the logo.
- *   - A single "Begin Boarding" CTA positioned bottom-right of the
- *     image, in the runway/sky area where contrast is highest and
- *     the suited figure on the left isn't covered.
- *   - A tail-coloured glow under the button to lift it off the
- *     warm sky tones.
- *
- * Animation kept minimal so the photograph is the hero:
- *   - Wordmark staggers in
- *   - Slogan fades in
- *   - Subtle floating aircraft icon over the runway (optional)
- *   - CTA breathes / glows
- *
- * No money, no objectives, no action cards, no ticker — same brief
- * as before but now overlaid on the player's chosen background.
+ * Stack (back → front):
+ *   1. /start-bg.png — the man-looking-out-over-a-runway photo,
+ *      cover-fit and centered on every aspect ratio.
+ *   2. MotionLayer — twinkling stars, drifting clouds, four small
+ *      aircraft crossing the sky at different speeds and heights,
+ *      a periodic hero takeoff plane rising from the bottom-right of
+ *      the photo with a contrail + wingtip strobes, a runway-light
+ *      sequence pulsing toward the vanishing point on the runway,
+ *      gold streaks travelling up the runway perspective line, a
+ *      slow tail-colour radar sweep over the terminal area on the
+ *      left.
+ *   3. Top + bottom darkening gradients so the wordmark and CTA read
+ *      cleanly without hiding the photograph.
+ *   4. SKYHAVEN TYCOON wordmark at the top with the gold airplane
+ *      glyph between two gradient lines + a short slogan beneath.
+ *   5. A single "Begin Boarding" CTA on a glass plate centered at the
+ *      bottom, with a breathing tail-colour glow.
  */
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { selectTailColor, useGameStore } from '../../state/store';
 import { useUiStore } from '../../state/uiStore';
 import { Button } from '../design/Button';
@@ -76,16 +72,15 @@ export function LivingAirportSplash() {
           transition={{ duration: MOTION.duration.medium / 1000 }}
           style={shell as Record<string, unknown>}
         >
-          {/* Background photo. Set via inline url() so Vite picks it
-              from /public and serves it at the root path. */}
+          {/* Background photo */}
           <div style={bgImage} aria-hidden />
-          {/* Top darkening gradient — keeps the logo + slogan readable
-              against the sky. */}
+
+          {/* Live motion layer painted on top of the photo */}
+          <MotionLayer tailColor={tailColor} />
+
+          {/* Legibility gradients */}
           <div style={topShade} aria-hidden />
-          {/* Bottom darkening gradient — gives the CTA contrast against
-              the runway glow without hiding the figure. */}
           <div style={bottomShade} aria-hidden />
-          {/* Subtle tail-colour vignette */}
           <div style={vignette(tailColor)} aria-hidden />
 
           {/* TOP: logo + slogan */}
@@ -111,9 +106,7 @@ export function LivingAirportSplash() {
             </motion.div>
           </div>
 
-          {/* BOTTOM: CTA in the area with strongest contrast (lower
-              right of the runway). The button gets its own glass plate
-              + tail glow so it always reads cleanly. */}
+          {/* BOTTOM: CTA */}
           <div style={ctaArea}>
             <motion.div
               initial={{ opacity: 0, y: 18, scale: 0.96 }}
@@ -143,6 +136,202 @@ export function LivingAirportSplash() {
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+/* ─── Motion layer overlay ────────────────────────────────────────── */
+
+function MotionLayer({ tailColor }: { tailColor: string }) {
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const loop = (): void => { setNow(performance.now()); raf = requestAnimationFrame(loop); };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // Deterministic stars across the upper sky.
+  const stars = useMemo(() => {
+    const out: Array<{ x: number; y: number; r: number; o: number; dur: number; delay: number }> = [];
+    let seed = 0xCAFE;
+    const rnd = (): number => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; return ((seed >>> 0) % 100000) / 100000; };
+    for (let i = 0; i < 90; i++) {
+      out.push({
+        x: rnd() * 100,
+        y: rnd() * 50,
+        r: 0.18 + rnd() * 0.35,
+        o: 0.35 + rnd() * 0.55,
+        dur: 2.2 + rnd() * 3.6,
+        delay: rnd() * 4,
+      });
+    }
+    return out;
+  }, []);
+
+  // Drifting aircraft across the upper sky.
+  const drifters = useMemo(() => [
+    { y: 9,  scale: 0.7, period: 32000, phase: 0.00, dir:  1, accent: '#F8FAFC' },
+    { y: 17, scale: 0.5, period: 41000, phase: 0.35, dir:  1, accent: '#CBD5E1' },
+    { y: 25, scale: 0.6, period: 36000, phase: 0.65, dir: -1, accent: '#F8FAFC' },
+    { y: 32, scale: 0.4, period: 48000, phase: 0.10, dir:  1, accent: '#94A3B8' },
+  ], []);
+
+  // Hero takeoff every ~20s. Path goes from (78, 75) — lower-right
+  // (runway departure end) — to (52, 18) — upper-left (into the
+  // clouds). Visible during 5–70% of the period.
+  const heroPeriod = 20000;
+  const heroT = (now / heroPeriod) % 1;
+  const heroVisible = heroT > 0.05 && heroT < 0.70;
+  const heroProg = heroVisible ? (heroT - 0.05) / 0.65 : 0;
+  const heroX = 78 - heroProg * 26;
+  const heroY = 75 - heroProg * 57;
+  const heroRot = -32 + heroProg * 6;
+  const heroScale = 0.9 + heroProg * 0.6;
+  const heroOpacity = heroProg < 0.05 ? heroProg / 0.05
+    : heroProg > 0.85 ? (1 - heroProg) / 0.15 : 1;
+
+  // Runway approach lights — perspective line from near end (52, 78)
+  // toward vanishing point (58, 40). Each light strobes on its own
+  // phase so the sequence reads as a wave racing to the horizon.
+  const lights = useMemo(() => {
+    const out: Array<{ x: number; y: number; r: number; phase: number }> = [];
+    const N = 8;
+    for (let i = 0; i < N; i++) {
+      const t = i / (N - 1);
+      const x = 52 + t * 6;
+      const y = 78 - t * 38;
+      const r = 0.9 - t * 0.55;
+      out.push({ x, y, r, phase: t * 0.7 });
+    }
+    return out;
+  }, []);
+
+  return (
+    <>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" style={svgLayer} aria-hidden>
+        {/* Stars */}
+        {stars.map((s, i) => (
+          <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#F8FAFC" opacity={s.o}>
+            <animate attributeName="opacity"
+              values={`${s.o};${s.o + 0.35};${s.o}`}
+              dur={`${s.dur}s`} begin={`${s.delay}s`} repeatCount="indefinite" />
+          </circle>
+        ))}
+
+        {/* Subtle cloud wisps drifting slowly across the upper sky */}
+        {[
+          { y: 6,  period: 90000, phase: 0.0,  o: 0.10 },
+          { y: 14, period: 110000, phase: 0.4, o: 0.08 },
+          { y: 22, period: 130000, phase: 0.7, o: 0.06 },
+        ].map((c, i) => {
+          const t = ((now / c.period) + c.phase) % 1;
+          const x = -20 + t * 140;
+          return (
+            <ellipse key={`cloud-${i}`} cx={x} cy={c.y} rx="18" ry="2.4"
+              fill="#F8FAFC" opacity={c.o} />
+          );
+        })}
+
+        {/* Drifting aircraft */}
+        {drifters.map((d, i) => {
+          const t = ((now / d.period) + d.phase) % 1;
+          const x = d.dir > 0 ? -10 + t * 120 : 110 - t * 120;
+          const angle = d.dir > 0 ? -2 : 178;
+          return (
+            <g key={`drift-${i}`} transform={`translate(${x} ${d.y}) rotate(${angle}) scale(${d.scale})`}>
+              <path d="M -7 0 L -1.5 0" stroke={d.accent} strokeWidth="0.45" opacity="0.55" strokeLinecap="round" />
+              <path d="M -2 0 L 1.8 -0.6 L 1.8 0.6 Z" fill={d.accent} />
+              <path d="M -0.5 -1.0 L 0.5 -1.0 L 0 0 Z" fill={d.accent} opacity="0.85" />
+              <path d="M -0.5 1.0 L 0.5 1.0 L 0 0 Z" fill={d.accent} opacity="0.85" />
+              <circle cx="1.8" cy="0" r="0.35" fill={tailColor} />
+            </g>
+          );
+        })}
+
+        {/* Hero takeoff aircraft */}
+        {heroVisible && (
+          <g transform={`translate(${heroX} ${heroY}) rotate(${heroRot}) scale(${heroScale})`} opacity={heroOpacity}>
+            <path d="M -20 0 L -2.4 0" stroke="#F8FAFC" strokeWidth="0.55" strokeLinecap="round" opacity="0.55" />
+            <path d="M -28 0 L -16 0" stroke="#F8FAFC" strokeWidth="0.35" strokeLinecap="round" opacity="0.25" />
+            <path d="M -3 0 L 3 -1 L 3 1 Z" fill="#F8FAFC" />
+            <path d="M -1 -1.6 L 0.6 -1.6 L 0 0 Z" fill={tailColor} />
+            <path d="M -1 1.6 L 0.6 1.6 L 0 0 Z" fill={tailColor} />
+            <path d="M -3.5 -1 L -4.4 -1.6 L -3.8 0 L -4.4 1.6 L -3.5 1 Z" fill={tailColor} />
+            <circle cx="3" cy="0" r="0.55" fill={tailColor} />
+            <circle cx="-1" cy="-1.6" r="0.32" fill={COLOR.gold.base}>
+              <animate attributeName="opacity" values="0.4;1;0.4" dur="0.7s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="-1" cy="1.6" r="0.32" fill="#F87171">
+              <animate attributeName="opacity" values="0.4;1;0.4" dur="0.7s" begin="0.35s" repeatCount="indefinite" />
+            </circle>
+          </g>
+        )}
+
+        {/* Runway approach-light sequence racing to vanishing point */}
+        {lights.map((p, i) => (
+          <circle key={`rl-${i}`} cx={p.x} cy={p.y} r={p.r * 0.6}
+            fill={COLOR.gold.base} opacity="0.85"
+            style={{
+              filter: `drop-shadow(0 0 ${p.r * 2}px ${COLOR.gold.base})`,
+            }}>
+            <animate attributeName="opacity"
+              values="0.25;1;0.25"
+              dur="2.4s" begin={`${p.phase}s`} repeatCount="indefinite" />
+            <animate attributeName="r"
+              values={`${p.r * 0.5};${p.r * 0.95};${p.r * 0.5}`}
+              dur="2.4s" begin={`${p.phase}s`} repeatCount="indefinite" />
+          </circle>
+        ))}
+
+        {/* Distant city-light blinks below the horizon */}
+        {[
+          { x: 18, y: 42, dur: 3.2 },
+          { x: 84, y: 44, dur: 2.6 },
+          { x: 24, y: 46, dur: 3.8 },
+          { x: 72, y: 41, dur: 3.0 },
+          { x: 30, y: 43, dur: 4.2 },
+        ].map((c, i) => (
+          <circle key={`city-${i}`} cx={c.x} cy={c.y} r="0.35"
+            fill={tailColor} opacity="0.7"
+            style={{ filter: `drop-shadow(0 0 1px ${tailColor})` }}>
+            <animate attributeName="opacity" values="0.3;1;0.3" dur={`${c.dur}s`} repeatCount="indefinite" />
+          </circle>
+        ))}
+      </svg>
+
+      {/* Radar sweep — slow conic-gradient wedge over the terminal /
+          tower area on the left of the photo. */}
+      <motion.div
+        style={radarSweep(tailColor) as Record<string, unknown>}
+        animate={{ rotate: 360 }}
+        transition={{ duration: 7, ease: 'linear', repeat: Infinity }}
+        aria-hidden
+      />
+
+      {/* Gold streaks travelling up the runway perspective line */}
+      <RunwayStreaks />
+    </>
+  );
+}
+
+function RunwayStreaks() {
+  return (
+    <div style={streakWrap} aria-hidden>
+      {[0, 1, 2].map((i) => (
+        <div key={i} style={{
+          ...streakDot,
+          animation: `runwayStreak 3.6s ease-in ${i * 1.2}s infinite`,
+        }} />
+      ))}
+      <style>{`
+        @keyframes runwayStreak {
+          0%   { transform: translate(-50%, 0)              scale(1.2); opacity: 0; }
+          12%  { opacity: 0.95; }
+          70%  { transform: translate(calc(-50% + 16px), -36vh) scale(0.4); opacity: 0.95; }
+          100% { transform: translate(calc(-50% + 22px), -44vh) scale(0.22); opacity: 0; }
+        }
+      `}</style>
+    </div>
   );
 }
 
@@ -177,10 +366,6 @@ const shell: React.CSSProperties = {
   overflow: 'hidden',
 };
 
-// The background image. Cover fit, centered, so portrait phones show
-// the photograph without distortion. URL is `/start-bg.png` because
-// the file lives at /home/user/airport/skyhaven/app/public/ and Vite
-// serves the public directory at the root URL.
 const bgImage: React.CSSProperties = {
   position: 'absolute',
   inset: 0,
@@ -190,36 +375,84 @@ const bgImage: React.CSSProperties = {
   backgroundRepeat: 'no-repeat',
 };
 
-// Top darkening gradient — sky portion gets ~70% darker to lift the
-// wordmark off the clouds.
+const svgLayer: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  width: '100%',
+  height: '100%',
+  pointerEvents: 'none',
+  zIndex: 2,
+};
+
+// Radar sweep wedge anchored over the terminal area on the left.
+const radarSweep = (tail: string): React.CSSProperties => ({
+  position: 'absolute',
+  left: '12%',
+  top: '32%',
+  width: 240,
+  height: 240,
+  marginLeft: -120,
+  marginTop: -120,
+  borderRadius: '50%',
+  background: `conic-gradient(from 0deg, ${tail}3a 0deg, ${tail}28 14deg, transparent 50deg, transparent 360deg)`,
+  filter: 'blur(2px)',
+  opacity: 0.45,
+  pointerEvents: 'none',
+  zIndex: 2,
+  mixBlendMode: 'screen',
+});
+
+// Runway streaks: small dots that travel up the runway perspective line
+// from the near end (~52% horizontal, 78% vertical) toward the
+// vanishing point.
+const streakWrap: React.CSSProperties = {
+  position: 'absolute',
+  left: '52%',
+  top: '78%',
+  width: 1,
+  height: 1,
+  pointerEvents: 'none',
+  zIndex: 2,
+};
+const streakDot: React.CSSProperties = {
+  position: 'absolute',
+  left: '50%',
+  top: 0,
+  width: 5,
+  height: 2.5,
+  borderRadius: 1,
+  background: COLOR.gold.base,
+  boxShadow: `0 0 10px ${COLOR.gold.base}, 0 0 22px ${COLOR.gold.base}`,
+  transform: 'translate(-50%, 0)',
+};
+
 const topShade: React.CSSProperties = {
   position: 'absolute',
   top: 0, left: 0, right: 0,
   height: '38%',
   background: 'linear-gradient(180deg, rgba(7,10,24,0.78) 0%, rgba(7,10,24,0.45) 60%, rgba(7,10,24,0) 100%)',
   pointerEvents: 'none',
+  zIndex: 3,
 };
 
-// Bottom darkening gradient — runway portion gets ~70% darker so the
-// CTA pops without obscuring the suited figure on the left.
 const bottomShade: React.CSSProperties = {
   position: 'absolute',
   left: 0, right: 0, bottom: 0,
   height: '32%',
   background: 'linear-gradient(0deg, rgba(7,10,24,0.92) 0%, rgba(7,10,24,0.62) 50%, rgba(7,10,24,0) 100%)',
   pointerEvents: 'none',
+  zIndex: 3,
 };
 
-// Subtle tail-colour vignette around the edges.
 const vignette = (tail: string): React.CSSProperties => ({
   position: 'absolute',
   inset: 0,
   background: `radial-gradient(ellipse at center, transparent 50%, ${tail}22 100%)`,
   pointerEvents: 'none',
   mixBlendMode: 'screen',
+  zIndex: 3,
 });
 
-// Top area: logo + slogan.
 const topArea: React.CSSProperties = {
   position: 'absolute',
   left: 0, right: 0,
@@ -272,8 +505,6 @@ const slogan: React.CSSProperties = {
   lineHeight: 1.4,
 };
 
-// CTA area: anchored to the bottom-right of the photo so the suited
-// figure on the lower-left of the image stays unobscured.
 const ctaArea: React.CSSProperties = {
   position: 'absolute',
   left: 0, right: 0,
