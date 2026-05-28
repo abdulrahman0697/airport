@@ -21,6 +21,7 @@ import { MapLiveTicker } from './components/MapLiveTicker';
 import { MoneyTrailLayer } from './components/MoneyTrail';
 import { HubPicker } from './components/HubPicker';
 import { IntroSplash } from './components/IntroSplash';
+import { LivingAirportSplash } from './components/LivingAirportSplash';
 import { OfflineSummary } from './components/OfflineSummary';
 import { StayInTouchCard } from './components/StayInTouchCard';
 import { Tutorial } from './components/Tutorial';
@@ -95,7 +96,15 @@ export function App() {
       <Tutorial />
       <FirstRouteCeremony />
       <FirstTakeoffCinematic />
-      <IntroSplash />
+      {/* LivingAirportSplash is the new opening surface — fully alive
+          airport scene with route arcs overhead and ground motion.
+          The legacy IntroSplash stays in the tree but no longer
+          renders because LivingAirportSplash dismisses the same
+          uiStore flag. We keep the import so a future rollback is a
+          one-line swap. */}
+      <LivingAirportSplash />
+      {/* Suppress the legacy splash entirely. */}
+      {false && <IntroSplash />}
     </ErrorBoundary>
   );
 }
