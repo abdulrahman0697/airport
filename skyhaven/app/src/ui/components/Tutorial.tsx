@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   selectPendingHubPickRegion,
   selectTailColor,
@@ -7,38 +7,43 @@ import {
   selectTutorialStep,
   useGameStore,
 } from '../../state/store';
+import { AirlineCrest } from '../design/AirlineCrest';
 import { Button } from '../design/Button';
-import { Typewriter } from '../design/Typewriter';
+import { COLOR, RADIUS, SPACE } from '../design/tokens';
 import { usePanelStore, type PanelId } from './PanelHost';
 import { useUiStore } from '../../state/uiStore';
 import type { SaveState } from '../../engine/types';
 
 /**
- * Playable tutorial (BRD §5.2).
+ * Playable tutorial — Design Review v3, points 2, 4, 5.
  *
- * Interactive walkthrough — each step either takes a quick player
- * input (rename) or watches the real game state for the player to
- * perform the action (sign a contract, buy a plane, open a route).
- * A glowing spotlight ring sits over the target UI element; a
- * tooltip card on the *opposite* end of the screen explains what to
- * do without obscuring the target. Auto-advances on state check.
+ * The previous version used giant "Mission Briefing" cards that froze
+ * the world and felt like form-filling. The new version uses two
+ * patterns:
  *
- * Failure-proof: navigation isn't blocked; the tutorial just waits.
+ *  1. Mission Control strip (~20–25% screen height, docked low,
+ *     non-blocking) for routine wait-state instructions. Three slots:
+ *     Objective, Tap, Reward — plus a glowing line/ring on the target
+ *     UI element. The player can keep interacting with the world; the
+ *     strip just nudges.
+ *
+ *  2. Full-screen emotional moments only for the open (welcome),
+ *     close (you're ready), and the Founder Card identity step.
+ *
+ * Copy follows a strict template: action verb + screen + exact button
+ * + result. No "switch to 'B" half-words.
  */
 
-/**
- * A target spec is either a single data-tutorial key or a *chain*.
- * useTargetRect tries each key in order and locks on to the first
- * element that's actually in the DOM, so the spotlight can shift as
- * the player progresses through nested UI (panel → buy tab → atr-42).
- */
 type TargetSpec = string | readonly string[];
 
 type Step =
   | { kind: 'info'; title: string; body: string; cta: string }
   | { kind: 'identity'; title: string; body: string }
   | {
-      kind: 'wait-state'; title: string; body: string;
+      kind: 'wait-state';
+      title: string;
+      tap: string;
+      reward: string;
       targetFor: (panel: PanelId) => TargetSpec;
       check: (s: SaveState) => boolean;
     }
@@ -48,25 +53,27 @@ const STEPS: readonly Step[] = [
   {
     kind: 'info',
     title: 'Welcome to SkyHaven Tycoon',
-    body: "Build an airline that owns the sky. Let's set you up — we'll do everything together.",
-    cta: 'Begin',
+    body: 'You are about to found an airline with $50K of founder capital. From one regional turboprop to a global aviation empire — let’s start.',
+    cta: 'Begin Boarding',
   },
   {
     kind: 'identity',
-    title: 'Name your airline',
-    body: 'Pick a name and a tail colour. Your two-letter code follows automatically.',
+    title: 'Found your airline',
+    body: 'Pick a name, choose a tail colour, and your two-letter call sign follows automatically.',
   },
   {
     kind: 'wait-state',
-    title: 'Secure more fuel',
-    body: 'Tap the glowing fuel gauge, then sign the highlighted Local Refinery contract.',
+    title: 'Secure your fuel pipeline',
+    tap: 'Open Fuel → Sign Local Refinery contract',
+    reward: '+ steady fuel supply (lifts route gate)',
     targetFor: (panel) => panel === 'fuel' ? 'fuel-sign-contract' : 'fuel-gauge',
     check: (s) => s.fuel.contracts.length >= 2,
   },
   {
     kind: 'wait-state',
     title: 'Buy your second aircraft',
-    body: 'Open Fleet, switch to "Buy aircraft", then buy the highlighted ATR 42 ($25K).',
+    tap: 'Open Hangar → Buy aircraft tab → ATR 42 → Buy + deliver ($25K)',
+    reward: '+1 aircraft ready to fly',
     targetFor: (panel) => panel === 'fleet'
       ? ['buy-aircraft-atr42', 'fleet-buy-tab']
       : 'fleet-tab',
@@ -75,7 +82,8 @@ const STEPS: readonly Step[] = [
   {
     kind: 'wait-state',
     title: 'Open your first route',
-    body: 'Tap "+ New route", then pick an origin (your hub), a destination, and confirm.',
+    tap: 'Operations → New route → pick origin + destination → Authorize Route',
+    reward: 'Active route + immediate income/min',
     targetFor: (panel) => panel === 'routes'
       ? ['routes-confirm-button', 'routes-dest-select', 'routes-origin-select', 'routes-new-button']
       : 'routes-tab',
@@ -83,15 +91,15 @@ const STEPS: readonly Step[] = [
   },
   {
     kind: 'wait-time',
-    title: 'Watch it earn',
-    body: 'Your route is flying. Cash counts up automatically — no taps needed.',
+    title: 'Watch the empire breathe',
+    body: 'Your aircraft is flying. Cash counts up automatically — no taps to claim. SkyHaven is an idle airline.',
     durationMs: 6_000,
   },
   {
     kind: 'info',
-    title: "You're ready",
-    body: 'An objective card will guide your next steps. Hubs, regions, managers, classics — the skies are yours.',
-    cta: "Let's go",
+    title: 'You’re ready, Founder',
+    body: 'Your home airport will physically grow with every milestone. Open routes. Hire managers. Unlock regions. The skies are yours.',
+    cta: 'Open Your Network',
   },
 ];
 
@@ -128,26 +136,65 @@ export function Tutorial() {
   const introDismissed = useUiStore((s) => s.introDismissed);
   const pendingHubPick = useGameStore(selectPendingHubPickRegion);
   if (!introDismissed) return null;
-  // Hub picker takes priority over the tutorial so the player doesn't
-  // see overlapping cards on first launch (BRD §5.2 sequencing).
   if (pendingHubPick !== null) return null;
   if (completed) return null;
   if (!current) return null;
 
-  return (
-    <>
-      {current.kind === 'wait-state' && rect && <Spotlight rect={rect} />}
-      <TutorialCard
+  // Wait-state steps render the compact, non-blocking Mission Control
+  // strip + a soft glow ring on the target. Info / identity / wait-time
+  // steps render a centered emotional moment.
+  if (current.kind === 'wait-state') {
+    return (
+      <>
+        {rect && <TargetGlow rect={rect} tailColor={tailColor} />}
+        <MissionControlStrip
+          step={step}
+          total={STEPS.length}
+          tailColor={tailColor}
+          title={current.title}
+          tap={current.tap}
+          reward={current.reward}
+          hasTarget={rect !== null}
+        />
+      </>
+    );
+  }
+
+  if (current.kind === 'wait-time') {
+    return (
+      <MissionControlStrip
         step={step}
         total={STEPS.length}
-        current={current}
         tailColor={tailColor}
-        airlineName={airlineName}
-        targetRect={rect}
-        onAdvance={advance}
-        onSetIdentity={(name, color): void => { setIdentity(name, color); advance(); }}
+        title={current.title}
+        tap={current.body}
+        reward="Auto-advances in a moment"
+        hasTarget={false}
       />
-    </>
+    );
+  }
+
+  if (current.kind === 'identity') {
+    return (
+      <FounderCard
+        airlineName={airlineName}
+        tailColor={tailColor}
+        onConfirm={(name, color): void => { setIdentity(name, color); advance(); }}
+      />
+    );
+  }
+
+  // info: full emotional moment
+  return (
+    <InfoMoment
+      title={current.title}
+      body={current.body}
+      cta={current.cta}
+      tailColor={tailColor}
+      step={step}
+      total={STEPS.length}
+      onAdvance={advance}
+    />
   );
 }
 
@@ -188,385 +235,430 @@ function useTargetRect(target: TargetSpec | null): DOMRect | null {
   return rect;
 }
 
-// ─── Spotlight ring + soft dim ───────────────────────────────────────
+// ─── Target glow ring (NO blocker backdrop) ─────────────────────────
 /**
- * Renders a glowing ring around the tutorial target *and* four
- * click-absorbing panels that cover the rest of the screen. The rect
- * is "cut out" by leaving a hole in the centre — taps inside the hole
- * fall through to the underlying control, while taps outside are
- * swallowed and gently rejected so the player can only progress by
- * doing the suggested action.
+ * A pulsing cyan ring around the tutorial target. Unlike the previous
+ * Spotlight component, this does NOT cover the rest of the screen with
+ * a dim blocker — the player keeps full access to the world while
+ * Mission Control nudges them.
  */
-function Spotlight({ rect }: { rect: DOMRect }) {
+function TargetGlow({ rect, tailColor }: { rect: DOMRect; tailColor: string }) {
   const padding = 8;
   const x = rect.left - padding;
   const y = rect.top - padding;
   const w = rect.width + padding * 2;
   const h = rect.height + padding * 2;
   return (
-    <>
-      {/* Click-blocking panels: top / bottom / left / right of the hole */}
-      <div style={{ ...blocker, top: 0, left: 0, right: 0, height: Math.max(0, y) }} />
-      <div style={{ ...blocker, top: y + h, left: 0, right: 0, bottom: 0 }} />
-      <div style={{ ...blocker, top: y, left: 0, width: Math.max(0, x), height: h }} />
-      <div style={{ ...blocker, top: y, left: x + w, right: 0, height: h }} />
-      <motion.div
-        key={`${rect.left}-${rect.top}-${rect.width}`}
-        initial={{ opacity: 0 }}
-        animate={{
-          opacity: 1,
-          scale: [1, 1.06, 1],
-        }}
-        transition={{
-          opacity: { duration: 0.22 },
-          scale: { duration: 1.6, repeat: Infinity, ease: 'easeInOut' },
-        }}
-        style={{
-          position: 'fixed',
-          left: x,
-          top: y,
-          width: w,
-          height: h,
-          borderRadius: 14,
-          border: '2px solid #5AC8FA',
-          boxShadow:
-            '0 0 32px rgba(90,200,250,0.7), inset 0 0 18px rgba(90,200,250,0.18)',
-          pointerEvents: 'none',
-          zIndex: 201,
-        }}
-      />
-    </>
+    <motion.div
+      key={`${rect.left}-${rect.top}-${rect.width}`}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1, scale: [1, 1.04, 1] }}
+      transition={{
+        opacity: { duration: 0.22 },
+        scale: { duration: 1.5, repeat: Infinity, ease: 'easeInOut' },
+      }}
+      style={{
+        position: 'fixed',
+        left: x,
+        top: y,
+        width: w,
+        height: h,
+        borderRadius: 14,
+        border: `2px solid ${tailColor}`,
+        boxShadow:
+          `0 0 32px ${tailColor}b3, inset 0 0 18px ${tailColor}30`,
+        pointerEvents: 'none',
+        zIndex: 35,
+      } as Record<string, unknown>}
+    />
   );
 }
 
-const blocker: React.CSSProperties = {
-  position: 'fixed',
-  background: 'rgba(0,0,0,0.55)',
-  pointerEvents: 'auto',
-  zIndex: 200,
-};
-
-// ─── The tutorial card ───────────────────────────────────────────────
-function TutorialCard({
-  step, total, current, tailColor, airlineName, targetRect,
-  onAdvance, onSetIdentity,
+// ─── Mission Control strip (compact, docked above bottom tabs) ───────
+function MissionControlStrip({
+  step, total, tailColor, title, tap, reward, hasTarget,
 }: {
   step: number;
   total: number;
-  current: Step;
   tailColor: string;
-  airlineName: string;
-  targetRect: DOMRect | null;
-  onAdvance: () => void;
-  onSetIdentity: (name: string, color: string) => void;
+  title: string;
+  tap: string;
+  reward: string;
+  hasTarget: boolean;
 }) {
-  const placement = useMemo(() => {
-    if (current.kind !== 'wait-state' || !targetRect) return 'center' as const;
-    // Geometric fit: pick the shell whose y-range does not intersect the
-    // target rect. Crude top/bottom heuristics fail mid-screen targets
-    // (e.g. a buy button on the third row of a list) — the card ends up
-    // sitting on top of the very control the player needs to tap.
-    const CARD_H = 320;
-    const GAP = 16;
-    const TOP_ANCHOR = 100;     // matches shellTop's `top` offset
-    const BOTTOM_ANCHOR = 144;  // matches shellBottom's `bottom` offset
-    const H = window.innerHeight;
-    const topShellBottomY = TOP_ANCHOR + CARD_H + GAP;
-    const bottomShellTopY = H - BOTTOM_ANCHOR - CARD_H - GAP;
-    const topSafe = targetRect.top >= topShellBottomY;
-    const bottomSafe = targetRect.bottom <= bottomShellTopY;
-    if (topSafe && bottomSafe) {
-      const targetMid = (targetRect.top + targetRect.bottom) / 2;
-      return targetMid > H / 2 ? 'top' as const : 'bottom' as const;
-    }
-    if (topSafe) return 'top' as const;
-    if (bottomSafe) return 'bottom' as const;
-    const topOverlap = Math.max(0, topShellBottomY - targetRect.top);
-    const bottomOverlap = Math.max(0, targetRect.bottom - bottomShellTopY);
-    return topOverlap < bottomOverlap ? 'top' as const : 'bottom' as const;
-  }, [current.kind, targetRect]);
-
   return (
     <AnimatePresence mode="wait">
       <motion.div
-        key={`step-${step}-${placement}`}
-        initial={{ y: placement === 'top' ? -24 : placement === 'bottom' ? 24 : 16, opacity: 0 }}
+        key={`mission-${step}`}
+        initial={{ y: 30, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        exit={{ opacity: 0 }}
+        exit={{ y: 30, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 360, damping: 28 }}
-        style={(placement === 'center' ? shellCenter : placement === 'top' ? shellTop : shellBottom) as Record<string, unknown>}
+        style={stripShell(tailColor) as Record<string, unknown>}
       >
-        <div style={card}>
-          {/* Scanline overlay — a game-HUD touch */}
-          <div style={scanlines} aria-hidden />
-          {/* Cyan top glow bar */}
-          <div style={topGlow(tailColor)} aria-hidden />
-
-          <div style={kicker}>
-            <span style={kickerLeft}>● Mission Briefing</span>
-            {current.kind === 'wait-state' && <span style={waitTag}>waiting for you</span>}
-            {current.kind === 'wait-time' && <span style={waitTagNeutral}>auto-advance</span>}
+        <div style={stripKickerRow}>
+          <span style={stripKicker(tailColor)}>
+            <span style={kickerDot(tailColor)} />
+            MISSION CONTROL · {step}/{total - 1}
+          </span>
+          <span style={stripStatus}>
+            {hasTarget ? 'Glowing target on screen' : 'Waiting for action'}
+          </span>
+        </div>
+        <div style={stripTitle}>{title}</div>
+        <div style={stripBody}>
+          <div style={stripCell}>
+            <div style={stripCellLabel}>TAP</div>
+            <div style={stripCellValue}>{tap}</div>
           </div>
-
-          <StepDots step={step} total={total} tailColor={tailColor} />
-
-          <h2 style={title}>{current.title}</h2>
-          <p style={body}>
-            <Typewriter text={current.body} cps={48} />
-          </p>
-
-          {current.kind === 'identity' && (
-            <IdentityFields
-              initialName={airlineName}
-              initialColor={tailColor}
-              onSubmit={onSetIdentity}
-            />
-          )}
-
-          {current.kind === 'info' && (
-            <Button
-              variant="primary"
-              size="lg"
-              fullWidth
-              accent={tailColor}
-              onClick={onAdvance}
-            >
-              {current.cta}
-            </Button>
-          )}
+          <div style={stripCellAccent(tailColor)}>
+            <div style={stripCellLabel}>REWARD</div>
+            <div style={{ ...stripCellValue, color: COLOR.gold.base }}>{reward}</div>
+          </div>
         </div>
       </motion.div>
     </AnimatePresence>
   );
 }
 
-function IdentityFields({
-  initialName, initialColor, onSubmit,
+// ─── Founder Card (identity moment) ─────────────────────────────────
+const NAME_SUGGESTIONS = ['SkyHaven Air', 'HavenJet', 'GulfWing'];
+const SWATCHES = ['#5AC8FA', '#F4C75B', '#8B5CF6', '#F87171', '#34D399', '#FFFFFF'];
+
+function FounderCard({
+  airlineName, tailColor, onConfirm,
 }: {
-  initialName: string;
-  initialColor: string;
-  onSubmit: (name: string, color: string) => void;
+  airlineName: string;
+  tailColor: string;
+  onConfirm: (name: string, color: string) => void;
 }) {
-  const [name, setName] = useState(initialName);
-  const [color, setColor] = useState(initialColor);
-  const colors = ['#5AC8FA', '#F4C75B', '#8B5CF6', '#F87171', '#34D399', '#FFFFFF'];
+  const [name, setName] = useState(airlineName || NAME_SUGGESTIONS[0]!);
+  const [color, setColor] = useState(tailColor);
+  const [editing, setEditing] = useState(false);
+
   return (
-    <div>
-      <label style={fieldLabel}>Airline name</label>
-      <input
-        value={name}
-        onChange={(e): void => setName(e.target.value.slice(0, 20))}
-        style={input}
-        maxLength={20}
-        placeholder="SkyHaven Airlines"
-      />
-      <label style={fieldLabel}>Tail colour</label>
-      <div style={swatchRow}>
-        {colors.map((c) => (
-          <button
-            key={c}
-            onClick={(): void => setColor(c)}
-            style={{
-              ...swatch,
-              background: c,
-              outline: color === c ? '2px solid rgba(255,255,255,0.85)' : 'none',
-              outlineOffset: 2,
-            }}
-            aria-label={`Choose ${c}`}
-          />
-        ))}
-      </div>
-      <div style={{ marginTop: 14 }}>
-        <Button
-          variant="primary"
-          size="lg"
-          fullWidth
-          accent={color}
-          onClick={(): void => onSubmit(name.trim() || 'SkyHaven Airlines', color)}
-        >
-          Continue
-        </Button>
-      </div>
-    </div>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={founderShell as Record<string, unknown>}
+    >
+      <motion.div
+        initial={{ scale: 0.92, opacity: 0, y: 18 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 320, damping: 26 }}
+        style={founderCard(color) as Record<string, unknown>}
+      >
+        <div style={founderKicker(color)}>FOUNDER CARD</div>
+
+        <div style={founderHero}>
+          <AirlineCrest name={name} tailColor={color} size={88} />
+        </div>
+
+        <h2 style={founderTitle}>{name.toUpperCase()}</h2>
+        <div style={founderTagline}>est. {new Date().getFullYear()}  ·  Aviation Empire (Founding)</div>
+
+        {!editing ? (
+          <>
+            <div style={founderHint}>QUICK PICK A NAME</div>
+            <div style={suggestionsRow}>
+              {NAME_SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  onClick={(): void => setName(s)}
+                  style={{
+                    ...suggestionPill,
+                    borderColor: name === s ? color : 'rgba(148,163,184,0.3)',
+                    background: name === s ? `${color}22` : 'rgba(11,17,32,0.5)',
+                    color: name === s ? color : COLOR.ink.secondary,
+                  }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+            <button onClick={(): void => setEditing(true)} style={customizeBtn}>
+              Customize name …
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={founderHint}>YOUR AIRLINE NAME</div>
+            <input
+              autoFocus
+              value={name}
+              onChange={(e): void => setName(e.target.value.slice(0, 20))}
+              style={nameInput}
+              maxLength={20}
+              placeholder="SkyHaven Air"
+            />
+          </>
+        )}
+
+        <div style={founderHint}>TAIL COLOUR</div>
+        <div style={swatchRow}>
+          {SWATCHES.map((c) => (
+            <button
+              key={c}
+              onClick={(): void => setColor(c)}
+              style={{
+                ...swatch,
+                background: c,
+                outline: color === c ? '2px solid rgba(255,255,255,0.9)' : 'none',
+                outlineOffset: 2,
+              }}
+              aria-label={`Choose tail color ${c}`}
+            />
+          ))}
+        </div>
+
+        <div style={{ marginTop: SPACE.l }}>
+          <Button
+            variant="gold"
+            size="lg"
+            fullWidth
+            hapticOnPress="heavy"
+            onClick={(): void => onConfirm(name.trim() || 'SkyHaven Air', color)}
+          >
+            Establish Airline
+          </Button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
-/** Compact step indicator row — dots fill in with the tail color as
- *  the player advances through the briefing chain. */
-function StepDots({ step, total, tailColor }: { step: number; total: number; tailColor: string }) {
+// ─── Info moment (welcome / closing) ────────────────────────────────
+function InfoMoment({
+  title, body, cta, tailColor, step, total, onAdvance,
+}: {
+  title: string;
+  body: string;
+  cta: string;
+  tailColor: string;
+  step: number;
+  total: number;
+  onAdvance: () => void;
+}) {
   return (
-    <div style={stepDotsRow} aria-label={`Step ${step + 1} of ${total}`}>
-      {Array.from({ length: total }).map((_, i) => {
-        const state = i < step ? 'done' : i === step ? 'current' : 'future';
-        return (
-          <span
-            key={i}
-            style={{
-              width: state === 'current' ? 28 : 6,
-              height: 6,
-              borderRadius: 3,
-              background: state === 'future'
-                ? 'rgba(11,17,32,0.15)'
-                : state === 'current'
-                  ? tailColor
-                  : `${tailColor}77`,
-              boxShadow: state === 'current' ? `0 0 8px ${tailColor}` : 'none',
-              transition: 'width 320ms cubic-bezier(0.16,1,0.3,1), background 320ms ease',
-            }}
-          />
-        );
-      })}
-    </div>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={infoShell as Record<string, unknown>}
+    >
+      <motion.div
+        initial={{ scale: 0.94, opacity: 0, y: 16 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 320, damping: 26 }}
+        style={infoCard(tailColor) as Record<string, unknown>}
+      >
+        <div style={infoKicker(tailColor)}>
+           CHAPTER {step + 1} / {total}
+        </div>
+        <h2 style={infoTitle}>{title}</h2>
+        <p style={infoBody}>{body}</p>
+        <Button
+          variant="gold"
+          size="lg"
+          fullWidth
+          accent={tailColor}
+          hapticOnPress="heavy"
+          onClick={onAdvance}
+        >
+          {cta}
+        </Button>
+      </motion.div>
+    </motion.div>
   );
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────
-// All three shells sit ABOVE the Spotlight blockers (z 200) and ring
-// (z 201) so the briefing card reads bright against the dimmed world
-// instead of being painted over by the click-blocker panels.
-const shellCenter: React.CSSProperties = {
+
+const stripShell = (tail: string): React.CSSProperties => ({
+  position: 'fixed',
+  bottom: 'calc(64px + env(safe-area-inset-bottom, 0px) + 8px)',
+  left: 8,
+  right: 8,
+  zIndex: 36,
+  maxWidth: 480,
+  marginLeft: 'auto',
+  marginRight: 'auto',
+  background: 'linear-gradient(150deg, rgba(11,17,32,0.94), rgba(15,23,42,0.94))',
+  border: `1px solid ${tail}66`,
+  borderRadius: RADIUS.l,
+  boxShadow: `0 12px 36px rgba(0,0,0,0.55), 0 0 24px ${tail}33`,
+  backdropFilter: 'blur(14px)',
+  padding: '10px 12px 12px',
+  pointerEvents: 'auto',
+});
+const stripKickerRow: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: 8,
+  marginBottom: 6,
+};
+const stripKicker = (tail: string): React.CSSProperties => ({
+  fontSize: 9,
+  fontWeight: 800,
+  letterSpacing: '0.18em',
+  color: tail,
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+});
+const kickerDot = (tail: string): React.CSSProperties => ({
+  display: 'inline-block',
+  width: 6, height: 6, borderRadius: 999,
+  background: tail,
+  boxShadow: `0 0 6px ${tail}`,
+});
+const stripStatus: React.CSSProperties = {
+  fontSize: 9,
+  letterSpacing: '0.1em',
+  color: COLOR.ink.faint,
+  fontWeight: 600,
+};
+const stripTitle: React.CSSProperties = {
+  fontSize: 15,
+  fontWeight: 800,
+  color: COLOR.ink.primary,
+  letterSpacing: '0.01em',
+  margin: '2px 0 8px',
+};
+const stripBody: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr auto',
+  gap: 8,
+};
+const stripCell: React.CSSProperties = {
+  background: 'rgba(11,17,32,0.55)',
+  border: `1px solid ${COLOR.border.soft}`,
+  borderRadius: RADIUS.s,
+  padding: '6px 10px',
+  minWidth: 0,
+};
+const stripCellAccent = (tail: string): React.CSSProperties => ({
+  background: `linear-gradient(135deg, ${tail}1F, rgba(11,17,32,0.55))`,
+  border: `1px solid ${COLOR.gold.base}55`,
+  borderRadius: RADIUS.s,
+  padding: '6px 10px',
+});
+const stripCellLabel: React.CSSProperties = {
+  fontSize: 8,
+  fontWeight: 800,
+  letterSpacing: '0.18em',
+  color: COLOR.ink.faint,
+};
+const stripCellValue: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 700,
+  color: COLOR.ink.primary,
+  marginTop: 2,
+  lineHeight: 1.35,
+};
+
+// Founder card
+const founderShell: React.CSSProperties = {
   position: 'fixed',
   inset: 0,
   display: 'grid',
   placeItems: 'center',
-  padding: 16,
-  zIndex: 205,
-  pointerEvents: 'none',
+  padding: SPACE.l,
+  background: 'radial-gradient(circle at 50% 30%, rgba(11,17,32,0.65), rgba(7,10,24,0.92))',
+  backdropFilter: 'blur(6px)',
+  zIndex: 60,
 };
-// Target is in the BOTTOM half (bottom-tab spotlights) → card at TOP.
-const shellTop: React.CSSProperties = {
-  position: 'fixed',
-  top: 'calc(env(safe-area-inset-top, 0px) + 88px)',
-  left: 12,
-  right: 12,
-  zIndex: 205,
-  display: 'flex',
-  justifyContent: 'center',
-  pointerEvents: 'none',
-};
-// Target is in the TOP half (fuel-gauge spotlight) → card at BOTTOM,
-// safely above the bottom-tab strip + the goal-chain ribbon.
-const shellBottom: React.CSSProperties = {
-  position: 'fixed',
-  bottom: 'calc(64px + env(safe-area-inset-bottom, 0px) + 80px)',
-  left: 12,
-  right: 12,
-  zIndex: 205,
-  display: 'flex',
-  justifyContent: 'center',
-  pointerEvents: 'none',
-};
-const card: React.CSSProperties = {
+const founderCard = (tail: string): React.CSSProperties => ({
   width: '100%',
   maxWidth: 380,
-  // Glassy bright panel — readable against the dimmed world (Phase 10
-  // owner feedback) but with a game-style scanline overlay + glowing
-  // top bar to read as a Mission Briefing HUD frame.
-  background: 'linear-gradient(160deg, #EFF4FB, #D5DEEF)',
-  borderRadius: 18,
-  padding: '18px 18px 18px',
-  border: '2px solid #5AC8FA',
-  boxShadow:
-    '0 24px 70px rgba(0,0,0,0.55), 0 0 0 4px rgba(90,200,250,0.20), 0 0 56px rgba(90,200,250,0.55)',
-  pointerEvents: 'auto',
-  zIndex: 203,
+  background: 'linear-gradient(170deg, #14213D, #0B1426)',
+  borderRadius: 22,
+  border: `2px solid ${tail}55`,
+  boxShadow: `0 32px 60px rgba(0,0,0,0.6), 0 0 64px ${tail}44`,
+  padding: '22px 22px 20px',
   position: 'relative',
-  overflow: 'hidden',
-  color: '#0B1120',
-};
-const scanlines: React.CSSProperties = {
-  position: 'absolute', inset: 0, pointerEvents: 'none',
-  // Faint horizontal scanline pattern reads as a HUD overlay.
-  backgroundImage:
-    'repeating-linear-gradient(to bottom, transparent 0 3px, rgba(11,17,32,0.04) 3px 4px)',
-  mixBlendMode: 'multiply',
-  opacity: 0.6,
-};
-const topGlow = (tail: string): React.CSSProperties => ({
-  position: 'absolute', top: 0, left: 0, right: 0, height: 3,
-  background: `linear-gradient(90deg, transparent, ${tail}, transparent)`,
-  filter: `drop-shadow(0 0 6px ${tail})`,
 });
-const kicker: React.CSSProperties = {
+const founderKicker = (tail: string): React.CSSProperties => ({
   fontSize: 10,
-  letterSpacing: '0.18em',
-  textTransform: 'uppercase',
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  gap: 12,
   fontWeight: 800,
-  position: 'relative',
-};
-const kickerLeft: React.CSSProperties = {
-  color: '#0B4F73',
-  fontFeatureSettings: '"tnum" 1',
-};
-const stepDotsRow: React.CSSProperties = {
+  letterSpacing: '0.32em',
+  color: tail,
+  textAlign: 'center',
+});
+const founderHero: React.CSSProperties = {
   display: 'flex',
-  alignItems: 'center',
-  gap: 4,
-  marginTop: 12,
-  marginBottom: 4,
-  position: 'relative',
+  justifyContent: 'center',
+  margin: '14px 0 12px',
 };
-const waitTag: React.CSSProperties = {
-  fontSize: 9,
-  color: '#0B4F73',
-  letterSpacing: '0.06em',
-  textTransform: 'none',
-  fontWeight: 700,
-};
-const waitTagNeutral: React.CSSProperties = {
-  fontSize: 9,
-  color: '#475569',
-  letterSpacing: '0.06em',
-  textTransform: 'none',
-  fontWeight: 700,
-};
-const title: React.CSSProperties = {
-  margin: '8px 0 8px',
+const founderTitle: React.CSSProperties = {
+  margin: 0,
   fontSize: 22,
-  color: '#0B1120',
-  fontWeight: 800,
-  lineHeight: 1.2,
-  letterSpacing: '0.01em',
-  position: 'relative',
+  fontWeight: 900,
+  textAlign: 'center',
+  color: COLOR.ink.primary,
+  letterSpacing: '0.08em',
 };
-const body: React.CSSProperties = {
-  margin: '0 0 14px',
-  color: '#1E293B',
-  fontSize: 13,
-  lineHeight: 1.5,
-  minHeight: 39,
-  position: 'relative',
-};
-const fieldLabel: React.CSSProperties = {
-  display: 'block',
-  fontSize: 11,
-  letterSpacing: '0.1em',
+const founderTagline: React.CSSProperties = {
+  fontSize: 10,
+  textAlign: 'center',
+  color: COLOR.ink.faint,
+  letterSpacing: '0.12em',
+  marginTop: 4,
+  marginBottom: SPACE.m,
   textTransform: 'uppercase',
-  color: '#475569',
-  fontWeight: 700,
-  marginTop: 12,
-  marginBottom: 4,
 };
-const input: React.CSSProperties = {
+const founderHint: React.CSSProperties = {
+  fontSize: 9,
+  fontWeight: 800,
+  letterSpacing: '0.22em',
+  color: COLOR.ink.muted,
+  marginTop: SPACE.m,
+  marginBottom: 6,
+};
+const suggestionsRow: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 6,
+};
+const suggestionPill: React.CSSProperties = {
+  fontFamily: 'inherit',
+  fontSize: 12,
+  fontWeight: 700,
+  padding: '8px 12px',
+  borderRadius: 999,
+  border: '1px solid rgba(148,163,184,0.3)',
+  cursor: 'pointer',
+  transition: 'border-color 200ms ease, background 200ms ease, color 200ms ease',
+};
+const customizeBtn: React.CSSProperties = {
+  marginTop: 8,
+  background: 'transparent',
+  color: COLOR.ink.muted,
+  border: 0,
+  fontFamily: 'inherit',
+  fontSize: 11,
+  letterSpacing: '0.08em',
+  cursor: 'pointer',
+  textDecoration: 'underline',
+};
+const nameInput: React.CSSProperties = {
   width: '100%',
-  background: 'rgba(11,17,32,0.06)',
-  border: '1px solid rgba(11,17,32,0.18)',
-  color: '#0B1120',
-  padding: '10px',
-  borderRadius: 8,
+  background: 'rgba(255,255,255,0.06)',
+  border: '1px solid rgba(148,163,184,0.3)',
+  color: COLOR.ink.primary,
+  padding: '10px 12px',
+  borderRadius: 10,
   fontSize: 14,
   fontFamily: 'inherit',
   minHeight: 44,
+  boxSizing: 'border-box',
 };
 const swatchRow: React.CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
-  gap: 10,
-  marginTop: 4,
+  gap: 8,
 };
 const swatch: React.CSSProperties = {
   width: 32,
@@ -574,4 +666,51 @@ const swatch: React.CSSProperties = {
   borderRadius: 8,
   border: 0,
   cursor: 'pointer',
+};
+
+// Info moment
+const infoShell: React.CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  display: 'grid',
+  placeItems: 'center',
+  padding: SPACE.l,
+  background: 'radial-gradient(circle at 50% 30%, rgba(11,17,32,0.55), rgba(7,10,24,0.88))',
+  backdropFilter: 'blur(4px)',
+  zIndex: 60,
+};
+const infoCard = (tail: string): React.CSSProperties => ({
+  width: '100%',
+  maxWidth: 380,
+  background: 'linear-gradient(170deg, #14213D, #0B1426)',
+  borderRadius: 20,
+  border: `2px solid ${tail}55`,
+  boxShadow: `0 32px 60px rgba(0,0,0,0.6), 0 0 56px ${tail}44`,
+  padding: SPACE.l,
+});
+const infoKicker = (tail: string): React.CSSProperties => ({
+  display: 'inline-block',
+  fontSize: 10,
+  fontWeight: 800,
+  letterSpacing: '0.24em',
+  color: tail,
+  background: `${tail}14`,
+  border: `1px solid ${tail}44`,
+  padding: '4px 10px',
+  borderRadius: 999,
+  marginBottom: SPACE.s,
+});
+const infoTitle: React.CSSProperties = {
+  margin: '0 0 8px',
+  fontSize: 24,
+  fontWeight: 900,
+  color: COLOR.ink.primary,
+  letterSpacing: '0.01em',
+  lineHeight: 1.2,
+};
+const infoBody: React.CSSProperties = {
+  margin: `0 0 ${SPACE.l}px`,
+  color: COLOR.ink.secondary,
+  fontSize: 14,
+  lineHeight: 1.55,
 };

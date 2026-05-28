@@ -7,9 +7,8 @@ describe('evaluateAchievements', () => {
   it('returns the same state when nothing newly resolves', () => {
     const s = createInitialState(0);
     // Fresh saves don't yet have any predicate-true achievements
-    // (no aircraft, no hubs, $2M cash but no lifetime, etc).
-    // Pre-seed every cash-threshold to mark as known so we evaluate
-    // no-op deterministically.
+    // (no aircraft, no hubs, $50K cash but no lifetime, etc).
+    // Pre-seed every achievement so we evaluate no-op deterministically.
     const all = { ...s, achievements: ACHIEVEMENT_DEFS.map((d) => d.id) };
     const out = evaluateAchievements(all);
     expect(out.state).toBe(all);
@@ -17,12 +16,13 @@ describe('evaluateAchievements', () => {
     expect(out.totalReward).toBe(0);
   });
 
-  it('unlocks the starter cash achievement on a fresh save (cash $2M)', () => {
+  it('credits the fresh-save predicate achievements (fleet + capacity)', () => {
     const s = createInitialState(0);
     const out = evaluateAchievements(s);
-    // The init state has $2M starter cash — that crosses
-    // econ.cash.1m and econ.cash.100k.
-    expect(out.newlyUnlocked).toEqual(expect.arrayContaining(['econ.cash.100k', 'econ.cash.1m']));
+    // A fresh founder save starts with 1 aircraft (fleet.size.1) and
+    // a starter capacity contract (ops.capacity.2). Starter cash $50K
+    // sits *below* the econ.cash.100k threshold, so those don't credit.
+    expect(out.newlyUnlocked).toEqual(expect.arrayContaining(['fleet.size.1', 'ops.capacity.2']));
     expect(out.totalReward).toBeGreaterThan(0);
     expect(out.state.cash).toBe(s.cash + out.totalReward);
     expect(out.state.lifetimeEarnings).toBe(s.lifetimeEarnings + out.totalReward);

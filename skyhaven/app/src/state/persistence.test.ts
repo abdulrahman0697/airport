@@ -36,7 +36,7 @@ describe('writeSave / loadSave', () => {
     const s = createInitialState(456);
     s.cash = 42;
     await writeSave(s);
-    prefsStore.set('skyhaven.savegame.v2', '{not valid json');
+    prefsStore.set('skyhaven.savegame.v3', '{not valid json');
     const back = await loadSave(Date.now());
     expect(back?.cash).toBe(42);
   });

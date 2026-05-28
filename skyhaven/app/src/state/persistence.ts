@@ -22,8 +22,12 @@ import type { SaveState } from '../engine/types';
 // cinematic onboarding fires on next install. Bumping the key suffix
 // is the safest way: old saves stay on disk (recoverable for debug)
 // but the runtime ignores them and creates a fresh save on launch.
-const KEY_MAIN = 'skyhaven.savegame.v2';
-const KEY_BAK = 'skyhaven.savegame.v2.bak';
+// Bumped from v2 → v3 for the Design Review v3 pass: starter cash
+// reset to $50K, onboarding rewritten, mission card pattern changed.
+// Old saves stay on disk for debug; runtime ignores them and creates
+// a fresh founder save on launch.
+const KEY_MAIN = 'skyhaven.savegame.v3';
+const KEY_BAK = 'skyhaven.savegame.v3.bak';
 
 export async function loadSave(nowMs: number): Promise<SaveState | null> {
   for (const key of [KEY_MAIN, KEY_BAK] as const) {

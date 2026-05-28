@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { useGameStore } from '../../state/store';
+import { useGameStore, selectTutorialCompleted } from '../../state/store';
+import { useUiStore } from '../../state/uiStore';
 import { formatCash } from '../format';
 import { usePanelStore } from './PanelHost';
 
@@ -13,7 +14,10 @@ import { usePanelStore } from './PanelHost';
  */
 export function FuelGauge() {
   const fuel = useGameStore((s) => s.state?.fuel);
+  const tutorialDone = useGameStore(selectTutorialCompleted);
   const open = usePanelStore((s) => s.open);
+  const mapMode = useUiStore((s) => s.mapMode);
+  const activePanel = usePanelStore((s) => s.active);
 
   // Smooth the displayed reserve so the bar doesn't jitter.
   const [shown, setShown] = useState(fuel?.reserve ?? 0);
@@ -46,6 +50,12 @@ export function FuelGauge() {
   }, []);
 
   if (!fuel) return null;
+  // Design Review v3 — the home airport surface owns "fuel" via the
+  // cargo-apron zone + stat tile. Keep the gauge for the tutorial
+  // (which still spotlights it) and for the world-map view. Hide it
+  // on home so the airport diorama isn't overlapped.
+  const homeShellShowing = !mapMode && activePanel === null && tutorialDone;
+  if (homeShellShowing) return null;
   const pct = fuel.capacity > 0 ? Math.max(0, Math.min(1, shown / fuel.capacity)) : 0;
   const net = fuel.supplyRate - fuel.demandRate;
   const draining = net < 0;

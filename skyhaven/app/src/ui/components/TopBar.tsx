@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cashPerSecond } from '../../engine/economy';
 import { getAircraftDef } from '../../data/aircraft';
 import { MAX_TIER, TIER_UNLOCK_THRESHOLDS } from '../../engine/tierUnlocks';
+import { AIRPORT_GROWTH } from '../../data/tierGrowth';
 import {
   selectActiveEvents,
   selectAirlineName,
   selectCash,
   selectHubs,
   selectLifetime,
+  selectRoutes,
   selectTailColor,
   selectTier,
   useGameStore,
@@ -26,6 +28,7 @@ export function TopBar() {
   const lifetime = useGameStore(selectLifetime);
   const hubs = useGameStore(selectHubs);
   const activeEvents = useGameStore(selectActiveEvents);
+  const routes = useGameStore(selectRoutes);
   const state = useGameStore((s) => s.state);
   const open = usePanelStore((s) => s.open);
 
@@ -42,13 +45,48 @@ export function TopBar() {
     setPerSec(total);
   }, [state, hubs, activeEvents]);
 
+  // Design Review v3 — point 8. Pulse the rate when income first
+  // appears so the player sees the empire come alive instead of
+  // staring at "0/min".
+  const wasIdle = useRef(true);
+  const [livePulse, setLivePulse] = useState(false);
+  useEffect(() => {
+    if (perSec > 0 && wasIdle.current) {
+      wasIdle.current = false;
+      setLivePulse(true);
+      const id = window.setTimeout(() => setLivePulse(false), 3000);
+      return () => window.clearTimeout(id);
+    }
+    return undefined;
+  }, [perSec]);
+
   if (!state) return null;
 
-  // Tier progress
+  // Tier progress (kept for ring + advanced mode).
   const curThreshold = TIER_UNLOCK_THRESHOLDS[tier] ?? 0;
   const nextThreshold = tier < MAX_TIER ? (TIER_UNLOCK_THRESHOLDS[tier + 1] ?? curThreshold * 10) : curThreshold;
   const span = Math.max(1, nextThreshold - curThreshold);
   const pct = tier >= MAX_TIER ? 1 : Math.max(0, Math.min(1, (lifetime - curThreshold) / span));
+
+  // Design Review v3 — point 6. Early-game mode shows the next physical
+  // milestone in plain English instead of a percentage to T3. ECO badge
+  // only appears after Tier 3 when environmental mechanics matter.
+  const earlyGame = tier < 3;
+  const nextGrowth = AIRPORT_GROWTH[tier]; // next tier's row
+  const nextGoalText = tier >= MAX_TIER
+    ? 'Max tier reached'
+    : nextGrowth
+      ? `Next: ${nextGrowth.label}`
+      : `Next milestone soon`;
+
+  // Design Review v3 — point 8. "No active routes" reads as truthful;
+  // "0/min" reads as broken.
+  const hasIncome = perSec > 0;
+  const rateText = hasIncome
+    ? formatRate(perSec)
+    : routes.length === 0
+      ? 'No active routes'
+      : 'Spooling up…';
 
   return (
     <header style={shell} aria-label="airline header">
@@ -56,17 +94,17 @@ export function TopBar() {
         <TierRing pct={pct} tier={tier} color={tailColor} size={42} />
         <div style={brandCol}>
           <div style={brandText}>{airlineName.toUpperCase()}</div>
-          <div style={brandSub}>
-            {tier >= MAX_TIER ? 'Max tier reached' : `${Math.round(pct * 100)}% to T${tier + 1}`}
-          </div>
-          <EcoBadge />
+          <div style={brandSub}>{nextGoalText}</div>
+          {!earlyGame && <EcoBadge />}
         </div>
       </button>
       <div style={cashCol}>
         <div style={cashAmount}>
           <RollingCash value={cash} />
         </div>
-        <div style={cashRate}>{formatRate(perSec)}</div>
+        <div style={{ ...cashRate, ...(livePulse ? cashRatePulse : {}), color: hasIncome ? '#34D399' : '#94A3B8' }}>
+          {rateText}
+        </div>
       </div>
       <button
         onClick={(): void => open('office')}
@@ -145,6 +183,17 @@ const cashRate: React.CSSProperties = {
   marginTop: 2,
   letterSpacing: '0.03em',
   fontFeatureSettings: '"tnum" 1',
+  padding: '2px 6px',
+  marginRight: -6,
+  borderRadius: 4,
+  transition: 'background 320ms ease, box-shadow 320ms ease',
+};
+
+// 3-second green halo around income/min the first time it goes
+// non-zero — proves the system is alive (Design Review v3 — point 8).
+const cashRatePulse: React.CSSProperties = {
+  background: 'rgba(52,211,153,0.18)',
+  boxShadow: '0 0 12px rgba(52,211,153,0.45)',
 };
 
 const officeBtn = (color: string): React.CSSProperties => ({

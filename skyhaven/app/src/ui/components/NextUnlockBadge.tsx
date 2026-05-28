@@ -16,8 +16,10 @@ import {
   selectLifetime,
   selectTailColor,
   selectTier,
+  selectTutorialCompleted,
   useGameStore,
 } from '../../state/store';
+import { useUiStore } from '../../state/uiStore';
 import { COLOR, RADIUS, SHADOW, SPACE } from '../design/tokens';
 import { formatCash } from '../format';
 import { usePanelStore } from './PanelHost';
@@ -26,12 +28,17 @@ export function NextUnlockBadge() {
   const tier = useGameStore(selectTier);
   const lifetime = useGameStore(selectLifetime);
   const tailColor = useGameStore(selectTailColor);
+  const tutorialDone = useGameStore(selectTutorialCompleted);
+  const mapMode = useUiStore((s) => s.mapMode);
   const activePanel = usePanelStore((s) => s.active);
   const open = usePanelStore((s) => s.open);
 
-  // Hide while any panel is open or at max tier.
+  // Hide while any panel is open or at max tier. Also hide on home,
+  // where the diorama's own Expansion Preview owns this prompt; the
+  // badge belongs on the world-map view.
   if (activePanel !== null) return null;
   if (tier >= MAX_TIER) return null;
+  if (tutorialDone && !mapMode) return null;
 
   const nextGrowth = growthFor(tier + 1);
   const nextThreshold = TIER_UNLOCK_THRESHOLDS[tier + 1];

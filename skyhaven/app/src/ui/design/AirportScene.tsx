@@ -1,29 +1,39 @@
 /**
- * AirportScene (Design Review v2 — points 2, 14, 22, 23).
+ * AirportScene — Design Review v3 (point 13, 16).
  *
- * A living illustration of the player's home airport. Grows with
- * tier — gates / runways / lounge / tower / parking visibly appear
- * as the player upgrades.
+ * The emotional center of the game. Grows physically with tier and is
+ * tappable: terminal, runway, cargo apron, tower, parking and hotel
+ * each fire `onZoneTap` so a parent can open a zone-detail card.
  *
- * Pure SVG, deterministic. The same set of layers always renders;
- * each layer's opacity / visibility is bound to a tier threshold so
- * progression manifests visually.
+ * Passenger streams (point 16) are a core visual: tiny coloured dots
+ * walk from the terminal entrance to the gates. The number of dots
+ * scales with active route load; if `premium` is requested a few
+ * gold dots appear; if `cargoBacklog` is true the cargo apron shows
+ * extra crates and a slow truck.
  *
  *   Tier 1 — single small terminal + one gate + one runway
- *   Tier 2 — adds a second gate + cargo apron
- *   Tier 3 — adds a control tower with a beacon
+ *   Tier 2 — adds second gate + cargo apron + baggage belt
+ *   Tier 3 — adds control tower with strobing beacon
  *   Tier 4 — adds parking + ground vehicles
- *   Tier 5 — adds a premium lounge wing + lit windows row
- *   Tier 6 — adds a second runway + skybridge
- *   Tier 7 — adds a metro / rail line
- *   Tier 8 — adds a hotel tower
+ *   Tier 5 — adds premium lounge wing + lit windows row
+ *   Tier 6 — adds second runway + skybridge
+ *   Tier 7 — adds metro / rail line
+ *   Tier 8 — adds hotel tower
  *
- * Animated ambient activity: passenger silhouettes walking, ground
- * vehicles moving on the apron, tower beacon strobing, baggage belt
- * scrolling. Honours prefers-reduced-motion at the consumer level —
- * the SVG animations are CSS-driven and stop with the OS pref.
+ * Pure SVG. CSS animations stop with prefers-reduced-motion.
  */
 import { COLOR } from './tokens';
+
+export type AirportZone =
+  | 'terminal'
+  | 'gate'
+  | 'runway'
+  | 'tower'
+  | 'cargo'
+  | 'parking'
+  | 'lounge'
+  | 'hotel'
+  | 'metro';
 
 export interface AirportSceneProps {
   /** Player tier 1..8 — drives which layers render. */
@@ -32,10 +42,29 @@ export interface AirportSceneProps {
   tailColor: string;
   /** Optional width override (px). Height auto from 16:9-ish aspect. */
   width?: number;
+  /** Number of passenger silhouettes to animate (0..8). */
+  passengerLoad?: number;
+  /** Render a few gold-tinted dots — premium pax. */
+  premium?: boolean;
+  /** Cargo crates pile up + slower truck. */
+  cargoBacklog?: boolean;
+  /** A tap fires with the zone that was hit. */
+  onZoneTap?: (z: AirportZone) => void;
+  /** When provided, draws a soft "ghost" of the next-tier upgrade. */
+  showNextGhost?: boolean;
 }
 
-export function AirportScene({ tier, tailColor, width = 360 }: AirportSceneProps) {
+export function AirportScene({
+  tier, tailColor, width = 360,
+  passengerLoad = 3,
+  premium = false,
+  cargoBacklog = false,
+  onZoneTap,
+  showNextGhost = false,
+}: AirportSceneProps) {
   const height = (width * 200) / 400;
+  const tap = (z: AirportZone): React.MouseEventHandler<SVGElement> => () => onZoneTap?.(z);
+
   return (
     <svg
       width={width}
@@ -43,7 +72,7 @@ export function AirportScene({ tier, tailColor, width = 360 }: AirportSceneProps
       viewBox="0 0 400 200"
       role="img"
       aria-label={`Home airport at Tier ${tier}`}
-      style={{ display: 'block', borderRadius: 12, overflow: 'hidden' }}
+      style={{ display: 'block', borderRadius: 12, overflow: 'visible' }}
     >
       <defs>
         <linearGradient id="airport-sky" x1="0" y1="0" x2="0" y2="1">
@@ -68,9 +97,17 @@ export function AirportScene({ tier, tailColor, width = 360 }: AirportSceneProps
           @keyframes pulse-window { 0%,100% { opacity: 0.55; } 50% { opacity: 0.95; } }
           @keyframes drift-vehicle { 0% { transform: translateX(0); } 100% { transform: translateX(60px); } }
           @keyframes drift-vehicle-back { 0% { transform: translateX(60px); } 100% { transform: translateX(0); } }
-          @keyframes drift-passenger { 0% { transform: translateX(0); } 100% { transform: translateX(50px); } }
+          @keyframes drift-passenger { 0% { transform: translateX(0); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateX(80px); opacity: 0; } }
           @keyframes belt-scroll { 0% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -16; } }
           @keyframes plane-taxi { 0% { transform: translateX(0); } 50% { transform: translateX(40px); } 100% { transform: translateX(0); } }
+          @keyframes runway-pulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+          @keyframes ghost-pulse { 0%,100% { opacity: 0.25; } 50% { opacity: 0.55; } }
+          @media (prefers-reduced-motion: reduce) {
+            * { animation: none !important; }
+          }
         `}</style>
       </defs>
 
@@ -103,37 +140,41 @@ export function AirportScene({ tier, tailColor, width = 360 }: AirportSceneProps
       {/* Ground */}
       <rect x="0" y="120" width="400" height="80" fill="url(#airport-ground)" />
 
-      {/* Runway 1 (always present) */}
-      <rect x="40" y="155" width="320" height="6" rx="3" fill="#1E293B" />
-      {/* Centerline dashes */}
-      {[60, 100, 140, 180, 220, 260, 300, 340].map((cx) => (
-        <rect key={cx} x={cx} y={157.5} width="14" height="1" fill="#94A3B8" opacity="0.6" />
-      ))}
-      {/* Runway approach lights */}
-      {[44, 50, 56].map((cx) => (
-        <circle key={cx} cx={cx} cy={158} r="1.2" fill={COLOR.gold.base} opacity="0.8" />
-      ))}
+      {/* Runway 1 (always present) — clickable zone */}
+      <g onClick={tap('runway')} style={{ cursor: onZoneTap ? 'pointer' : 'default' }}>
+        <rect x="40" y="155" width="320" height="6" rx="3" fill="#1E293B" />
+        {[60, 100, 140, 180, 220, 260, 300, 340].map((cx) => (
+          <rect key={cx} x={cx} y={157.5} width="14" height="1" fill="#94A3B8" opacity="0.6" />
+        ))}
+        {[44, 50, 56].map((cx, i) => (
+          <circle key={cx} cx={cx} cy={158} r="1.2" fill={COLOR.gold.base}
+            opacity="0.8"
+            style={{ animation: `runway-pulse ${1.4 + i * 0.2}s ease-in-out ${i * 0.1}s infinite` }} />
+        ))}
+        {[346, 352, 358].map((cx, i) => (
+          <circle key={cx} cx={cx} cy={158} r="1.2" fill={COLOR.gold.base}
+            opacity="0.8"
+            style={{ animation: `runway-pulse ${1.4 + i * 0.2}s ease-in-out ${i * 0.1}s infinite` }} />
+        ))}
+      </g>
 
       {/* Runway 2 (Tier ≥ 6) */}
       {tier >= 6 && (
-        <>
+        <g onClick={tap('runway')} style={{ cursor: onZoneTap ? 'pointer' : 'default' }}>
           <rect x="40" y="175" width="320" height="6" rx="3" fill="#1E293B" />
           {[60, 100, 140, 180, 220, 260, 300, 340].map((cx) => (
             <rect key={`r2-${cx}`} x={cx} y={177.5} width="14" height="1" fill="#94A3B8" opacity="0.5" />
           ))}
-        </>
+        </g>
       )}
 
       {/* Apron / taxiway */}
       <rect x="60" y="142" width="220" height="2" fill="#1E293B" opacity="0.7" />
 
-      {/* Terminal — always present */}
-      <g>
-        {/* Main building */}
+      {/* Terminal — always present, clickable */}
+      <g onClick={tap('terminal')} style={{ cursor: onZoneTap ? 'pointer' : 'default' }}>
         <path d="M50 145 L50 125 L70 118 L160 118 L180 125 L180 145 Z" fill="url(#airport-terminal)" />
-        {/* Roofline accent */}
         <path d="M50 125 L70 118 L160 118 L180 125" stroke={tailColor} strokeOpacity="0.4" strokeWidth="0.8" fill="none" />
-        {/* Front windows row */}
         {[55, 65, 75, 85, 95, 105, 115, 125, 135, 145, 155, 165, 175].map((x, i) => (
           <rect
             key={x}
@@ -146,29 +187,29 @@ export function AirportScene({ tier, tailColor, width = 360 }: AirportSceneProps
             style={{ animation: `pulse-window ${3 + (i % 3)}s ease-in-out ${(i * 0.2)}s infinite` }}
           />
         ))}
-        {/* Top floor — only if tier >= 5 ("premium lounge wing") */}
+        {/* Premium lounge wing — Tier ≥ 5 — clickable as 'lounge' */}
         {tier >= 5 && (
-          <>
+          <g onClick={tap('lounge')}>
             <rect x="62" y="110" width="100" height="9" fill="#314370" stroke={tailColor} strokeOpacity="0.5" strokeWidth="0.6" />
             {[64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152].map((x, i) => (
               <rect key={`up-${x}`} x={x} y={112} width="3" height="4" fill={COLOR.gold.base} opacity="0.7"
                 style={{ animation: `pulse-window ${4 + (i % 3)}s ease-in-out ${(i * 0.25)}s infinite` }} />
             ))}
             <text x={68} y={108} fill={COLOR.gold.base} fontSize="3" fontWeight="800" letterSpacing="0.18em">VIP LOUNGE</text>
-          </>
+          </g>
         )}
       </g>
 
-      {/* Gate 1 — always present */}
-      <Gate x={90} tail={tailColor} />
-      {/* Gate 2 — Tier ≥ 2 */}
-      {tier >= 2 && <Gate x={130} tail={tailColor} />}
-      {/* Gate 3 — Tier ≥ 4 */}
-      {tier >= 4 && <Gate x={170} tail={tailColor} />}
+      {/* Gates — clickable as 'gate' */}
+      <g onClick={tap('gate')} style={{ cursor: onZoneTap ? 'pointer' : 'default' }}>
+        <Gate x={90} tail={tailColor} />
+        {tier >= 2 && <Gate x={130} tail={tailColor} />}
+        {tier >= 4 && <Gate x={170} tail={tailColor} />}
+      </g>
 
-      {/* Control Tower — Tier ≥ 3 */}
+      {/* Control Tower — Tier ≥ 3 — clickable */}
       {tier >= 3 && (
-        <g>
+        <g onClick={tap('tower')} style={{ cursor: onZoneTap ? 'pointer' : 'default' }}>
           <rect x="195" y="100" width="6" height="45" fill="#2A3556" />
           <rect x="190" y="92" width="16" height="9" rx="1.5" fill="#3A4A75" />
           <rect x="192" y="94" width="12" height="3" fill="#0F1734" />
@@ -176,30 +217,38 @@ export function AirportScene({ tier, tailColor, width = 360 }: AirportSceneProps
         </g>
       )}
 
-      {/* Cargo apron — Tier ≥ 2 */}
+      {/* Cargo apron — Tier ≥ 2 — clickable */}
       {tier >= 2 && (
-        <g>
+        <g onClick={tap('cargo')} style={{ cursor: onZoneTap ? 'pointer' : 'default' }}>
           <rect x="215" y="138" width="50" height="7" fill="#243254" opacity="0.8" />
-          {/* Baggage belt */}
           <path d="M218 141.5 L262 141.5" stroke={COLOR.ink.muted} strokeWidth="0.8" strokeDasharray="4 4"
             style={{ animation: 'belt-scroll 1.6s linear infinite' }} />
-          {/* Cargo crates */}
           <rect x="222" y="139" width="3.5" height="2" fill={COLOR.gold.base} opacity="0.8" />
           <rect x="232" y="139" width="3.5" height="2" fill={COLOR.gold.base} opacity="0.7" />
           <rect x="246" y="139" width="3.5" height="2" fill={COLOR.gold.base} opacity="0.8" />
+          {cargoBacklog && (
+            <>
+              <rect x="216" y="136.5" width="3" height="2" fill={COLOR.gold.base} opacity="0.9" />
+              <rect x="220" y="136.5" width="3" height="2" fill={COLOR.gold.base} opacity="0.7" />
+              <rect x="226" y="136.5" width="3" height="2" fill={COLOR.gold.light} opacity="0.85" />
+              <g style={{ animation: 'drift-vehicle 7s ease-in-out infinite alternate' }}>
+                <rect x="218" y="143.5" width="7" height="2" fill={tailColor} opacity="0.85" />
+                <circle cx={219} cy={145.5} r="0.6" fill="#0B1120" />
+                <circle cx={224} cy={145.5} r="0.6" fill="#0B1120" />
+              </g>
+            </>
+          )}
           <text x={216} y={134} fill={COLOR.ink.faint} fontSize="3" letterSpacing="0.12em">CARGO</text>
         </g>
       )}
 
-      {/* Parking + ground vehicles — Tier ≥ 4 */}
+      {/* Parking + ground vehicles — Tier ≥ 4 — clickable */}
       {tier >= 4 && (
-        <g>
+        <g onClick={tap('parking')} style={{ cursor: onZoneTap ? 'pointer' : 'default' }}>
           <rect x="278" y="138" width="50" height="7" fill="#1E2944" opacity="0.7" />
-          {/* Parked cars */}
           {[280, 287, 294, 301, 308, 315, 322].map((cx) => (
             <rect key={cx} x={cx} y={140} width="4" height="2" fill="#3A4A75" />
           ))}
-          {/* Ground service vehicle drifting on apron */}
           <g style={{ animation: 'drift-vehicle 4s ease-in-out infinite alternate' }}>
             <rect x="68" y="143" width="6" height="2" fill={COLOR.gold.base} opacity="0.85" />
             <circle cx={69} cy={145} r="0.6" fill="#0B1120" />
@@ -218,9 +267,9 @@ export function AirportScene({ tier, tailColor, width = 360 }: AirportSceneProps
         <path d="M180 122 L210 122" stroke={tailColor} strokeOpacity="0.7" strokeWidth="2.5" />
       )}
 
-      {/* Metro / rail line — Tier ≥ 7 */}
+      {/* Metro / rail line — Tier ≥ 7 — clickable */}
       {tier >= 7 && (
-        <g>
+        <g onClick={tap('metro')} style={{ cursor: onZoneTap ? 'pointer' : 'default' }}>
           <rect x="0" y="190" width="400" height="3" fill="#1A2347" />
           <rect x="50" y="189" width="20" height="5" fill={tailColor} opacity="0.7" />
           <rect x="73" y="189" width="20" height="5" fill={tailColor} opacity="0.7" />
@@ -232,9 +281,9 @@ export function AirportScene({ tier, tailColor, width = 360 }: AirportSceneProps
         </g>
       )}
 
-      {/* Hotel tower — Tier ≥ 8 */}
+      {/* Hotel tower — Tier ≥ 8 — clickable */}
       {tier >= 8 && (
-        <g>
+        <g onClick={tap('hotel')} style={{ cursor: onZoneTap ? 'pointer' : 'default' }}>
           <rect x="340" y="80" width="20" height="65" fill="#243254" />
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((row) => (
             <g key={row}>
@@ -248,16 +297,13 @@ export function AirportScene({ tier, tailColor, width = 360 }: AirportSceneProps
         </g>
       )}
 
-      {/* Walking passenger silhouettes */}
-      <g style={{ animation: 'drift-passenger 5s ease-in-out infinite alternate' }}>
-        <Passenger x={75} />
-        <Passenger x={82} />
-      </g>
-      {tier >= 3 && (
-        <g style={{ animation: 'drift-passenger 7s ease-in-out infinite alternate' }}>
-          <Passenger x={155} />
-        </g>
-      )}
+      {/* Ghost of next-tier upgrade — drawn faint so the player sees
+          what's "almost here" without confusion. */}
+      {showNextGhost && <NextTierGhost tier={tier} tailColor={tailColor} />}
+
+      {/* Passenger streams — coloured dots walking from terminal to gates.
+          Number scales with passengerLoad. Premium adds 1–2 gold dots. */}
+      <PassengerStreams count={passengerLoad} premium={premium} tailColor={tailColor} />
 
       {/* A small plane parked at gate 1, gently taxiing */}
       <g style={{ animation: 'plane-taxi 6s ease-in-out infinite' }}>
@@ -268,7 +314,6 @@ export function AirportScene({ tier, tailColor, width = 360 }: AirportSceneProps
 }
 
 function Gate({ x, tail }: { x: number; tail: string }) {
-  // Jet bridge stub + gate number plate.
   return (
     <g>
       <rect x={x - 1} y="145" width="2" height="6" fill="#2A3556" />
@@ -277,26 +322,116 @@ function Gate({ x, tail }: { x: number; tail: string }) {
   );
 }
 
-function Passenger({ x }: { x: number }) {
+function PassengerStreams({ count, premium, tailColor }: { count: number; premium: boolean; tailColor: string }) {
+  // Each passenger walks left-to-right from the terminal entrance
+  // toward the gate row. Stagger them with delay so it's a stream,
+  // not a clump. Premium pax are gold-tinted for the lounge fantasy.
+  const n = Math.max(0, Math.min(8, count));
+  const seq = Array.from({ length: n }, (_, i) => i);
   return (
-    <g transform={`translate(${x}, 138)`}>
-      <circle cx="0" cy="0" r="1.3" fill="#94A3B8" />
-      <rect x={-1} y={1.2} width="2" height="3" rx="0.5" fill="#94A3B8" />
+    <g aria-hidden>
+      {seq.map((i) => {
+        const isPremium = premium && (i % 4 === 3);
+        const color = isPremium ? COLOR.gold.base : '#94A3B8';
+        const startY = 140 + (i % 3) - 1;
+        return (
+          <g
+            key={i}
+            style={{
+              animation: `drift-passenger ${4 + (i % 4)}s linear ${i * 0.55}s infinite`,
+              transformOrigin: '60px 140px',
+            }}
+          >
+            <Passenger x={60} y={startY} color={color} />
+          </g>
+        );
+      })}
+      {/* Glow if there's a premium stream */}
+      {premium && (
+        <text x={120} y={114} fill={COLOR.gold.base} fontSize="3" fontWeight="800" letterSpacing="0.16em" opacity="0.7">
+          ★ PREMIUM PAX
+        </text>
+      )}
+      {/* Subtle accent on the entrance */}
+      <circle cx={60} cy={143} r="2" fill={tailColor} opacity="0.18" />
+    </g>
+  );
+}
+
+function Passenger({ x, y, color = '#94A3B8' }: { x: number; y?: number; color?: string }) {
+  return (
+    <g transform={`translate(${x}, ${y ?? 138})`}>
+      <circle cx="0" cy="0" r="1.3" fill={color} />
+      <rect x={-1} y={1.2} width="2" height="3" rx="0.5" fill={color} />
     </g>
   );
 }
 
 function ParkedPlane({ cx, tailColor }: { cx: number; tailColor: string }) {
-  // Tiny top-down silhouette — fuselage + wings.
   return (
     <g transform={`translate(${cx}, 148)`}>
-      {/* Fuselage */}
       <ellipse cx="0" cy="0" rx="6" ry="1.4" fill="#F8FAFC" />
-      {/* Wings */}
       <path d="M-1 -0.5 L-4 -3 L-2 -3.2 L1 -0.5 Z" fill={tailColor} opacity="0.85" />
       <path d="M-1 0.5 L-4 3 L-2 3.2 L1 0.5 Z" fill={tailColor} opacity="0.85" />
-      {/* Tail fin */}
       <path d="M-5 -1 L-7 -2 L-6 0 L-7 2 L-5 1 Z" fill={tailColor} opacity="0.9" />
     </g>
   );
+}
+
+/** Faint outline of what the next tier will add. */
+function NextTierGhost({ tier, tailColor }: { tier: number; tailColor: string }) {
+  const style = { animation: 'ghost-pulse 2.4s ease-in-out infinite' };
+  switch (tier + 1) {
+    case 2:
+      return (
+        <g style={style} aria-hidden>
+          <rect x={129} y={143} width={2} height={8} fill={tailColor} strokeDasharray="2 2" stroke={tailColor} strokeWidth={0.4} opacity={0.4} />
+          <text x={120} y={158} fill={tailColor} fontSize="3" opacity="0.7">+ gate 2</text>
+        </g>
+      );
+    case 3:
+      return (
+        <g style={style} aria-hidden>
+          <rect x={195} y={100} width={6} height={45} fill="none" stroke={tailColor} strokeWidth="0.5" strokeDasharray="2 2" />
+          <text x={188} y={97} fill={tailColor} fontSize="3" opacity="0.7">+ tower</text>
+        </g>
+      );
+    case 4:
+      return (
+        <g style={style} aria-hidden>
+          <rect x={278} y={138} width={50} height={7} fill="none" stroke={tailColor} strokeWidth="0.5" strokeDasharray="2 2" />
+          <text x={290} y={134} fill={tailColor} fontSize="3" opacity="0.7">+ parking</text>
+        </g>
+      );
+    case 5:
+      return (
+        <g style={style} aria-hidden>
+          <rect x={62} y={110} width={100} height={9} fill="none" stroke={tailColor} strokeWidth="0.5" strokeDasharray="2 2" />
+          <text x={88} y={108} fill={tailColor} fontSize="3" opacity="0.7">+ lounge</text>
+        </g>
+      );
+    case 6:
+      return (
+        <g style={style} aria-hidden>
+          <rect x={40} y={175} width={320} height={6} fill="none" stroke={tailColor} strokeWidth="0.5" strokeDasharray="2 2" />
+          <text x={160} y={188} fill={tailColor} fontSize="3" opacity="0.7">+ runway 2</text>
+        </g>
+      );
+    case 7:
+      return (
+        <g style={style} aria-hidden>
+          <rect x={0} y={190} width={400} height={3} fill="none" stroke={tailColor} strokeWidth="0.5" strokeDasharray="3 3" />
+          <text x={170} y={199} fill={tailColor} fontSize="3" opacity="0.7">+ metro</text>
+        </g>
+      );
+    case 8:
+      return (
+        <g style={style} aria-hidden>
+          <rect x={340} y={80} width={20} height={65} fill="none" stroke={tailColor} strokeWidth="0.5" strokeDasharray="2 2" />
+          <text x={324} y={78} fill={tailColor} fontSize="3" opacity="0.7">+ hotel</text>
+        </g>
+      );
+    default:
+      return null;
+  }
 }

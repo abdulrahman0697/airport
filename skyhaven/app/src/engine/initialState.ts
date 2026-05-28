@@ -18,11 +18,13 @@ import { CURRENT_SCHEMA_VERSION } from './types';
 const STARTER_AIRLINE_NAME = 'SkyHaven Airlines';
 const STARTER_TAIL_COLOR = '#5AC8FA';
 const STARTER_CODE = 'SH';
-// TEMP (Phase 5 testing): bumped from $25K → $2M so the owner can
-// exercise region unlocks ($250K+) and hub creation without grinding.
-// REVERT TO 25_000 BEFORE PHASE 17 LAUNCH PREP. The BRD §20.5 acceptance
-// criterion targets the $25K → $10M growth curve.
-const STARTER_CASH = 2_000_000;
+// Design Review v3 — point 7. The previous $2M starter cash killed
+// the "scrappy founder" fantasy and made early decisions feel weightless.
+// Reset to $50K Founder Loan: enough to buy a second ATR 42 ($25K) and
+// sign a fuel contract, but not enough to skip the early game. The UI
+// labels this surface as "Founder Capital" so the player feels the
+// climb instead of inheriting an empire.
+const STARTER_CASH = 50_000;
 const STARTER_AIRCRAFT_DEF = 't1.atr42';
 const STARTER_CONTRACT = 'fc.starter';
 

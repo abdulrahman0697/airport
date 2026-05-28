@@ -1,4 +1,5 @@
-import { useGameStore } from '../../state/store';
+import { useGameStore, selectFleet, selectRoutes, selectTier, selectTutorialCompleted } from '../../state/store';
+import { useUiStore } from '../../state/uiStore';
 import { conditionBand } from '../../engine/condition';
 import {
   DealsIcon,
@@ -15,53 +16,90 @@ interface TabSpec {
   id: Exclude<PanelId, null> | 'map';
   label: string;
   Icon: React.FC<IconProps>;
+  /** Tab is visible from the start. */
+  alwaysOn?: boolean;
+  /** Predicate over game state — when true, tab unlocks. */
+  unlock?: (s: { fleetSize: number; routeCount: number; tier: number; tutorialDone: boolean }) => boolean;
+  /** Short unlock copy shown on the reveal animation. */
+  unlockHint?: string;
 }
 
 /**
- * Aviation-themed tab labels (Design Review v2 — point 9).
- *  Map → Network (radar)
- *  Routes → Operations (paper-plane launch arrow)
- *  Fleet → Hangar (boxy hangar with plane silhouette)
- *  Crew → Staff HQ (two-person)
- *  Leaders → Control Tower (tower with antenna)
- *  Store → Executive Deals (briefcase)
+ * Design Review v3 — point 22. Progressive tab unlocking.
  *
- * Achievements + Missions live on the SideLauncher (Phase DA), so
- * the bottom row stays at 6 columns and reads as the airport
- * operations bar.
+ * Showing six tabs to a new player is overwhelming and makes the game
+ * read as "heavy management". We start with just Network (map) and
+ * Hangar, then reveal each tab when it actually matters:
+ *
+ *  - Operations  ← first route opened
+ *  - Staff HQ    ← first hub created (managers become hireable)
+ *  - Control Tower ← Tier 3 reached
+ *  - Executive Deals ← tutorial complete (monetization surface)
+ *
+ * Locked tabs are simply not rendered. When a tab reveals, the bar
+ * gently re-flows. The aviation theme is preserved.
  */
 const TABS: readonly TabSpec[] = [
-  { id: 'map',     label: 'Network',         Icon: NetworkIcon },
-  { id: 'routes',  label: 'Operations',      Icon: OperationsIcon },
-  { id: 'fleet',   label: 'Hangar',          Icon: HangarIcon },
-  { id: 'crew',    label: 'Staff HQ',        Icon: StaffIcon },
-  { id: 'leaders', label: 'Control Tower',   Icon: TowerIcon },
-  { id: 'store',   label: 'Executive Deals', Icon: DealsIcon },
+  { id: 'map',     label: 'Network',         Icon: NetworkIcon, alwaysOn: true },
+  { id: 'fleet',   label: 'Hangar',          Icon: HangarIcon,  alwaysOn: true },
+  { id: 'routes',  label: 'Operations',      Icon: OperationsIcon,
+    unlock: (s) => s.routeCount >= 1, unlockHint: 'First route launched' },
+  { id: 'crew',    label: 'Staff HQ',        Icon: StaffIcon,
+    unlock: (s) => s.fleetSize >= 2 || s.tier >= 2, unlockHint: 'Hub managers available' },
+  { id: 'leaders', label: 'Control Tower',   Icon: TowerIcon,
+    unlock: (s) => s.tier >= 3 || s.tutorialDone, unlockHint: 'Leaderboards unlocked' },
+  { id: 'store',   label: 'Executive Deals', Icon: DealsIcon,
+    unlock: (s) => s.tutorialDone, unlockHint: 'Premium services unlocked' },
 ];
 
 export function BottomTabs() {
   const active = usePanelStore((s) => s.active);
   const open = usePanelStore((s) => s.open);
   const close = usePanelStore((s) => s.close);
+  const fleet = useGameStore(selectFleet);
+  const routes = useGameStore(selectRoutes);
+  const tier = useGameStore(selectTier);
+  const tutorialDone = useGameStore(selectTutorialCompleted);
+  const mapMode = useUiStore((s) => s.mapMode);
+  const setMapMode = useUiStore((s) => s.setMapMode);
 
-  // "Needs attention" badge on the Hangar tab when an aircraft
-  // condition has slipped into degraded / critical.
+  const ctx = {
+    fleetSize: fleet.length,
+    routeCount: routes.length,
+    tier,
+    tutorialDone,
+  };
+
+  const visibleTabs = TABS.filter((t) => t.alwaysOn || (t.unlock && t.unlock(ctx)));
+
   const needsAttention = useGameStore((s) =>
     (s.state?.fleet ?? []).reduce((n, a) => n + (conditionBand(a.condition) !== 'normal' ? 1 : 0), 0),
   );
 
   return (
-    <nav style={shell} aria-label="Main">
-      {TABS.map((t) => {
-        const isActive = t.id === 'map' ? active === null : active === t.id;
+    <nav style={{ ...shell, gridTemplateColumns: `repeat(${visibleTabs.length + 1}, 1fr)` }} aria-label="Main">
+      {/* Home button — always first, always lights up the home airport. */}
+      <button
+        onClick={(): void => { close(); setMapMode(false); }}
+        style={{ ...btn, ...((!mapMode && active === null) ? btnActive : {}) }}
+        aria-label="Home Airport"
+        aria-current={(!mapMode && active === null) ? 'page' : undefined}
+      >
+        <HomeGlyph active={!mapMode && active === null} />
+        <span style={label}>Home</span>
+      </button>
+      {visibleTabs.map((t) => {
+        const isActive = t.id === 'map'
+          ? (mapMode && active === null)
+          : active === t.id;
         const showBadge = t.id === 'fleet' && needsAttention > 0;
         return (
           <button
             key={t.id}
             data-tutorial={`${t.id}-tab`}
             onClick={(): void => {
-              if (t.id === 'map') close();
-              else open(t.id);
+              if (t.id === 'map') { close(); setMapMode(true); }
+              else { open(t.id); setMapMode(false); }
             }}
             style={{ ...btn, ...(isActive ? btnActive : {}) }}
             aria-label={t.label}
@@ -77,13 +115,23 @@ export function BottomTabs() {
   );
 }
 
+function HomeGlyph({ active }: { active: boolean }) {
+  const c = active ? '#5AC8FA' : '#94A3B8';
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4 11 L12 4 L20 11 V20 H4 Z" stroke={c} strokeWidth="1.6" strokeLinejoin="round" />
+      <rect x={9} y={13} width={6} height={7} stroke={c} strokeWidth="1.4" />
+      <circle cx={12} cy={9} r={1} fill={c} />
+    </svg>
+  );
+}
+
 const shell: React.CSSProperties = {
   position: 'fixed',
   bottom: 0,
   left: 0,
   right: 0,
   display: 'grid',
-  gridTemplateColumns: 'repeat(6, 1fr)',
   background: 'rgba(11,17,32,0.92)',
   backdropFilter: 'blur(12px)',
   borderTop: '1px solid rgba(255,255,255,0.06)',
