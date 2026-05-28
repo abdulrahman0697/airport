@@ -343,7 +343,14 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
   // Achievement evaluation runs after vintage + before goal-chain so
   // any reward-credited achievement (e.g. lifetime-earnings milestone)
   // contributes to the goal-chain's cash check this same tick.
-  const withAchievements = evaluateAchievements(withVintage).state;
+  // Suppressed during the tutorial: Mission Control is the only
+  // progression signal we want the player to react to in those first
+  // minutes, and we don't want a "+$10K Achievement Unlocked" toast
+  // firing the moment the player taps "Sign Local Refinery" because
+  // they're following an instruction, not making a strategic move.
+  const withAchievements = withVintage.tutorialCompleted
+    ? evaluateAchievements(withVintage).state
+    : withVintage;
   // Daily missions: roll new set on date change, recompute progress
   // every tick. Cheap (K=3 templates).
   const withDailyRoll = rollIfNeeded(withAchievements, ctx.nowMs);

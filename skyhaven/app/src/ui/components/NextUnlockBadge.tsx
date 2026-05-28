@@ -33,12 +33,16 @@ export function NextUnlockBadge() {
   const activePanel = usePanelStore((s) => s.active);
   const open = usePanelStore((s) => s.open);
 
-  // Hide while any panel is open or at max tier. Also hide on home,
-  // where the diorama's own Expansion Preview owns this prompt; the
-  // badge belongs on the world-map view.
+  // Hide while any panel is open or at max tier. Also hide during the
+  // tutorial — Mission Control already tells the player what they're
+  // chasing, and stacking two "what's next" cards covered the map,
+  // the event banner and the fuel gauge. After tutorial, the badge
+  // belongs on the world-map view only (home owns its own Expansion
+  // Preview).
   if (activePanel !== null) return null;
   if (tier >= MAX_TIER) return null;
-  if (tutorialDone && !mapMode) return null;
+  if (!tutorialDone) return null;
+  if (!mapMode) return null;
 
   const nextGrowth = growthFor(tier + 1);
   const nextThreshold = TIER_UNLOCK_THRESHOLDS[tier + 1];

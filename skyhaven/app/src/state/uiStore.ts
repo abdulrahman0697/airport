@@ -10,6 +10,7 @@ interface UiStore {
   /** SideLauncher collapsed (true = pip only, false = full rail). */
   launcherCollapsed: boolean;
   toggleLauncher: () => void;
+  setLauncherCollapsed: (v: boolean) => void;
   /** First-Takeoff cinematic has played once. */
   cinematicSeen: boolean;
   markCinematicSeen: () => void;
@@ -66,8 +67,9 @@ interface UiStore {
 export const useUiStore = create<UiStore>((set) => ({
   introDismissed: false,
   dismissIntro: (): void => set({ introDismissed: true }),
-  launcherCollapsed: false,
+  launcherCollapsed: true,
   toggleLauncher: (): void => set((s) => ({ launcherCollapsed: !s.launcherCollapsed })),
+  setLauncherCollapsed: (v): void => set({ launcherCollapsed: v }),
   cinematicSeen: false,
   markCinematicSeen: (): void => set({ cinematicSeen: true }),
   mapMode: false,

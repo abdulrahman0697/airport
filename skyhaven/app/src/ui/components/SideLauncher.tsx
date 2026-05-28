@@ -17,7 +17,7 @@
  * unread achievement toasts in the future).
  */
 import { AnimatePresence, motion } from 'framer-motion';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useUiStore } from '../../state/uiStore';
 import {
   selectAchievements,
@@ -64,6 +64,22 @@ export function SideLauncher() {
   const open = usePanelStore((s) => s.open);
   const collapsed = useUiStore((s) => s.launcherCollapsed);
   const toggle = useUiStore((s) => s.toggleLauncher);
+  const setCollapsed = useUiStore((s) => s.setLauncherCollapsed);
+  const shellRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-close: any pointer-down outside the rail collapses it. Skip
+  // while already collapsed so we don't churn the store on every tap.
+  useEffect(() => {
+    if (collapsed) return;
+    const handler = (ev: PointerEvent): void => {
+      const target = ev.target;
+      if (target instanceof Node && shellRef.current && shellRef.current.contains(target)) return;
+      setCollapsed(true);
+    };
+    // capture: fire before any panel-open handlers swallow it.
+    document.addEventListener('pointerdown', handler, true);
+    return () => document.removeEventListener('pointerdown', handler, true);
+  }, [collapsed, setCollapsed]);
 
   // Pending-action signals so the rail can hint there's something to claim.
   const dailyMissions = useGameStore(selectDailyMissions);
@@ -77,7 +93,7 @@ export function SideLauncher() {
   const unreadAchievements = useGameStore(selectAchievements).length > 0 ? 0 : 0;
 
   return (
-    <div style={shellWrap}>
+    <div style={shellWrap} ref={shellRef}>
       <AnimatePresence initial={false}>
         {!collapsed && (
           <motion.div
@@ -104,6 +120,7 @@ export function SideLauncher() {
                     } else {
                       open(item.id);
                     }
+                    setCollapsed(true);
                   }}
                   aria-label={item.label}
                   title={item.label}
