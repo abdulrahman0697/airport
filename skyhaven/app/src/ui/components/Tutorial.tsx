@@ -155,6 +155,7 @@ export function Tutorial() {
           tap={current.tap}
           reward={current.reward}
           hasTarget={rect !== null}
+          targetRect={rect}
         />
       </>
     );
@@ -170,6 +171,7 @@ export function Tutorial() {
         tap={current.body}
         reward="Auto-advances in a moment"
         hasTarget={false}
+        targetRect={null}
       />
     );
   }
@@ -274,9 +276,18 @@ function TargetGlow({ rect, tailColor }: { rect: DOMRect; tailColor: string }) {
   );
 }
 
-// ─── Mission Control strip (compact, docked above bottom tabs) ───────
+// ─── Mission Control strip (compact, dynamically placed) ─────────────
+/**
+ * Position rule: if the spotlighted target is in the bottom half of the
+ * viewport (e.g. the Authorize Route button in a route-creation modal,
+ * a buy button mid-list), place the strip at the TOP so it never sits
+ * on top of the very control the player is meant to tap. Otherwise
+ * place it at the bottom above the tabs. The placement also accounts
+ * for an estimated strip height so it can't overlap the target rect
+ * itself.
+ */
 function MissionControlStrip({
-  step, total, tailColor, title, tap, reward, hasTarget,
+  step, total, tailColor, title, tap, reward, hasTarget, targetRect,
 }: {
   step: number;
   total: number;
@@ -285,16 +296,19 @@ function MissionControlStrip({
   tap: string;
   reward: string;
   hasTarget: boolean;
+  targetRect: DOMRect | null;
 }) {
+  const placement = useStripPlacement(targetRect);
+  const shellStyle = placement === 'top' ? stripShellTop(tailColor) : stripShellBottom(tailColor);
   return (
     <AnimatePresence mode="wait">
       <motion.div
-        key={`mission-${step}`}
-        initial={{ y: 30, opacity: 0 }}
+        key={`mission-${step}-${placement}`}
+        initial={{ y: placement === 'top' ? -30 : 30, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 30, opacity: 0 }}
+        exit={{ y: placement === 'top' ? -30 : 30, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 360, damping: 28 }}
-        style={stripShell(tailColor) as Record<string, unknown>}
+        style={shellStyle as Record<string, unknown>}
       >
         <div style={stripKickerRow}>
           <span style={stripKicker(tailColor)}>
@@ -319,6 +333,28 @@ function MissionControlStrip({
       </motion.div>
     </AnimatePresence>
   );
+}
+
+/**
+ * Choose 'top' when the strip would otherwise overlap the spotlight
+ * target. Recomputes on resize so rotation / keyboard show-up doesn't
+ * leave the strip parked on top of a button.
+ */
+function useStripPlacement(targetRect: DOMRect | null): 'top' | 'bottom' {
+  const [vh, setVh] = useState<number>(typeof window === 'undefined' ? 800 : window.innerHeight);
+  useEffect(() => {
+    const onResize = (): void => setVh(window.innerHeight);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  if (!targetRect) return 'bottom';
+  const STRIP_H = 150;            // approx strip height
+  const BOTTOM_ANCHOR = 80;       // tabs (64) + safe + gap
+  const stripTopWhenBottom = vh - BOTTOM_ANCHOR - STRIP_H;
+  // If the target's bottom would land in (or below) the strip's bounds,
+  // the strip would overlap — so move it to the top instead.
+  if (targetRect.bottom >= stripTopWhenBottom - 8) return 'top';
+  return 'bottom';
 }
 
 // ─── Founder Card (identity moment) ─────────────────────────────────
@@ -475,22 +511,32 @@ function InfoMoment({
 
 // ─── Styles ──────────────────────────────────────────────────────────
 
-const stripShell = (tail: string): React.CSSProperties => ({
+const stripShellBase = (tail: string): React.CSSProperties => ({
   position: 'fixed',
-  bottom: 'calc(64px + env(safe-area-inset-bottom, 0px) + 8px)',
   left: 8,
   right: 8,
-  zIndex: 36,
+  // Sit above bottom-modal panels (z 20) AND above the bottom tabs
+  // (z 30) so the strip is never covered. Sit BELOW the top bar (z 30)
+  // — the top bar wins at the top, the strip is anchored just under it.
+  zIndex: 120,
   maxWidth: 480,
   marginLeft: 'auto',
   marginRight: 'auto',
-  background: 'linear-gradient(150deg, rgba(11,17,32,0.94), rgba(15,23,42,0.94))',
+  background: 'linear-gradient(150deg, rgba(11,17,32,0.96), rgba(15,23,42,0.96))',
   border: `1px solid ${tail}66`,
   borderRadius: RADIUS.l,
-  boxShadow: `0 12px 36px rgba(0,0,0,0.55), 0 0 24px ${tail}33`,
+  boxShadow: `0 12px 36px rgba(0,0,0,0.6), 0 0 24px ${tail}44`,
   backdropFilter: 'blur(14px)',
   padding: '10px 12px 12px',
   pointerEvents: 'auto',
+});
+const stripShellBottom = (tail: string): React.CSSProperties => ({
+  ...stripShellBase(tail),
+  bottom: 'calc(64px + env(safe-area-inset-bottom, 0px) + 8px)',
+});
+const stripShellTop = (tail: string): React.CSSProperties => ({
+  ...stripShellBase(tail),
+  top: 'calc(env(safe-area-inset-top, 0px) + 88px)',
 });
 const stripKickerRow: React.CSSProperties = {
   display: 'flex',
