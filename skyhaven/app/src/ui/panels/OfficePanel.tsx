@@ -5,6 +5,7 @@ import { ACHIEVEMENT_COUNT, frameTier, FRAME_COLORS } from '../../data/achieveme
 import { FrameBadge } from '../components/AchievementFrame';
 import { AirlineCrest } from '../design/AirlineCrest';
 import { Button } from '../design/Button';
+import { PanelHeader } from '../design/PanelHeader';
 import { FriendsCard } from '../components/FriendsCard';
 import { usePanelStore } from '../components/PanelHost';
 import { ShareAirlineModal } from '../components/ShareAirlineModal';
@@ -95,10 +96,11 @@ export function OfficePanel() {
 
   return (
     <div style={shell}>
-      <div style={header}>
-        <h2 style={title}>Office of the CEO</h2>
-        <div style={subtitle}>Operational dashboard</div>
-      </div>
+      <PanelHeader
+        kicker="Command"
+        title="Office of the CEO"
+        subtitle="Operational dashboard"
+      />
       <div style={body}>
         {/* Airline identity card */}
         <section style={identityCard(tailColor, frameTier(achievements.length))}>
@@ -390,12 +392,6 @@ function computeTierProgress(tier: number, lifetime: number): { pct: number; thr
 
 // ─── Styles ──────────────────────────────────────────────────────────
 const shell: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100%' };
-const header: React.CSSProperties = { padding: '20px 16px 8px', borderBottom: '1px solid rgba(255,255,255,0.06)' };
-const title: React.CSSProperties = { margin: 0, fontSize: 22, color: '#F8FAFC' };
-const subtitle: React.CSSProperties = {
-  color: '#94A3B8', fontSize: 10, marginTop: 4,
-  letterSpacing: '0.18em', textTransform: 'uppercase',
-};
 const body: React.CSSProperties = {
   flex: 1, overflowY: 'auto', padding: 12,
   display: 'flex', flexDirection: 'column', gap: 10,

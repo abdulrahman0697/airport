@@ -2,6 +2,10 @@ import { useState } from 'react';
 import { MANAGER_DEFS, managerCost } from '../../data/managers';
 import type { Hub } from '../../engine/types';
 import { selectCash, selectHubs, useGameStore } from '../../state/store';
+import { Button } from '../design/Button';
+import { Chip } from '../design/Chip';
+import { EmptyState } from '../design/EmptyState';
+import { PanelHeader } from '../design/PanelHeader';
 import { formatCash } from '../format';
 import { haptics } from '../juice/haptics';
 
@@ -10,16 +14,18 @@ export function CrewPanel() {
 
   return (
     <div style={shell}>
-      <div style={header}>
-        <h2 style={title}>Crew</h2>
-        <div style={subtitle}>Managers are hub-scoped, hired per hub</div>
-      </div>
+      <PanelHeader
+        kicker="Personnel"
+        title="Crew"
+        subtitle="Managers are hub-scoped — hire per hub for targeted bonuses."
+      />
       <div style={body}>
         {hubs.length === 0 ? (
-          <div style={empty}>
-            No hubs yet. Promote an airport to a hub from the Network panel,
-            then hire managers here.
-          </div>
+          <EmptyState
+            icon="◇"
+            title="No hubs to staff"
+            body="Promote an airport to a hub from the Network panel, then return here to hire managers."
+          />
         ) : (
           <ul style={list}>
             {hubs.map((h) => <HubBlock key={h.iata} hub={h} />)}
@@ -53,24 +59,28 @@ function HubBlock({ hub }: { hub: Hub }) {
               <div style={mTopRow}>
                 <div style={mName}>{m.name}</div>
                 {hired
-                  ? <span style={hiredPill}>Hired</span>
-                  : <span style={mCost}>${formatCash(cost, 1)}</span>}
+                  ? <Chip tone="success">Hired</Chip>
+                  : <Chip tone="gold">${formatCash(cost, 1)}</Chip>}
               </div>
               <div style={mTagline}>{m.tagline}</div>
               <div style={mBio}>{m.bio}</div>
               {!hired && (
-                <button
+                <Button
+                  size="sm"
+                  variant="primary"
+                  disabled={!afford}
+                  fullWidth
+                  hapticOnPress="medium"
                   onClick={(): void => {
                     const res = hire(hub.iata, m.kind);
                     if (res.ok) haptics.success();
                     else haptics.warning();
                     setError(res.ok ? null : res.message);
                   }}
-                  disabled={!afford}
-                  style={{ ...hireBtn, opacity: afford ? 1 : 0.5 }}
+                  style={{ marginTop: 8 }}
                 >
                   Hire
-                </button>
+                </Button>
               )}
             </div>
           );
@@ -87,9 +97,6 @@ function countHired(hub: Hub): number {
 
 // ─── Styles ──────────────────────────────────────────────────────────
 const shell: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100%' };
-const header: React.CSSProperties = { padding: '20px 16px 8px', borderBottom: '1px solid rgba(255,255,255,0.06)' };
-const title: React.CSSProperties = { margin: 0, fontSize: 22, color: '#F8FAFC' };
-const subtitle: React.CSSProperties = { color: '#94A3B8', fontSize: 12, marginTop: 2 };
 const body: React.CSSProperties = { flex: 1, overflowY: 'auto', padding: 12 };
 const list: React.CSSProperties = { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 14 };
 const hubCard: React.CSSProperties = {
@@ -113,18 +120,6 @@ const mTopRow: React.CSSProperties = { display: 'flex', justifyContent: 'space-b
 const mName: React.CSSProperties = { fontSize: 14, fontWeight: 600, color: '#F8FAFC' };
 const mTagline: React.CSSProperties = { color: '#5AC8FA', fontSize: 12, marginTop: 2 };
 const mBio: React.CSSProperties = { color: '#94A3B8', fontSize: 11, marginTop: 6, lineHeight: 1.45 };
-const mCost: React.CSSProperties = { color: '#F4C75B', fontWeight: 700, fontSize: 13, fontFeatureSettings: '"tnum" 1' };
-const hiredPill: React.CSSProperties = {
-  fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase',
-  color: '#34D399', background: 'rgba(52,211,153,0.12)',
-  padding: '3px 8px', borderRadius: 4,
-};
-const hireBtn: React.CSSProperties = {
-  width: '100%', marginTop: 10, padding: 8, borderRadius: 8,
-  background: '#5AC8FA', color: '#0B1120', border: 0, fontWeight: 700,
-  cursor: 'pointer', minHeight: 36, fontFamily: 'inherit',
-};
-const empty: React.CSSProperties = { padding: 32, textAlign: 'center', color: '#94A3B8' };
 const errorText: React.CSSProperties = {
   marginTop: 8, padding: '6px 10px', fontSize: 11, color: '#F87171',
   background: 'rgba(248,113,113,0.08)', borderRadius: 6,

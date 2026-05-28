@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { FUEL_CAPACITY_TIERS, nextCapacityTier } from '../../data/fuelCapacity';
 import { FUEL_CONTRACTS } from '../../data/fuelContracts';
 import { selectCash, useGameStore } from '../../state/store';
+import { PanelHeader } from '../design/PanelHeader';
 import { formatCash } from '../format';
 
 export function FuelPanel() {
@@ -27,9 +28,11 @@ export function FuelPanel() {
 
   return (
     <div style={shell}>
-      <div style={header}>
-        <h2 style={title}>Fuel</h2>
-      </div>
+      <PanelHeader
+        kicker="Supply chain"
+        title="Fuel"
+        subtitle={`Net flow ${net >= 0 ? '+' : ''}${net.toFixed(1)}/s · Reserve ${Math.round(pct * 100)}%`}
+      />
       <div style={body}>
         <section style={card}>
           <div style={readingRow}>
@@ -126,8 +129,6 @@ export function FuelPanel() {
 }
 
 const shell: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100%' };
-const header: React.CSSProperties = { padding: '20px 16px 8px', borderBottom: '1px solid rgba(255,255,255,0.06)' };
-const title: React.CSSProperties = { margin: 0, fontSize: 22, color: '#F8FAFC' };
 const body: React.CSSProperties = { flex: 1, overflowY: 'auto', padding: 12 };
 const list: React.CSSProperties = { listStyle: 'none', margin: '0 0 12px', padding: 0, display: 'flex', flexDirection: 'column', gap: 8 };
 const card: React.CSSProperties = {

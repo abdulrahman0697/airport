@@ -21,6 +21,8 @@ import {
   useGameStore,
 } from '../../state/store';
 import { countryName } from '../countryNames';
+import { Button } from '../design/Button';
+import { PanelHeader } from '../design/PanelHeader';
 import { formatCash, formatRate } from '../format';
 import { haptics } from '../juice/haptics';
 
@@ -32,32 +34,38 @@ export function RoutesPanel() {
 
   return (
     <div style={shell}>
-      <div style={header}>
-        <h2 style={title}>Network</h2>
-        <div role="tablist" style={tabs}>
-          <button role="tab" onClick={(): void => setTab('routes')}
-            style={{ ...tabBtn, ...(tab === 'routes' ? tabActive : {}) }}>
-            Routes ({routes.length})
-          </button>
-          <button role="tab" onClick={(): void => setTab('hubs')}
-            style={{ ...tabBtn, ...(tab === 'hubs' ? tabActive : {}) }}>
-            Hubs ({hubs.length})
-          </button>
-          <button role="tab" onClick={(): void => setTab('regions')}
-            style={{ ...tabBtn, ...(tab === 'regions' ? tabActive : {}) }}>
-            Regions
-          </button>
-        </div>
-        {tab === 'routes' && (
-          <button
+      <PanelHeader
+        kicker="Operations"
+        title="Network"
+        subtitle={`${routes.length} routes · ${hubs.length} hubs`}
+        right={tab === 'routes' ? (
+          <Button
             data-tutorial="routes-new-button"
+            variant="primary"
+            size="md"
             onClick={(): void => setShowNew(true)}
-            style={newBtn}
+            hapticOnPress="medium"
           >
             + New route
-          </button>
-        )}
-      </div>
+          </Button>
+        ) : null}
+        tabs={
+          <div role="tablist" style={{ display: 'flex', gap: 4 }}>
+            <button role="tab" onClick={(): void => setTab('routes')}
+              style={{ ...tabBtn, ...(tab === 'routes' ? tabActive : {}) }}>
+              Routes ({routes.length})
+            </button>
+            <button role="tab" onClick={(): void => setTab('hubs')}
+              style={{ ...tabBtn, ...(tab === 'hubs' ? tabActive : {}) }}>
+              Hubs ({hubs.length})
+            </button>
+            <button role="tab" onClick={(): void => setTab('regions')}
+              style={{ ...tabBtn, ...(tab === 'regions' ? tabActive : {}) }}>
+              Regions
+            </button>
+          </div>
+        }
+      />
       <div style={body}>
         {tab === 'routes' && <RoutesList />}
         {tab === 'hubs' && <HubsList />}
@@ -645,19 +653,11 @@ function sortAirports(arr: Airport[]): Airport[] {
 
 // ───────────────────────────────────────────────────────────────────────
 const shell: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100%' };
-const header: React.CSSProperties = { padding: '20px 16px 8px', borderBottom: '1px solid rgba(255,255,255,0.06)' };
-const title: React.CSSProperties = { margin: 0, fontSize: 22, color: '#F8FAFC' };
-const tabs: React.CSSProperties = { display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' };
 const tabBtn: React.CSSProperties = {
-  background: 'transparent', color: '#94A3B8', border: 0, padding: '8px 14px', borderRadius: 8,
-  cursor: 'pointer', fontSize: 13, minHeight: 36, fontFamily: 'inherit',
+  background: 'transparent', color: '#94A3B8', border: 0, padding: '6px 10px', borderRadius: 6,
+  cursor: 'pointer', fontSize: 12, minHeight: 32, fontFamily: 'inherit',
 };
-const tabActive: React.CSSProperties = { background: 'rgba(90,200,250,0.12)', color: '#5AC8FA' };
-const newBtn: React.CSSProperties = {
-  marginTop: 12, padding: '10px 14px', borderRadius: 8,
-  background: '#5AC8FA', color: '#0B1120', border: 0,
-  fontWeight: 700, cursor: 'pointer', minHeight: 44, fontFamily: 'inherit',
-};
+const tabActive: React.CSSProperties = { background: 'rgba(90,200,250,0.18)', color: '#5AC8FA' };
 const body: React.CSSProperties = { flex: 1, overflowY: 'auto', padding: 12 };
 const list: React.CSSProperties = { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 };
 const sectionTitle: React.CSSProperties = {

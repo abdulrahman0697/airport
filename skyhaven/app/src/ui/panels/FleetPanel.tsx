@@ -3,6 +3,7 @@ import { AIRCRAFT_DEFS, getAircraftDef } from '../../data/aircraft';
 import { conditionBand, repairCost } from '../../engine/condition';
 import { MAX_TIER } from '../../engine/tierUnlocks';
 import { AircraftDetailModal } from '../components/AircraftDetailModal';
+import { PanelHeader } from '../design/PanelHeader';
 import {
   UPGRADE_LABELS,
   UPGRADE_SPECS,
@@ -34,35 +35,36 @@ export function FleetPanel() {
 
   return (
     <div style={shell}>
-      <div style={header}>
-        <h2 style={title}>Fleet</h2>
-        <div style={subtitleRow}>
-          <span style={subtitle}>{fleet.length} aircraft</span>
-          {tutorialCompleted && (
-            <button onClick={(): void => { resetTutorial(); }} style={replayLink}>
-              Replay tutorial
+      <PanelHeader
+        kicker="Operations"
+        title="Fleet"
+        subtitle={`${fleet.length} aircraft${vintage.length ? ` · ${vintage.length} vintage` : ''}`}
+        right={tutorialCompleted ? (
+          <button onClick={(): void => { resetTutorial(); }} style={replayLink}>
+            Replay tutorial
+          </button>
+        ) : null}
+        tabs={
+          <div role="tablist" style={{ display: 'flex', gap: 4 }}>
+            <button role="tab" onClick={(): void => setTab('owned')}
+              style={{ ...tabBtn, ...(tab === 'owned' ? tabActive : {}) }}>
+              Owned ({fleet.length})
             </button>
-          )}
-        </div>
-        <div role="tablist" style={tabs}>
-          <button role="tab" onClick={(): void => setTab('owned')}
-            style={{ ...tabBtn, ...(tab === 'owned' ? tabActive : {}) }}>
-            Owned ({fleet.length})
-          </button>
-          <button
-            role="tab"
-            data-tutorial="fleet-buy-tab"
-            onClick={(): void => setTab('buy')}
-            style={{ ...tabBtn, ...(tab === 'buy' ? tabActive : {}) }}
-          >
-            Buy aircraft
-          </button>
-          <button role="tab" onClick={(): void => setTab('vintage')}
-            style={{ ...tabBtn, ...(tab === 'vintage' ? tabActive : {}) }}>
-            Vintage ({vintage.length})
-          </button>
-        </div>
-      </div>
+            <button
+              role="tab"
+              data-tutorial="fleet-buy-tab"
+              onClick={(): void => setTab('buy')}
+              style={{ ...tabBtn, ...(tab === 'buy' ? tabActive : {}) }}
+            >
+              Buy aircraft
+            </button>
+            <button role="tab" onClick={(): void => setTab('vintage')}
+              style={{ ...tabBtn, ...(tab === 'vintage' ? tabActive : {}) }}>
+              Vintage ({vintage.length})
+            </button>
+          </div>
+        }
+      />
       <div style={body}>
         {tab === 'owned' && <OwnedList />}
         {tab === 'buy' && <BuyList />}
@@ -288,16 +290,6 @@ function BuyRow({ def, unlocked }: { def: AircraftDef; unlocked: boolean }) {
 
 // ─── Styles ──────────────────────────────────────────────────────────
 const shell: React.CSSProperties = { display: 'flex', flexDirection: 'column', height: '100%' };
-const header: React.CSSProperties = { padding: '20px 16px 8px', borderBottom: '1px solid rgba(255,255,255,0.06)' };
-const title: React.CSSProperties = { margin: 0, fontSize: 22, color: '#F8FAFC' };
-const subtitle: React.CSSProperties = { color: '#94A3B8', fontSize: 12 };
-const subtitleRow: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  marginTop: 2,
-  gap: 12,
-};
 const replayLink: React.CSSProperties = {
   background: 'transparent',
   border: 0,
@@ -308,7 +300,6 @@ const replayLink: React.CSSProperties = {
   fontFamily: 'inherit',
   padding: 0,
 };
-const tabs: React.CSSProperties = { display: 'flex', gap: 6, marginTop: 12 };
 const tabBtn: React.CSSProperties = {
   background: 'transparent', color: '#94A3B8', border: 0, padding: '8px 14px', borderRadius: 8,
   cursor: 'pointer', fontSize: 13, minHeight: 36, fontFamily: 'inherit',
