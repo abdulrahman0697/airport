@@ -141,11 +141,11 @@ function tickCollectibles(state: SaveState, ctx: TickContext, seed: number): {
         const idx = Math.floor(uniform(s) * airports.length) % airports.length;
         const anchor = airports[idx]!;
         s = nextSeed(s);
-        const isCash = uniform(s) < 0.7;
-        s = nextSeed(s);
-        const rewardAmount = isCash
-          ? Math.round(2000 * (1 + uniform(s) * 8))      // $2K–$18K
-          : Math.round(200 + uniform(s) * 500);           // 200–700 fuel
+        // Player feedback: drop fuel collectibles entirely — every
+        // roaming pickup is now a cash reward. The fuel branch in
+        // claimCollectible() stays available so any in-flight
+        // collectibles from older saves are still claimable.
+        const rewardAmount = Math.round(2000 * (1 + uniform(s) * 8)); // $2K–$18K
         collectibles = [
           ...collectibles,
           {
@@ -154,7 +154,7 @@ function tickCollectibles(state: SaveState, ctx: TickContext, seed: number): {
             lon: anchor.lon + (uniform(nextSeed(s + 1)) - 0.5) * 12,
             spawnedAt: nextSpawnMs,
             expiresAt: nextSpawnMs + 90_000,
-            reward: { kind: isCash ? 'cash' : 'fuel', amount: rewardAmount },
+            reward: { kind: 'cash', amount: rewardAmount },
           },
         ];
       }

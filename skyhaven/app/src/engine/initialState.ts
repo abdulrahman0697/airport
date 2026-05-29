@@ -24,7 +24,10 @@ const STARTER_CODE = 'SH';
 // sign a fuel contract, but not enough to skip the early game. The UI
 // labels this surface as "Founder Capital" so the player feels the
 // climb instead of inheriting an empire.
-const STARTER_CASH = 50_000;
+// Founder capital — player feedback bumped this from $50K → $100K so
+// the tutorial's second-aircraft buy (~$25K) doesn't strand the
+// player with almost no operating cash for the first fuel contract.
+const STARTER_CASH = 100_000;
 const STARTER_AIRCRAFT_DEF = 't1.atr42';
 const STARTER_CONTRACT = 'fc.starter';
 

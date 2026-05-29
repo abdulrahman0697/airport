@@ -1,11 +1,15 @@
 /**
  * Region definitions (BRD §4.4).
  *
- * 9 regions, each cash-unlockable. Players start in their home region
- * (Europe by default — the Phase-2 initialState seeds the starter route
- * there). Unlock costs roughly track the lifetime-earnings curve so a
- * player crossing each tier-unlock threshold finds the next region
- * within reach.
+ * 9 regions, each cash-unlockable. Players pick a starting region in
+ * the founder flow; that region is granted free (added to
+ * `unlockedRegions` without charging). Every OTHER region costs its
+ * unlockCost below, including Europe — previously Europe was hard-
+ * coded to 0 because it was the historical default starter, but a
+ * player who founded in (say) the Middle East could then "unlock"
+ * Europe for free. Costs now scale uniformly with the
+ * lifetime-earnings curve so each tier-unlock threshold lines up
+ * with affording the next region.
  */
 
 export interface RegionDef {
@@ -20,7 +24,7 @@ export interface RegionDef {
 export const REGIONS: readonly RegionDef[] = [
   { id: 1, name: 'North America',  unlockCost: 250_000,     centerLat:  39, centerLon: -100 },
   { id: 2, name: 'Latin America',  unlockCost: 750_000,     centerLat: -15, centerLon:  -60 },
-  { id: 3, name: 'Europe',         unlockCost: 0,           centerLat:  50, centerLon:   12 },
+  { id: 3, name: 'Europe',         unlockCost: 250_000,     centerLat:  50, centerLon:   12 },
   { id: 4, name: 'Middle East',    unlockCost: 2_000_000,   centerLat:  27, centerLon:   46 },
   { id: 5, name: 'Africa',         unlockCost: 5_000_000,   centerLat:   3, centerLon:   22 },
   { id: 6, name: 'South Asia',     unlockCost: 10_000_000,  centerLat:  22, centerLon:   80 },
