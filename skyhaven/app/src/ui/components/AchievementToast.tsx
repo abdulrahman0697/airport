@@ -40,7 +40,7 @@ export function AchievementToast() {
     const newToasts = added.map((id) => ({ id, key: keyRef.current++ }));
     setToasts((cur) => [...cur, ...newToasts]);
     haptics.success();
-    sfx.claim();
+    sfx.play('achievement_unlock');
     const timer = setTimeout(() => {
       setToasts((cur) => cur.slice(newToasts.length));
     }, SHOW_MS);

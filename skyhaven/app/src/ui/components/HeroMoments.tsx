@@ -78,7 +78,7 @@ export function HeroMoments() {
       };
       setQueue((q) => [...q, moment]);
       haptics.success();
-      sfx.success();
+      sfx.play('tier_unlock');
     }
     seenTier.current = tier;
   }, [tier, tailColor, tutorialCompleted]);
@@ -115,7 +115,7 @@ export function HeroMoments() {
       });
       setQueue((q) => [...q, ...newOnes]);
       haptics.success();
-      sfx.success();
+      sfx.play('region_unlock');
     }
   }, [regions, tailColor, tutorialCompleted]);
 

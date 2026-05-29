@@ -7,6 +7,7 @@
  * "Settings" button.
  */
 import { Suspense, lazy } from 'react';
+import { AudioSettingsCard } from '../components/AudioSettingsCard';
 import { PanelHeader } from '../design/PanelHeader';
 import { COLOR, SPACE } from '../design/tokens';
 
@@ -23,9 +24,10 @@ export function SettingsPanel() {
       <PanelHeader
         kicker="Account"
         title="Settings"
-        subtitle="Cloud sync, friend codes, and other preferences."
+        subtitle="Sound, cloud sync, friend codes, and other preferences."
       />
       <div style={body}>
+        <AudioSettingsCard />
         <Suspense fallback={<div style={fallback}>Loading…</div>}>
           <CloudAccountCard />
           <FriendsCard />

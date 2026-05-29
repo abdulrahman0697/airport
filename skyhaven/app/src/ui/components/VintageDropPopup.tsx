@@ -1,6 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useRef } from 'react';
 import { getClassicDef } from '../../data/classics';
 import { selectPendingVintageDrop, selectVintage, useGameStore } from '../../state/store';
+import { sfx } from '../juice/sfx';
 
 /**
  * Vintage drop reveal (BRD §4.9 "juicy reveal moment").
@@ -15,6 +17,13 @@ export function VintageDropPopup() {
   const vintage = useGameStore(selectVintage);
   const ack = useGameStore((s) => s.acknowledgeVintageDrop);
   const def = id ? getClassicDef(id) : null;
+
+  // Distinctive "rarity" cue when a classic is revealed.
+  const sounded = useRef<string | null>(null);
+  useEffect(() => {
+    if (id && sounded.current !== id) { sfx.play('vintage_award'); sounded.current = id; }
+    if (!id) sounded.current = null;
+  }, [id]);
 
   return (
     <AnimatePresence>

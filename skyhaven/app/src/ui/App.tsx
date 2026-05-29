@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { createGameLoop } from '../state/gameLoop';
+import { initAudio } from './juice/sfx';
 import { selectTutorialCompleted, useGameStore } from '../state/store';
 import { AchievementToast } from './components/AchievementToast';
 import { AircraftDeliveryRitual } from './components/AircraftDeliveryRitual';
@@ -31,6 +32,9 @@ import { WorldView } from './components/WorldView';
 
 export function App() {
   useEffect(() => {
+    // Audio unlock: installs a one-shot gesture listener that resumes
+    // the AudioContext and starts the music/ambience bed (if enabled).
+    initAudio();
     const loop = createGameLoop();
     void loop.start();
     // Cloud sync runs alongside the local game loop. Firebase is a

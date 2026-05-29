@@ -37,7 +37,7 @@ export function AircraftDetailModal({
     const res = applyUpgrade(uid, kind);
     if (res.ok) {
       haptics.heavy();
-      sfx.success();
+      sfx.play('upgrade_complete');
       setError(null);
     } else {
       haptics.warning();

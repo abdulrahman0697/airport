@@ -5,6 +5,7 @@ import { getRegion } from '../../data/regions';
 import { isAnnounced } from '../../engine/events';
 import type { ActiveEvent } from '../../engine/types';
 import { selectActiveEvents, useGameStore } from '../../state/store';
+import { sfx } from '../juice/sfx';
 
 /**
  * Event announcement popup (Phase 6 polish).
@@ -40,6 +41,15 @@ export function EventPopup() {
     // (250 ms cadence above + store updates).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events, now]);
+
+  // Announce cue — positive for boom/rush, warning for the fuel spike.
+  const soundedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (announced && soundedRef.current !== announced.id) {
+      sfx.play(announced.kind === 'fuel_price_spike' ? 'event_negative' : 'event_positive');
+      soundedRef.current = announced.id;
+    }
+  }, [announced]);
 
   const dismiss = (id: string): void => {
     dismissedRef.current.add(id);

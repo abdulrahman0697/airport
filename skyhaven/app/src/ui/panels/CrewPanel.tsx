@@ -98,7 +98,7 @@ function HubCard({ hub }: { hub: Hub }) {
     const res = hire(hub.iata, kind);
     if (res.ok) {
       haptics.success();
-      sfx.success();
+      sfx.play('manager_hire');
       setError(null);
     } else {
       haptics.warning();
@@ -237,7 +237,7 @@ function AutoUpgradeModal({ hub, onClose }: { hub: Hub; onClose: () => void }) {
     const res = bulkUpgrade(hub.iata, plan.totalCost);
     if (res.ok) {
       haptics.success();
-      sfx.success();
+      sfx.play('upgrade_complete');
       setCommitted(true);
       window.setTimeout(onClose, 700);
     } else {

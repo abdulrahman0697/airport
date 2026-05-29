@@ -59,7 +59,7 @@ export function AircraftDeliveryRitual() {
     if (!pending) return;
     setBeat(1);
     haptics.medium();
-    sfx.confirm();
+    sfx.play('aircraft_delivery');
     const t1 = window.setTimeout(() => { setBeat(2); haptics.light(); }, BEAT_2_MS);
     const t2 = window.setTimeout(() => { setBeat(3); haptics.success(); }, BEAT_3_MS);
     return () => {
