@@ -24,6 +24,7 @@ import {
   hubUpgradeCost,
   MAX_HUB_LEVEL,
 } from './hubs';
+import { effectiveIncomePerSec } from './economy';
 import { airportSupportsAircraft, minRunwayForAircraft } from './runway';
 import { upgradeCost, UPGRADE_SPECS, type UpgradeKind } from './upgrades';
 import type { Collectible, Hub, OwnedAircraft, Route, RoutePricing, SaveState } from './types';
@@ -808,4 +809,31 @@ export function fleetSummary(state: SaveState): {
     if (conditionBand(a.condition) !== 'normal') needsAttention++;
   }
   return { total: state.fleet.length, needsAttention, grounded };
+}
+
+// ─── Monetization grants (Phase 15) ──────────────────────────────────
+
+/** Credit a flat cash amount (rewarded-ad offline doubler, IAP packs). */
+export function grantCash(state: SaveState, amount: number): SaveState {
+  const amt = Math.max(0, Math.floor(amount));
+  if (amt <= 0) return state;
+  return { ...state, cash: state.cash + amt, lifetimeEarnings: state.lifetimeEarnings + amt };
+}
+
+/** Credit `seconds` of the player's current effective income — backs the
+ *  "15-minute yield" rewarded ad, the VIP welcome bonus, and the cash
+ *  packs (whose hour counts are a backend detail). */
+export function grantYieldSeconds(state: SaveState, seconds: number, nowMs: number): SaveState {
+  return grantCash(state, effectiveIncomePerSec(state, nowMs) * Math.max(0, seconds));
+}
+
+/** Instantly top the fuel reserve back to capacity (rewarded ad). */
+export function fillFuel(state: SaveState): SaveState {
+  return { ...state, fuel: { ...state.fuel, reserve: state.fuel.capacity } };
+}
+
+/** Start (or extend) the 2× revenue speed-up by `durationMs` (rewarded ad). */
+export function startSpeedUp(state: SaveState, nowMs: number, durationMs: number): SaveState {
+  const from = Math.max(state.speedUpUntilMs ?? 0, nowMs);
+  return { ...state, speedUpUntilMs: from + Math.max(0, durationMs) };
 }

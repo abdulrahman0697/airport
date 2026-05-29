@@ -1,8 +1,9 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { selectPendingOfflineSummary, useGameStore } from '../../state/store';
 import { useUiStore } from '../../state/uiStore';
 import { sfx } from '../juice/sfx';
+import { showRewardedAd } from '../monetize/ads';
 import { formatCash } from '../format';
 
 /**
@@ -26,12 +27,23 @@ export function OfflineSummary() {
   const ackBase = useGameStore((s) => s.acknowledgeOfflineSummary);
   const tailColor = useGameStore((s) => s.state?.tailColor ?? '#5AC8FA');
   const setStayInTouchCard = useUiStore((s) => s.setStayInTouchCard);
+  const grantCash = useGameStore((s) => s.grantCash);
+  const [bonus, setBonus] = useState(0);
+  const [doubling, setDoubling] = useState(false);
 
   const sounded = useRef(false);
   useEffect(() => {
     if (summary && !sounded.current) { sfx.play('offline_welcome'); sounded.current = true; }
-    if (!summary) sounded.current = false;
+    if (!summary) { sounded.current = false; setBonus(0); setDoubling(false); }
   }, [summary]);
+
+  const doubleIt = async (): Promise<void> => {
+    if (!summary || doubling || bonus > 0) return;
+    setDoubling(true);
+    const ok = await showRewardedAd('offline_double');
+    if (ok) { grantCash(summary.earnings); setBonus(summary.earnings); sfx.play('claim_coin'); }
+    setDoubling(false);
+  };
 
   // Design Review v4 — point 1. The first time the player completes
   // an offline summary, fire the in-game "stay-in-touch" card *after*
@@ -75,12 +87,18 @@ export function OfflineSummary() {
               <h2 style={title}>While you were away</h2>
               <p style={subtitle}>{formatDuration(summary.elapsedMs)} offline · routes kept earning</p>
               <div style={amountRow}>
-                <span style={amountLabel}>Cash credited</span>
-                <span style={amountValue}>${formatCash(summary.earnings)}</span>
+                <span style={amountLabel}>{bonus > 0 ? 'Cash credited (2×)' : 'Cash credited'}</span>
+                <span style={amountValue}>${formatCash(summary.earnings + bonus)}</span>
               </div>
-              <p style={smallNote}>
-                A 2× rewarded-ad doubler arrives with the ad system. For now, the catch-up is auto-collected.
-              </p>
+              {bonus === 0 && (
+                <button
+                  style={{ ...btn, background: '#F4C75B', color: '#0B1120', marginBottom: 8 }}
+                  disabled={doubling}
+                  onClick={(): void => { void doubleIt(); }}
+                >
+                  {doubling ? 'Loading ad…' : '▶  Double it (watch ad)'}
+                </button>
+              )}
               <button style={{ ...btn, background: tailColor }} onClick={(): void => { ack(); }}>
                 Collect
               </button>
@@ -154,13 +172,6 @@ const amountValue: React.CSSProperties = {
   fontWeight: 700,
   fontFeatureSettings: '"tnum" 1',
   textShadow: '0 0 20px rgba(244,199,91,0.4)',
-};
-const smallNote: React.CSSProperties = {
-  marginTop: 12,
-  marginBottom: 16,
-  fontSize: 11,
-  color: '#94A3B8',
-  lineHeight: 1.55,
 };
 const btn: React.CSSProperties = {
   width: '100%',

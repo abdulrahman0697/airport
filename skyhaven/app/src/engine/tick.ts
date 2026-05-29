@@ -21,11 +21,12 @@ import { loadTopAirports } from '../data/airports';
 import { evaluateAchievements } from './achievements';
 import { recomputeProgress, rollIfNeeded } from './dailyMissions';
 import { repairCost } from './condition';
-import { computeEcoScore, ecoRevenueBonus } from './eco';
+import { computeEcoScore } from './eco';
 import { TIME_COMPRESSION, legDurationMs, legRevenue } from './economy';
 import { processGoalChain } from './goalChain';
 import { TUNING } from './tuning';
-import { processVintageMilestones, vintageGlobalYieldBonus } from './vintage';
+import { globalYieldMultFor, VIP_FUEL_SUPPLY_MULT, isVipActive } from './yield';
+import { processVintageMilestones } from './vintage';
 import {
   COLLECTIBLE_INTERVAL_MS,
   COLLECTIBLE_SPAWN_PROBABILITY,
@@ -218,13 +219,12 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
   // Computed once per tick from state at tick-start; classics added
   // mid-tick via processVintageMilestones don't retroactively boost
   // earnings within the same tick.
-  const ecoScoreAtStart = computeEcoScore(state.fleet);
-  const globalYieldMult =
-    (1 + vintageGlobalYieldBonus(state.vintage) + ecoRevenueBonus(ecoScoreAtStart))
-    * TUNING.globalYieldMult;
+  const globalYieldMult = globalYieldMultFor(state, ctx.nowMs);
 
   // ── Fuel reserve evolution with event modifier ──────────────────
-  const supplyMul = fuelSupplyEventMultiplier(running);
+  // VIP Pass adds +50% fuel supply (reserve refills faster) while active.
+  const supplyMul = fuelSupplyEventMultiplier(running)
+    * (isVipActive(state, ctx.nowMs) ? VIP_FUEL_SUPPLY_MULT : 1);
   const effectiveSupply = state.fuel.supplyRate * supplyMul;
   const dtSec = ctx.dtMs / 1000;
   const netRate = effectiveSupply - state.fuel.demandRate;

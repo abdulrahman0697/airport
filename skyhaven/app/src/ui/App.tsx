@@ -10,6 +10,8 @@ import { BottomTabs } from './components/BottomTabs';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { DailyReward } from './components/DailyReward';
 import { FuelAlerts } from './components/FuelAlerts';
+import { FuelEmptyOffer } from './components/FuelEmptyOffer';
+import { MonetizeOffers } from './components/MonetizeOffers';
 import { FirstFlightStory } from './components/FirstFlightStory';
 import { FirstRouteCeremony } from './components/FirstRouteCeremony';
 import { FuelContractToast } from './components/FuelContractToast';
@@ -89,6 +91,8 @@ export function App() {
       <VintageDropPopup />
       <HeroMoments />
       <FuelAlerts />
+      <FuelEmptyOffer />
+      <MonetizeOffers />
       <AchievementToast />
       <AircraftDeliveryRitual />
       <EmpireJourney />

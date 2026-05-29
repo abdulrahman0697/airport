@@ -187,6 +187,13 @@ const MIGRATIONS: Record<number, Migration> = {
       }),
     };
   },
+  // v10 → v11 (Phase 15): monetization boost timers. Default both off.
+  10: (s) => ({
+    ...s,
+    schemaVersion: 11,
+    speedUpUntilMs: typeof s.speedUpUntilMs === 'number' ? s.speedUpUntilMs : 0,
+    vipUntilMs: typeof s.vipUntilMs === 'number' ? s.vipUntilMs : 0,
+  }),
 };
 
 /**

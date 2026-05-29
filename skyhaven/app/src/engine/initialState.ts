@@ -92,5 +92,7 @@ export function createInitialState(nowMs: number, homeRegion = 3): SaveState {
     pendingHubPickRegion: homeRegion,
     dailyMissions: null,
     dailyMissionSnapshot: null,
+    speedUpUntilMs: 0,
+    vipUntilMs: 0,
   };
 }

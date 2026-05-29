@@ -3,6 +3,8 @@ import { FUEL_CAPACITY_TIERS, nextCapacityTier } from '../../data/fuelCapacity';
 import { FUEL_CONTRACTS } from '../../data/fuelContracts';
 import { selectCash, useGameStore } from '../../state/store';
 import { PanelHeader } from '../design/PanelHeader';
+import { sfx } from '../juice/sfx';
+import { showRewardedAd } from '../monetize/ads';
 import { formatCash } from '../format';
 
 export function FuelPanel() {
@@ -10,7 +12,17 @@ export function FuelPanel() {
   const fuel = useGameStore((s) => s.state?.fuel);
   const signContract = useGameStore((s) => s.signFuelContract);
   const upgradeCapacity = useGameStore((s) => s.upgradeFuelCapacity);
+  const fillFuel = useGameStore((s) => s.fillFuel);
   const [error, setError] = useState<string | null>(null);
+  const [filling, setFilling] = useState(false);
+
+  const watchFill = async (): Promise<void> => {
+    if (filling) return;
+    setFilling(true);
+    const ok = await showRewardedAd('fuel_fill');
+    if (ok) { fillFuel(); sfx.play('claim_coin'); }
+    setFilling(false);
+  };
 
   if (!fuel) return null;
   const net = fuel.supplyRate - fuel.demandRate;
@@ -56,6 +68,11 @@ export function FuelPanel() {
             <span>Supply: <b>{fuel.supplyRate.toFixed(1)}/s</b></span>
             <span>Demand: <b>{fuel.demandRate.toFixed(1)}/s</b></span>
           </div>
+          {fuel.reserve < fuel.capacity && (
+            <button style={fillBtn} disabled={filling} onClick={(): void => { void watchFill(); }}>
+              {filling ? 'Loading ad…' : '▶  Watch ad → fill fuel to 100%'}
+            </button>
+          )}
         </section>
 
         <h3 style={sectionTitle}>Fuel contracts</h3>
@@ -169,6 +186,11 @@ const subRow: React.CSSProperties = {
   fontSize: 11,
   marginTop: 10,
   fontFeatureSettings: '"tnum" 1',
+};
+const fillBtn: React.CSSProperties = {
+  marginTop: 12, width: '100%', minHeight: 40, borderRadius: 8, border: 0,
+  background: '#F4C75B', color: '#0B1120', fontWeight: 800, fontSize: 12,
+  cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.03em',
 };
 const cardHeader: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' };
 const cardTitle: React.CSSProperties = { color: '#F8FAFC', fontSize: 14, fontWeight: 600 };

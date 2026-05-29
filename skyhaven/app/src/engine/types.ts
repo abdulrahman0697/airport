@@ -8,7 +8,7 @@
  * `migrations.ts` and bumps `CURRENT_SCHEMA_VERSION`.
  */
 
-export const CURRENT_SCHEMA_VERSION = 10;
+export const CURRENT_SCHEMA_VERSION = 11;
 
 export type AircraftCategory = 'passenger' | 'cargo' | 'classic';
 export type RoutePricing = 'economy' | 'balanced' | 'premium';
@@ -212,6 +212,12 @@ export interface SaveState {
    * via migration v8 → v9 for backwards-compatible loads.
    */
   inauguralRouteCommitted?: boolean;
+
+  // ── Monetization (Phase 15) ──────────────────────────────────────
+  /** Epoch ms until which the rewarded-ad 2× speed-up is active (0/absent = off). */
+  speedUpUntilMs?: number;
+  /** Epoch ms until which the VIP Pass is active (0/absent = off). */
+  vipUntilMs?: number;
 }
 
 export interface DailyMission {
