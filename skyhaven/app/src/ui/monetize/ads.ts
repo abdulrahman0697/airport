@@ -1,23 +1,18 @@
 /**
  * Rewarded-ad service (Phase 15).
  *
- * Single choke-point for showing a rewarded video. Returns whether the
- * player earned the reward (watched to completion) vs dismissed it.
+ * Native (Android): real Google AdMob rewarded video via
+ * `@capacitor-community/admob` (lazy-imported, native-only). Web/dev:
+ * a simulated watch so the flow stays exercisable in the browser.
  *
- * Currently SIMULATED: there's no native ad SDK wired yet (AdMob account
- * + unit IDs are an owner setup step). The simulated path resolves
- * `true` after a short "loading" delay so every placement is fully
- * playable and testable now. When the SDK lands this is the only file
- * that changes.
- *
- * TODO(native): install `@capacitor-community/admob`, configure the app
- * id + rewarded unit ids, and replace the simulated branch with
- * `AdMob.prepareRewardVideoAd()` + `AdMob.showRewardVideoAd()`, resolving
- * on the `adReward` event. Web/dev stays simulated. Interstitials are
- * intentionally NOT implemented (kept off per design); the placement
- * vocabulary leaves room to add them later.
+ * Ad unit ids live in `adsConfig.ts` — currently Google's TEST units
+ * (real test ads, no account approval), swappable for live ids later.
+ * Interstitials are intentionally not implemented (kept off); the
+ * placement vocabulary leaves room to add them.
  */
+import { Capacitor } from '@capacitor/core';
 import { track } from '../../backend/analytics';
+import { ADMOB_USING_TEST_IDS, REWARDED_AD_UNITS } from './adsConfig';
 
 export type RewardedPlacement =
   | 'offline_double'
@@ -25,20 +20,50 @@ export type RewardedPlacement =
   | 'instant_yield'
   | 'speed_up';
 
-/** True while real ads aren't wired — UI can show a subtle "demo" hint. */
-export const ADS_SIMULATED = true;
-
 let showing = false;
+let initPromise: Promise<void> | null = null;
 
+async function ensureAdMobInit(): Promise<void> {
+  if (!initPromise) {
+    initPromise = (async () => {
+      const { AdMob } = await import('@capacitor-community/admob');
+      await AdMob.initialize({ initializeForTesting: ADMOB_USING_TEST_IDS });
+    })();
+  }
+  return initPromise;
+}
+
+async function showNativeRewarded(placement: RewardedPlacement): Promise<boolean> {
+  const { AdMob, RewardAdPluginEvents } = await import('@capacitor-community/admob');
+  await ensureAdMobInit();
+  let rewarded = false;
+  const handle = await AdMob.addListener(RewardAdPluginEvents.Rewarded, () => {
+    rewarded = true;
+  });
+  try {
+    await AdMob.prepareRewardVideoAd({ adId: REWARDED_AD_UNITS[placement] });
+    await AdMob.showRewardVideoAd();
+  } finally {
+    await handle.remove();
+  }
+  return rewarded;
+}
+
+/**
+ * Show a rewarded ad for `placement`. Resolves true if the player earned
+ * the reward (watched to completion), false if dismissed/failed.
+ */
 export async function showRewardedAd(placement: RewardedPlacement): Promise<boolean> {
   if (showing) return false; // never stack ads
   showing = true;
   track.adStarted(placement);
   try {
-    // Simulated watch. Real SDK call goes here.
-    await new Promise((resolve) => setTimeout(resolve, 700));
-    track.adRewarded(placement);
-    return true;
+    const rewarded = Capacitor.isNativePlatform()
+      ? await showNativeRewarded(placement)
+      : await new Promise<boolean>((resolve) => setTimeout(() => resolve(true), 700)); // web/dev sim
+    if (rewarded) track.adRewarded(placement);
+    else track.adDismissed(placement);
+    return rewarded;
   } catch {
     track.adDismissed(placement);
     return false;
