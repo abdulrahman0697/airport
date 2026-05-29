@@ -654,20 +654,27 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
     [airports, unlocked],
   );
 
-  const idleAircraft = fleet.filter((a) => a.routeId === null);
-  const [acUid, setAcUid] = useState<string>(idleAircraft[0]?.uid ?? '');
-  const selectedAc = idleAircraft.find((a) => a.uid === acUid);
-  const def = selectedAc ? getAircraftDef(selectedAc.defId) : undefined;
-  // Aircraft are hub-scoped now: the origin is the aircraft's home
-  // hub (locked). If the player wants to fly out of a different hub
-  // they have to switch to an aircraft based there.
-  const aircraftHub = selectedAc?.homeHubIata ?? null;
-  const [originIata, setOriginIata] = useState<string>(
-    aircraftHub ?? hubs[0]?.iata ?? '',
+  // Order matches the player's mental model: pick the HUB you want
+  // to fly out of first, then the aircraft list filters down to
+  // planes based there, then the destination. Aircraft are still
+  // hub-scoped (homeHubIata) — they just no longer drive the form.
+  const [originIata, setOriginIata] = useState<string>(hubs[0]?.iata ?? '');
+  const idleAircraftAtOrigin = useMemo(
+    () => fleet.filter((a) => a.routeId === null && a.homeHubIata === originIata),
+    [fleet, originIata],
   );
+  const [acUid, setAcUid] = useState<string>(idleAircraftAtOrigin[0]?.uid ?? '');
+  // When the origin changes, jump to the first idle aircraft at the
+  // new hub (or clear the selection if there's none). Without this
+  // the form ends up with an aircraft from the OLD hub still showing
+  // and the engine would throw WRONG_HUB on confirm.
   useEffect(() => {
-    if (aircraftHub && aircraftHub !== originIata) setOriginIata(aircraftHub);
-  }, [aircraftHub, originIata]);
+    if (!idleAircraftAtOrigin.some((a) => a.uid === acUid)) {
+      setAcUid(idleAircraftAtOrigin[0]?.uid ?? '');
+    }
+  }, [idleAircraftAtOrigin, acUid]);
+  const selectedAc = idleAircraftAtOrigin.find((a) => a.uid === acUid);
+  const def = selectedAc ? getAircraftDef(selectedAc.defId) : undefined;
   const [destIata, setDestIata] = useState<string>('');
   const [destExpanded, setDestExpanded] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
@@ -800,43 +807,46 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
     <div style={modalBackdrop} onClick={onClose}>
       <div style={modalShell} onClick={(e): void => e.stopPropagation()}>
         <h3 style={{ margin: '0 0 12px', color: '#F8FAFC' }}>New route</h3>
-        {idleAircraft.length === 0 ? (
-          <div style={empty}>No idle aircraft. Buy or close an existing route first.</div>
+        {hubs.length === 0 ? (
+          <div style={empty}>No hubs yet. Add one from Network → Hubs.</div>
         ) : (
           <>
-            <label style={formLabel}>Aircraft</label>
-            <select value={acUid} onChange={(e): void => setAcUid(e.target.value)} style={selectStyle}>
-              {idleAircraft.map((a) => {
-                const ad = getAircraftDef(a.defId);
-                const baseLabel = a.homeHubIata ? ` · base ${a.homeHubIata}` : '';
-                return (
-                  <option key={a.uid} value={a.uid}>
-                    {ad?.displayName ?? '?'}{baseLabel} · {a.condition.toFixed(0)}% cond · range {ad?.rangeKm.toLocaleString()} km
-                  </option>
-                );
-              })}
+            <label style={formLabel}>Origin (hub)</label>
+            <select
+              {...(!originIata ? { 'data-tutorial': 'routes-origin-select' } : {})}
+              value={originIata}
+              onChange={(e): void => {
+                setOriginIata(e.target.value);
+                // Reset the destination — old picks won't match the
+                // new origin's reachable list.
+                setDestIata('');
+              }}
+              style={selectStyle}
+            >
+              <option value="">— pick a hub —</option>
+              {originAirports.map((a) => (
+                <option key={a.iata} value={a.iata}>
+                  {a.iata} · {a.city || a.country} ({countryName(a.country)})
+                </option>
+              ))}
             </select>
 
-            <label style={formLabel}>Origin (hub)</label>
-            {hubs.length === 0 ? (
-              <div style={empty}>No hubs yet. Add one from Network → Hubs.</div>
+            <label style={formLabel}>Aircraft based at {originIata || '—'}</label>
+            {idleAircraftAtOrigin.length === 0 ? (
+              <div style={empty}>
+                No idle aircraft based at {originIata || 'this hub'}. Buy one (or
+                close an existing route) before opening a route from here.
+              </div>
             ) : (
-              <select
-                {...(!originIata ? { 'data-tutorial': 'routes-origin-select' } : {})}
-                value={originIata}
-                // Origin is locked to the aircraft's home hub when set;
-                // switching it would just throw a WRONG_HUB error from
-                // the engine.
-                disabled={aircraftHub !== null}
-                onChange={(e): void => { setOriginIata(e.target.value); setDestIata(''); }}
-                style={selectStyle}
-              >
-                <option value="">— pick a hub —</option>
-                {originAirports.map((a) => (
-                  <option key={a.iata} value={a.iata}>
-                    {a.iata} · {a.city || a.country} ({countryName(a.country)})
-                  </option>
-                ))}
+              <select value={acUid} onChange={(e): void => setAcUid(e.target.value)} style={selectStyle}>
+                {idleAircraftAtOrigin.map((a) => {
+                  const ad = getAircraftDef(a.defId);
+                  return (
+                    <option key={a.uid} value={a.uid}>
+                      {ad?.displayName ?? '?'} · {a.condition.toFixed(0)}% cond · range {ad?.rangeKm.toLocaleString()} km
+                    </option>
+                  );
+                })}
               </select>
             )}
 
