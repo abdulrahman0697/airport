@@ -51,13 +51,25 @@ Direct-purchase store (no premium currency), billing **simulated**
 - No Remove-Ads product (no interstitials). No premium currency.
 - Test: `activateVip` in `engine/monetize.test.ts`.
 
-### Deferred
-- **Server-side receipt validation Cloud Function** — intentionally not
-  added yet: it needs real Play Billing + the Play Developer API +
-  service account, all owner-gated, and isn't meaningfully testable
-  while billing is simulated. The client grants entitlements locally for
-  now (VIP persists in `SaveState` and cloud-syncs). Wire validation
-  alongside the native Billing plugin.
+### Receipt validation ✅ (server half, pre-built)
+- **`functions/validatePurchase`** — v2 callable that verifies a
+  `{ productId, purchaseToken }` against the Google Play Developer API
+  (`androidpublisher.purchases.products.get`), checks `purchaseState`,
+  and acknowledges the purchase. Returns a clear `failed-precondition`
+  until the Play Developer API + service-account access are configured
+  (owner). Exported in `functions/index.ts`; functions build is green.
+- **Client wrapper** `backend/purchases.ts` → `validatePurchase()` calls
+  the function via `httpsCallable` (`getFirebaseFunctions`, us-central1).
+- `iap.ts` documents the exact native flow: Billing purchase → token →
+  `validatePurchase` → grant. Still simulated until the Play Billing
+  plugin + live products land.
+
+### Remaining (owner-gated)
+- Choose + install the Play Billing Capacitor plugin and wire the real
+  purchase → token path into `iap.ts`.
+- Play Console: create the 7 product ids, upload to a testing track,
+  add license testers; enable the Play Developer API + grant the
+  function's service account access.
 
 ## Owner setup (gates real ads/IAP; until then simulated)
 - AdMob: account + app + rewarded unit ids + link to Firebase + app-ads.txt.

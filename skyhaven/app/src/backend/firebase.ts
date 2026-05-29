@@ -26,11 +26,13 @@ import {
   persistentMultipleTabManager,
   type Firestore,
 } from 'firebase/firestore';
+import { getFunctions, type Functions } from 'firebase/functions';
 import { FIREBASE_CONFIG } from './config';
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let firestore: Firestore | null = null;
+let functions: Functions | null = null;
 
 function ensureApp(): FirebaseApp {
   if (app) return app;
@@ -78,4 +80,11 @@ export function getFirebaseFirestore(): Firestore {
     firestore = getFirestore(a);
   }
   return firestore;
+}
+
+/** Callable Cloud Functions client (region must match the deployed fns). */
+export function getFirebaseFunctions(): Functions {
+  if (functions) return functions;
+  functions = getFunctions(ensureApp(), 'us-central1');
+  return functions;
 }

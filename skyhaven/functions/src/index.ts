@@ -18,6 +18,7 @@ export {
   expireOldFriendRequests,
 } from './friends';
 export { sendGift, claimGift } from './gifts';
+export { validatePurchase } from './validatePurchase';
 export { publishScheduledEvents } from './scheduledEvents';
 export { sendComebackPush } from './comebackPush';
 

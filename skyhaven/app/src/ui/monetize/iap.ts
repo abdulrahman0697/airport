@@ -14,7 +14,15 @@
  * TODO(native): install the Play Billing Capacitor plugin, query real
  * localized prices (overriding `priceLabel`), and on a verified purchase
  * call the server-side validation Cloud Function before granting. Web
- * stays simulated.
+ * stays simulated. The server half is ready:
+ *
+ *   import { validatePurchase } from '../../backend/purchases';
+ *   const { purchaseToken } = await billing.purchase(id);   // native plugin
+ *   if (!(await validatePurchase(id, purchaseToken))) return false;
+ *   // …then consume (cash packs) / acknowledge handled server-side…
+ *   return true;
+ *
+ * (`backend/purchases.ts` → `validatePurchase` Cloud Function.)
  */
 import { track } from '../../backend/analytics';
 
