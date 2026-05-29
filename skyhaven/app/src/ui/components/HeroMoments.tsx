@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
+import { track } from '../../backend/analytics';
 import { aircraftByTier } from '../../data/aircraft';
 import { getRegion } from '../../data/regions';
 import {
@@ -79,6 +80,7 @@ export function HeroMoments() {
       setQueue((q) => [...q, moment]);
       haptics.success();
       sfx.play('tier_unlock');
+      track.tierUnlocked(newTier);
     }
     seenTier.current = tier;
   }, [tier, tailColor, tutorialCompleted]);
@@ -101,7 +103,7 @@ export function HeroMoments() {
     const additions: number[] = [];
     for (const r of regions) if (!seen.has(r)) additions.push(r);
     if (additions.length > 0) {
-      for (const r of additions) seen.add(r);
+      for (const r of additions) { seen.add(r); track.regionUnlocked(r); }
       const newOnes = additions.map((id) => {
         const def = getRegion(id);
         return {

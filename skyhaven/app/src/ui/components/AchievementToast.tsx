@@ -8,6 +8,7 @@
  */
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
+import { track } from '../../backend/analytics';
 import { getAchievement } from '../../data/achievements';
 import { selectAchievements, selectTailColor, useGameStore } from '../../state/store';
 import { formatCash } from '../format';
@@ -41,6 +42,7 @@ export function AchievementToast() {
     setToasts((cur) => [...cur, ...newToasts]);
     haptics.success();
     sfx.play('achievement_unlock');
+    for (const id of added) track.achievementUnlocked(id);
     const timer = setTimeout(() => {
       setToasts((cur) => cur.slice(newToasts.length));
     }, SHOW_MS);

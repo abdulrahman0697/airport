@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef } from 'react';
 import { getClassicDef } from '../../data/classics';
 import { selectPendingVintageDrop, selectVintage, useGameStore } from '../../state/store';
+import { track } from '../../backend/analytics';
 import { sfx } from '../juice/sfx';
 
 /**
@@ -21,7 +22,7 @@ export function VintageDropPopup() {
   // Distinctive "rarity" cue when a classic is revealed.
   const sounded = useRef<string | null>(null);
   useEffect(() => {
-    if (id && sounded.current !== id) { sfx.play('vintage_award'); sounded.current = id; }
+    if (id && sounded.current !== id) { sfx.play('vintage_award'); track.vintageCollected(id); sounded.current = id; }
     if (!id) sounded.current = null;
   }, [id]);
 

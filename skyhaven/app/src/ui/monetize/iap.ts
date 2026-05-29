@@ -16,6 +16,8 @@
  * call the server-side validation Cloud Function before granting. Web
  * stays simulated.
  */
+import { track } from '../../backend/analytics';
+
 export type ProductKind = 'vip' | 'cash';
 
 export interface IapProduct {
@@ -43,13 +45,16 @@ export const IAP_SIMULATED = true;
 let busy = false;
 
 /** Returns true if the purchase completed (and was server-validated, once wired). */
-export async function purchaseProduct(_id: string): Promise<boolean> {
+export async function purchaseProduct(id: string): Promise<boolean> {
   if (busy) return false;
   busy = true;
+  track.iapStarted(id);
   try {
     await new Promise((resolve) => setTimeout(resolve, 700));
+    track.iapSuccess(id);
     return true;
   } catch {
+    track.iapFailed(id);
     return false;
   } finally {
     busy = false;

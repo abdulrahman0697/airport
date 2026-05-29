@@ -36,6 +36,7 @@ import { COLOR } from '../design/tokens';
 import { formatCash } from '../format';
 import { haptics } from '../juice/haptics';
 import { sfx } from '../juice/sfx';
+import { track } from '../../backend/analytics';
 
 export function CrewPanel() {
   const hubs = useGameStore(selectHubs);
@@ -99,6 +100,7 @@ function HubCard({ hub }: { hub: Hub }) {
     if (res.ok) {
       haptics.success();
       sfx.play('manager_hire');
+      track.managerHired(kind);
       setError(null);
     } else {
       haptics.warning();

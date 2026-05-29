@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef } from 'react';
 import { STREAK_REWARDS } from '../../engine/dailyLogin';
 import { selectPendingDailyReward, useGameStore } from '../../state/store';
+import { track } from '../../backend/analytics';
 import { sfx } from '../juice/sfx';
 import { formatCash } from '../format';
 
@@ -23,6 +24,8 @@ export function DailyReward() {
     if (!reward) sounded.current = false;
   }, [reward]);
 
+  const doClaim = (): void => { if (reward) track.dailyRewardClaimed(reward.day); claim(); };
+
   return (
     <AnimatePresence>
       {reward && (
@@ -33,7 +36,7 @@ export function DailyReward() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
           style={backdrop as Record<string, unknown>}
-          onClick={(): void => { claim(); }}
+          onClick={(): void => { doClaim(); }}
         >
           <motion.div
             key="daily-card"
@@ -67,7 +70,7 @@ export function DailyReward() {
                 <span style={rewardLabel}>Today's reward</span>
                 <span style={rewardValue}>+${formatCash(reward.amount)}</span>
               </div>
-              <button style={{ ...btn, background: tailColor }} onClick={(): void => { claim(); }}>
+              <button style={{ ...btn, background: tailColor }} onClick={(): void => { doClaim(); }}>
                 Claim
               </button>
             </div>

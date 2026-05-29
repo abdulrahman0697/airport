@@ -16,6 +16,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import { getAircraftDef } from '../../data/aircraft';
+import { track } from '../../backend/analytics';
 import { aircraftNickname, aircraftTailNumber } from '../../engine/identity';
 import {
   selectAirlineCode,
@@ -60,6 +61,7 @@ export function AircraftDeliveryRitual() {
     setBeat(1);
     haptics.medium();
     sfx.play('aircraft_delivery');
+    track.aircraftPurchased(pending.defId, getAircraftDef(pending.defId)?.tier ?? 0);
     const t1 = window.setTimeout(() => { setBeat(2); haptics.light(); }, BEAT_2_MS);
     const t2 = window.setTimeout(() => { setBeat(3); haptics.success(); }, BEAT_3_MS);
     return () => {

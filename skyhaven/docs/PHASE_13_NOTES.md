@@ -53,6 +53,26 @@ defaults, so the game runs with zero backend.
   `gameLoop.ts`. (Still not RC-consumed at runtime — the cap is the
   hardcoded 1h; the template just no longer disagrees.)
 
+## Analytics ✅
+
+`backend/analytics.ts` — best-effort Firebase Analytics wrapper. Native
+(Android) routes through `@capacitor-firebase/analytics` (lazy import);
+web has no GA measurementId in the Android config so it traces in dev and
+no-ops otherwise. Never throws. All call sites go through the typed
+`track.*` helpers (GA4-safe snake_case names).
+
+Instrumented funnel:
+- **Lifecycle:** `app_start`.
+- **Progression:** `tier_unlocked`, `region_unlocked`, `achievement_unlocked`,
+  `vintage_collected`.
+- **Economy:** `aircraft_purchased`, `route_opened`, `route_closed`,
+  `hub_created`, `hub_upgraded`, `manager_hired`, `fuel_contract_signed`.
+- **Retention:** `daily_reward_claimed`, `offline_summary`, `offline_doubled`.
+- **Ads (central in `ads.ts`):** `ad_offer_shown`, `ad_started`,
+  `ad_rewarded`, `ad_dismissed` (per placement).
+- **IAP (central in `iap.ts`):** `store_opened`, `iap_purchase_started`,
+  `iap_purchase_success`, `iap_purchase_failed`, `vip_activated`.
+
 ## Owner steps (to make overrides take effect in production)
 1. Functions/Firestore need the **Blaze** plan (also required for Phase 12).
 2. Publish the Remote Config template (`remote-config.json`) in the

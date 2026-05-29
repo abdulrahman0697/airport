@@ -30,6 +30,7 @@ import { PanelHeader } from '../design/PanelHeader';
 import { formatCash, formatRate } from '../format';
 import { haptics } from '../juice/haptics';
 import { sfx } from '../juice/sfx';
+import { track } from '../../backend/analytics';
 
 export function RoutesPanel() {
   const [tab, setTab] = useState<'routes' | 'hubs' | 'regions'>('routes');
@@ -206,7 +207,7 @@ function RouteRow({ route }: { route: Route }) {
           <RouteAdvancedMenu
             onClose={(): void => {
               const res = closeRoute(route.id);
-              if (res.ok) sfx.play('route_close');
+              if (res.ok) { sfx.play('route_close'); track.routeClosed(); }
               setError(res.ok ? null : res.message);
             }}
           />
@@ -218,7 +219,7 @@ function RouteRow({ route }: { route: Route }) {
           <RouteAdvancedMenu
             onClose={(): void => {
               const res = closeRoute(route.id);
-              if (res.ok) sfx.play('route_close');
+              if (res.ok) { sfx.play('route_close'); track.routeClosed(); }
               setError(res.ok ? null : res.message);
             }}
           />
@@ -461,7 +462,7 @@ function HubsList() {
                     disabled={atMax || cash < upCost}
                     onClick={(): void => {
                       const res = upgrade(h.iata);
-                      if (res.ok) sfx.play('hub_upgraded');
+                      if (res.ok) { sfx.play('hub_upgraded'); track.hubUpgraded(h.level + 1); }
                       setError(res.ok ? null : res.message);
                     }}
                     style={{ ...primaryBtn, opacity: atMax || cash < upCost ? 0.5 : 1 }}
@@ -483,7 +484,7 @@ function HubsList() {
           onClose={(): void => setShowAdd(false)}
           onPick={(iata): void => {
             const res = pickHub(iata);
-            if (res.ok) { sfx.play('hub_created'); setShowAdd(false); }
+            if (res.ok) { sfx.play('hub_created'); track.hubCreated(); setShowAdd(false); }
             else setError(res.message);
           }}
         />
@@ -800,6 +801,7 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
     // Success path: hold the stamp briefly as a celebration, then
     // dismiss.
     sfx.play('route_open');
+    track.routeOpened();
     setAuthorizing(true);
     setError(null);
     window.setTimeout(() => {

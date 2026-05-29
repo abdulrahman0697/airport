@@ -7,7 +7,8 @@
  * the hour count. Billing is simulated until Play Billing is wired
  * (`ui/monetize/iap.ts`).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { track } from '../../backend/analytics';
 import { effectiveIncomePerSec } from '../../engine/economy';
 import { isVipActive } from '../../engine/yield';
 import { useGameStore } from '../../state/store';
@@ -24,6 +25,8 @@ export function StorePanel() {
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
+  useEffect(() => { track.storeOpened(); }, []);
+
   if (!state) return null;
   const now = Date.now();
   const perSec = effectiveIncomePerSec(state, now);
@@ -33,7 +36,7 @@ export function StorePanel() {
   const buyVip = async (): Promise<void> => {
     setBusy('vip_pass_7d'); setNote(null);
     const ok = await purchaseProduct('vip_pass_7d');
-    if (ok) { activateVip(Date.now()); haptics.success(); sfx.play('achievement_unlock'); }
+    if (ok) { activateVip(Date.now()); track.vipActivated(); haptics.success(); sfx.play('achievement_unlock'); }
     setBusy(null);
   };
   const buyCash = async (p: IapProduct): Promise<void> => {

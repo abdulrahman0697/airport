@@ -17,6 +17,8 @@
  * intentionally NOT implemented (kept off per design); the placement
  * vocabulary leaves room to add them later.
  */
+import { track } from '../../backend/analytics';
+
 export type RewardedPlacement =
   | 'offline_double'
   | 'fuel_fill'
@@ -28,14 +30,17 @@ export const ADS_SIMULATED = true;
 
 let showing = false;
 
-export async function showRewardedAd(_placement: RewardedPlacement): Promise<boolean> {
+export async function showRewardedAd(placement: RewardedPlacement): Promise<boolean> {
   if (showing) return false; // never stack ads
   showing = true;
+  track.adStarted(placement);
   try {
     // Simulated watch. Real SDK call goes here.
     await new Promise((resolve) => setTimeout(resolve, 700));
+    track.adRewarded(placement);
     return true;
   } catch {
+    track.adDismissed(placement);
     return false;
   } finally {
     showing = false;

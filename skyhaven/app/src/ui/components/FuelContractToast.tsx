@@ -23,6 +23,7 @@ import { COLOR, RADIUS } from '../design/tokens';
 import { formatCash } from '../format';
 import { haptics } from '../juice/haptics';
 import { sfx } from '../juice/sfx';
+import { track } from '../../backend/analytics';
 
 interface SignedContract {
   id: string;
@@ -63,6 +64,7 @@ export function FuelContractToast() {
     setStamped(false);
     haptics.medium();
     sfx.play('fuel_contract_sign');
+    track.fuelContractSigned(def.tier);
   }, [contracts]);
 
   // Stamp + auto-dismiss timeline.

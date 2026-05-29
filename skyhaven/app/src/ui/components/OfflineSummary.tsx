@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { selectPendingOfflineSummary, useGameStore } from '../../state/store';
 import { useUiStore } from '../../state/uiStore';
+import { track } from '../../backend/analytics';
 import { sfx } from '../juice/sfx';
 import { showRewardedAd } from '../monetize/ads';
 import { formatCash } from '../format';
@@ -33,7 +34,11 @@ export function OfflineSummary() {
 
   const sounded = useRef(false);
   useEffect(() => {
-    if (summary && !sounded.current) { sfx.play('offline_welcome'); sounded.current = true; }
+    if (summary && !sounded.current) {
+      sfx.play('offline_welcome');
+      track.offlineSummary(summary.elapsedMs, summary.earnings);
+      sounded.current = true;
+    }
     if (!summary) { sounded.current = false; setBonus(0); setDoubling(false); }
   }, [summary]);
 
@@ -41,7 +46,7 @@ export function OfflineSummary() {
     if (!summary || doubling || bonus > 0) return;
     setDoubling(true);
     const ok = await showRewardedAd('offline_double');
-    if (ok) { grantCash(summary.earnings); setBonus(summary.earnings); sfx.play('claim_coin'); }
+    if (ok) { grantCash(summary.earnings); setBonus(summary.earnings); track.offlineDoubled(); sfx.play('claim_coin'); }
     setDoubling(false);
   };
 

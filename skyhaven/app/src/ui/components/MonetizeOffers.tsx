@@ -8,6 +8,7 @@
  * pauses the play-time clock so the cadence tracks real engagement.
  */
 import { useEffect, useRef, useState } from 'react';
+import { track } from '../../backend/analytics';
 import { effectiveIncomePerSec } from '../../engine/economy';
 import { useGameStore } from '../../state/store';
 import { useUiStore } from '../../state/uiStore';
@@ -42,6 +43,7 @@ export function MonetizeOffers() {
       if (elapsed.current >= nextMark) {
         const kind: Offer = triggered.current % 2 === 0 ? 'instant_yield' : 'speed_up';
         triggered.current += 1;
+        track.adOffer(kind);
         setOffer(kind);
       }
     }, 1000);

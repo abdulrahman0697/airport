@@ -7,6 +7,7 @@
  * per-tick re-render).
  */
 import { useEffect, useState } from 'react';
+import { track } from '../../backend/analytics';
 import { useGameStore } from '../../state/store';
 import { showRewardedAd } from '../monetize/ads';
 import { RewardOfferPopup } from './RewardOfferPopup';
@@ -24,6 +25,7 @@ export function FuelEmptyOffer() {
       const pct = f.capacity > 0 ? f.reserve / f.capacity : 1;
       if (draining && f.reserve <= 0 && armed) {
         armed = false;
+        track.adOffer('fuel_fill');
         setOpen(true);
       } else if (pct >= 0.2) {
         armed = true;
