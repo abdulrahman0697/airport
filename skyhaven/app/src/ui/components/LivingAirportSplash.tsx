@@ -45,7 +45,7 @@ export function LivingAirportSplash() {
 
   const onPrimary = (): void => {
     if (stage === 'idle') {
-      haptics.medium(); sfx.tick(); setStage('boarding'); return;
+      haptics.medium(); sfx.playSplash(); setStage('boarding'); return;
     }
     if (stage === 'boarding') {
       haptics.medium(); sfx.tick(); setStage('ready'); return;

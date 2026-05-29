@@ -272,6 +272,22 @@ export const sfx = {
   play(slot: SfxSlot): void { playSlot(slot); },
   cashTick,
 
+  /** One-shot opening sting (lives in /audio/music, stereo). Plays if
+   *  either audio channel is enabled. */
+  playSplash(): void {
+    if (!sfxOn && !musicOn) return;
+    const a = ensureCtx();
+    if (!a) return;
+    if (a.state === 'suspended') { a.resume().catch(() => undefined); }
+    const url = `/audio/music/splash_sting.wav`;
+    const cached = buffers.get(url);
+    if (cached) { if (master) playBuffer(cached, master); return; }
+    void (async (): Promise<void> => {
+      const b = await loadBuffer(url);
+      if (b && master) playBuffer(b, master);
+    })();
+  },
+
   // Legacy vocabulary → mapped slots (synth fallback preserved).
   tick(): void { playSlot('ui_tick'); },
   confirm(): void { playSlot('ui_confirm'); },

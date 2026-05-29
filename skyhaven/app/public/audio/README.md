@@ -1,8 +1,15 @@
 # Audio assets
 
 Drop your sound files here. Filenames must match the slot ids **exactly**,
-all lowercase, `.wav` extension. The loader/manifest (wired after upload)
-keys off these names.
+all lowercase, `.wav` extension. The loader/manifest keys off these names,
+so overwriting a file (same name) swaps the sound with zero code changes.
+
+> **Placeholder note:** every slot is now filled and wired. Seven of them
+> (`event_positive`, `event_negative`, `event_end`, `fuel_low`,
+> `fuel_critical`, `collectible_spawn`, and `music/splash_sting`) are
+> **synthesized placeholders** generated to match each cue's intended
+> character. Replace any of them with a bespoke recording by overwriting
+> the file in place.
 
 ## Format
 - **Masters:** WAV, 48 kHz, 24-bit (uncompressed). Transcoding to web formats
