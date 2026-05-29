@@ -12,9 +12,9 @@
       "description": "Offline-earning fraction of online rate (0..1)."
     },
     "offline_cap_hours": {
-      "defaultValue": { "value": "8" },
+      "defaultValue": { "value": "1" },
       "valueType": "NUMBER",
-      "description": "Maximum offline accrual window in hours."
+      "description": "Maximum offline accrual window in hours. Matches the shipped 1h cap (idle income is a comeback nudge, not an overnight engine)."
     },
     "fuel_demand_mult": {
       "defaultValue": { "value": "1.0" },

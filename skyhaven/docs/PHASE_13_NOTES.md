@@ -48,9 +48,10 @@ defaults, so the game runs with zero backend.
   shipped behaviour and we do **not** gate any UI on the flags yet. If
   you want RC to actually gate them, set the console values intentionally
   before we wire the gates.
-- **Offline window:** `remote-config.json` says `offline_cap_hours = 8`,
-  but the code uses the player-requested **1h** cap. Left unwired to
-  avoid silently reverting that; tell me which should win.
+- **Offline window:** RESOLVED → **1 hour**. `remote-config.json` now
+  ships `offline_cap_hours = 1` to match the player-requested cap in
+  `gameLoop.ts`. (Still not RC-consumed at runtime — the cap is the
+  hardcoded 1h; the template just no longer disagrees.)
 
 ## Owner steps (to make overrides take effect in production)
 1. Functions/Firestore need the **Blaze** plan (also required for Phase 12).
