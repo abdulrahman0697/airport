@@ -266,6 +266,33 @@ export const sfx = {
     const unlock = (): void => { ensureStarted(); };
     window.addEventListener('pointerdown', unlock, { once: true });
     window.addEventListener('keydown', unlock, { once: true });
+
+    // Background/foreground: suspending the AudioContext pauses the
+    // music loops AND any in-flight SFX; resuming continues them. This
+    // stops the music from playing on while the app is merely
+    // backgrounded (not hard-closed).
+    const pause = (): void => {
+      const a = ctx;
+      if (a && a.state === 'running') a.suspend().catch(() => undefined);
+    };
+    const resume = (): void => {
+      const a = ctx;
+      if (a && a.state === 'suspended' && (sfxOn || musicOn)) a.resume().catch(() => undefined);
+    };
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) pause(); else resume();
+    });
+    window.addEventListener('pagehide', pause);
+    window.addEventListener('pageshow', resume);
+    // Native (Capacitor) lifecycle — more reliable than visibilitychange
+    // inside the Android WebView when the user leaves without closing.
+    void import('@capacitor/app')
+      .then(({ App }) => {
+        void App.addListener('appStateChange', ({ isActive }) => {
+          if (isActive) resume(); else pause();
+        });
+      })
+      .catch(() => undefined);
   },
 
   /** Generic specific-cue trigger. */

@@ -28,6 +28,7 @@ import { Button } from '../design/Button';
 import { COLOR, MOTION, RADIUS } from '../design/tokens';
 import { haptics } from '../juice/haptics';
 import { sfx } from '../juice/sfx';
+import { AudioSettingsCard } from './AudioSettingsCard';
 
 type BoardStage = 'idle' | 'boarding' | 'ready' | 'departing';
 
@@ -36,6 +37,7 @@ export function LivingAirportSplash() {
   const dismissIntro = useUiStore((s) => s.dismissIntro);
   const tailColor = useGameStore(selectTailColor);
   const [stage, setStage] = useState<BoardStage>('idle');
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     if (stage !== 'boarding') return;
@@ -82,6 +84,37 @@ export function LivingAirportSplash() {
           <div style={topShade} aria-hidden />
           <div style={bottomShade} aria-hidden />
           <div style={vignette(tailColor)} aria-hidden />
+
+          {/* Settings (gear) — start-menu access to sound options */}
+          <button
+            onClick={(): void => { haptics.light(); setShowSettings(true); }}
+            style={splashGearBtn}
+            aria-label="Settings"
+            title="Settings"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F8FAFC"
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          </button>
+
+          {/* Settings overlay — sound options before entering the game */}
+          {showSettings && (
+            <div style={settingsOverlay} onClick={(): void => setShowSettings(false)}>
+              <div style={settingsSheet} onClick={(e): void => e.stopPropagation()}>
+                <div style={settingsSheetHead}>
+                  <span style={settingsSheetTitle}>Settings</span>
+                  <button
+                    onClick={(): void => setShowSettings(false)}
+                    style={settingsSheetClose}
+                    aria-label="Close settings"
+                  >✕</button>
+                </div>
+                <AudioSettingsCard />
+              </div>
+            </div>
+          )}
 
           {/* TOP: logo + slogan */}
           <div style={topArea}>
@@ -457,6 +490,44 @@ const shell: React.CSSProperties = {
   zIndex: 95,
   background: '#000',
   overflow: 'hidden',
+};
+
+const splashGearBtn: React.CSSProperties = {
+  position: 'absolute',
+  top: 'calc(env(safe-area-inset-top, 0px) + 16px)',
+  right: 'max(16px, env(safe-area-inset-right, 0px))',
+  zIndex: 8,
+  width: 40, height: 40, borderRadius: 10,
+  background: 'rgba(11,17,32,0.55)',
+  border: '1px solid rgba(255,255,255,0.18)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  cursor: 'pointer', padding: 0,
+  backdropFilter: 'blur(6px)',
+};
+
+const settingsOverlay: React.CSSProperties = {
+  position: 'absolute', inset: 0, zIndex: 10,
+  background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+  display: 'grid', placeItems: 'center', padding: 20,
+};
+const settingsSheet: React.CSSProperties = {
+  width: '100%', maxWidth: 360,
+  background: '#0B1120', borderRadius: 16,
+  border: '1px solid rgba(255,255,255,0.1)',
+  padding: 14,
+  boxShadow: '0 24px 70px rgba(0,0,0,0.6)',
+};
+const settingsSheetHead: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+  marginBottom: 10,
+};
+const settingsSheetTitle: React.CSSProperties = {
+  fontSize: 16, fontWeight: 800, color: '#F8FAFC', letterSpacing: '0.04em',
+};
+const settingsSheetClose: React.CSSProperties = {
+  width: 32, height: 32, borderRadius: 8, border: 0,
+  background: 'rgba(255,255,255,0.08)', color: '#F8FAFC',
+  fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
 };
 
 const bgImage: React.CSSProperties = {
