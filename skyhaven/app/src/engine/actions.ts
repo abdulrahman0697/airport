@@ -464,10 +464,14 @@ export function unlockRegion(state: SaveState, regionId: number): SaveState {
 
 // ─── Pick / create hub ───────────────────────────────────────────────
 /**
- * Promote an airport to a hub. Phase 10 rework:
- *  - The first hub in any region is **free** (it's the player's
- *    foothold in that region — comes with the region unlock).
- *  - Subsequent hubs in an unlocked region cost the standard fee.
+ * Promote an airport to a hub.
+ *  - The very FIRST hub the player ever creates is free — that's
+ *    their foothold, granted with the starting region.
+ *  - Every subsequent hub (regardless of region) costs the standard
+ *    creation fee. Previously we counted hubs PER REGION, which
+ *    meant a player who started in (say) Middle East could later
+ *    plant a free Europe hub because Europe was still pristine —
+ *    surprising and easy to exploit.
  *  - Routes originate from hubs only (validated in `openRoute`).
  *
  * When the picked airport's region matches `pendingHubPickRegion`,
@@ -488,13 +492,10 @@ export function pickHub(state: SaveState, iata: string): SaveState {
     throw new ActionError('HUB_EXISTS', `${iata} is already a hub`);
   }
 
-  // Count existing hubs already in this region — first one's free.
-  let inRegion = 0;
-  for (const h of state.hubs) {
-    const hap = airports.find((a) => a.iata === h.iata);
-    if (hap && hap.region === ap.region) inRegion++;
-  }
-  const cost = inRegion === 0 ? 0 : hubCreationCost(iata);
+  // Only the player's very first hub is free (it's the foothold
+  // granted with the starting region). Anything beyond that costs
+  // the standard creation fee, regardless of region.
+  const cost = state.hubs.length === 0 ? 0 : hubCreationCost(iata);
   if (state.cash < cost) {
     throw new ActionError('INSUFFICIENT_CASH', `Need $${cost.toLocaleString()} to add hub`);
   }
@@ -523,15 +524,8 @@ export const createHub = pickHub;
 
 /** Compute the cost to pick a hub at this airport given current state. */
 export function hubPickCost(state: SaveState, iata: string): number {
-  const airports = loadTopAirports();
-  const ap = airports.find((a) => a.iata === iata);
-  if (!ap) return 0;
-  let inRegion = 0;
-  for (const h of state.hubs) {
-    const hap = airports.find((a) => a.iata === h.iata);
-    if (hap && hap.region === ap.region) inRegion++;
-  }
-  return inRegion === 0 ? 0 : hubCreationCost(iata);
+  if (state.hubs.length === 0) return 0;
+  return hubCreationCost(iata);
 }
 
 /**

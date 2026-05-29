@@ -69,8 +69,12 @@ describe('tick — invariants', () => {
 
   it('unlocks tier 2 once lifetime earnings cross $50K', () => {
     const s0 = loadedTestState();
-    const seeded = { ...s0, lifetimeEarnings: 49_000, tierUnlocked: 1 };
-    const s1 = tick(seeded, { nowMs: 60_000, dtMs: 60_000 });
+    // Seed lifetime just under the T2 threshold and run a long
+    // enough tick to push over it. After the rebalance pass (4× yield
+    // cut), per-second route revenue is much smaller, so we let
+    // 10 game-minutes accrue instead of 1.
+    const seeded = { ...s0, lifetimeEarnings: 49_500, tierUnlocked: 1 };
+    const s1 = tick(seeded, { nowMs: 600_000, dtMs: 600_000 });
     expect(s1.lifetimeEarnings).toBeGreaterThan(50_000);
     expect(s1.tierUnlocked).toBeGreaterThanOrEqual(2);
   });
