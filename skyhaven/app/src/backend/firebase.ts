@@ -38,6 +38,11 @@ function ensureApp(): FirebaseApp {
   return app;
 }
 
+/** The initialised Firebase app (lazily created). */
+export function getFirebaseApp(): FirebaseApp {
+  return ensureApp();
+}
+
 export function getFirebaseAuth(): Auth {
   if (auth) return auth;
   // Persist the session explicitly so a signed-in user survives an app

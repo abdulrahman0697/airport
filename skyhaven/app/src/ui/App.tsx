@@ -44,6 +44,9 @@ export function App() {
     // launch, which is plenty fast for cross-device sync.
     let stopCloud: (() => void) | null = null;
     void (async () => {
+      // Remote Config — live economy/feature tuning. Lazy + best-effort;
+      // the engine reads in-code defaults until this resolves.
+      void import('../backend/remoteConfig').then((m) => m.initRemoteConfig());
       const mod = await import('../backend/cloudSync');
       const cloud = mod.startCloudSync();
       stopCloud = (): void => cloud.stop();

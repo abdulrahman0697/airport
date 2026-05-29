@@ -9,6 +9,7 @@
  * a single repair never breaks the bank.
  */
 import { getAircraftDef } from '../data/aircraft';
+import { TUNING } from './tuning';
 import type { OwnedAircraft } from './types';
 
 /** Maximum fraction of purchase cost a fully-decayed (0%) repair charges. */
@@ -19,7 +20,7 @@ export function repairCost(aircraft: OwnedAircraft): number {
   const def = getAircraftDef(aircraft.defId);
   if (!def) return 0;
   const missingFraction = (100 - aircraft.condition) / 100;
-  return Math.round(def.basePurchaseCost * FULL_REPAIR_FRACTION * missingFraction);
+  return Math.round(def.basePurchaseCost * FULL_REPAIR_FRACTION * missingFraction * TUNING.repairCostMult);
 }
 
 export type ConditionBand = 'normal' | 'degraded' | 'critical';

@@ -18,6 +18,7 @@ import {
   LOGISTICS_DIRECTOR_FUEL_MULT,
   aircraftHasLogisticsDirector,
 } from './managers';
+import { TUNING } from './tuning';
 import type { Hub, OwnedAircraft, Route, SaveState } from './types';
 
 const REAL_SEC_PER_GAME_HOUR = 3600 / TIME_COMPRESSION;
@@ -51,7 +52,7 @@ export function totalDemand(state: SaveState): number {
     if (a.condition <= 0) continue;
     demand += aircraftEffectiveBurn(a, state.routes, state.hubs);
   }
-  return demand;
+  return demand * TUNING.fuelDemandMult;
 }
 
 /** Whether the airline has fuel headroom to add a new burn rate. */

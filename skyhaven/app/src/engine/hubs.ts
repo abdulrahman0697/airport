@@ -11,9 +11,11 @@
  */
 
 import { loadTopAirports } from '../data/airports';
+import { TUNING } from './tuning';
 import type { Hub, SaveState } from './types';
 
-/** Per-level network bonus. Tunable via Remote Config `hub_bonus_per_level`. */
+/** Per-level network bonus default. The live value is `TUNING.hubBonusPerLevel`,
+ *  overridable via Remote Config `hub_bonus_per_level`. */
 export const HUB_BONUS_PER_LEVEL = 0.05;
 
 export const MAX_HUB_LEVEL = 10;
@@ -57,7 +59,7 @@ export function networkBonusForRoute(
   let bonus = 0;
   for (const h of hubs) {
     if (h.iata === originIata || h.iata === destIata) {
-      bonus += h.level * HUB_BONUS_PER_LEVEL;
+      bonus += h.level * TUNING.hubBonusPerLevel;
     }
   }
   return bonus;

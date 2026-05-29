@@ -24,6 +24,7 @@ import { repairCost } from './condition';
 import { computeEcoScore, ecoRevenueBonus } from './eco';
 import { TIME_COMPRESSION, legDurationMs, legRevenue } from './economy';
 import { processGoalChain } from './goalChain';
+import { TUNING } from './tuning';
 import { processVintageMilestones, vintageGlobalYieldBonus } from './vintage';
 import {
   COLLECTIBLE_INTERVAL_MS,
@@ -219,7 +220,8 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
   // earnings within the same tick.
   const ecoScoreAtStart = computeEcoScore(state.fleet);
   const globalYieldMult =
-    1 + vintageGlobalYieldBonus(state.vintage) + ecoRevenueBonus(ecoScoreAtStart);
+    (1 + vintageGlobalYieldBonus(state.vintage) + ecoRevenueBonus(ecoScoreAtStart))
+    * TUNING.globalYieldMult;
 
   // ── Fuel reserve evolution with event modifier ──────────────────
   const supplyMul = fuelSupplyEventMultiplier(running);
@@ -272,7 +274,7 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
         globalYieldMult,
       );
       hoursAccumulated += gameHoursPerLeg;
-      conditionDelta += def.conditionDecayRate * gameHoursPerLeg;
+      conditionDelta += def.conditionDecayRate * TUNING.conditionDecayMult * gameHoursPerLeg;
     }
 
     if (revenueThisTick > 0) {
