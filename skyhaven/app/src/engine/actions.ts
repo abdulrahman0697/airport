@@ -837,3 +837,19 @@ export function startSpeedUp(state: SaveState, nowMs: number, durationMs: number
   const from = Math.max(state.speedUpUntilMs ?? 0, nowMs);
   return { ...state, speedUpUntilMs: from + Math.max(0, durationMs) };
 }
+
+/** VIP Pass duration (7 days) and the immediate welcome cash bonus (5h of yield). */
+export const VIP_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+export const VIP_WELCOME_YIELD_SECONDS = 5 * 60 * 60;
+
+/**
+ * Activate (or extend) the VIP Pass and pay the one-time welcome bonus.
+ * VIP's ongoing effects (+50% revenue, +50% fuel supply) read `vipUntilMs`
+ * live in the tick; here we just set the expiry and grant 5 hours of
+ * income up front.
+ */
+export function activateVip(state: SaveState, nowMs: number): SaveState {
+  const from = Math.max(state.vipUntilMs ?? 0, nowMs);
+  const withVip: SaveState = { ...state, vipUntilMs: from + VIP_DURATION_MS };
+  return grantYieldSeconds(withVip, VIP_WELCOME_YIELD_SECONDS, nowMs);
+}

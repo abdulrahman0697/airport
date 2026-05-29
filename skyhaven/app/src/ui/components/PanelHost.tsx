@@ -19,6 +19,7 @@ export const usePanelStore = create<PanelStore>((set) => ({
 const FleetPanel = lazy(() => import('../panels/FleetPanel').then((m) => ({ default: m.FleetPanel })));
 const RoutesPanel = lazy(() => import('../panels/RoutesPanel').then((m) => ({ default: m.RoutesPanel })));
 const FuelPanel = lazy(() => import('../panels/FuelPanel').then((m) => ({ default: m.FuelPanel })));
+const StorePanel = lazy(() => import('../panels/StorePanel').then((m) => ({ default: m.StorePanel })));
 const CrewPanel = lazy(() => import('../panels/CrewPanel').then((m) => ({ default: m.CrewPanel })));
 const OfficePanel = lazy(() => import('../panels/OfficePanel').then((m) => ({ default: m.OfficePanel })));
 const LeaderboardsPanel = lazy(() => import('../panels/LeaderboardsPanel').then((m) => ({ default: m.LeaderboardsPanel })));
@@ -66,7 +67,7 @@ export function PanelHost() {
             {active === 'airport' && <AirportPanel />}
             {active === 'settings' && <SettingsPanel />}
             {active === 'tower' && <ControlTowerPanel />}
-            {active === 'store' && <ComingSoonPanel name="Executive Deals" />}
+            {active === 'store' && <StorePanel />}
           </Suspense>
         </motion.div>
       )}
@@ -76,15 +77,6 @@ export function PanelHost() {
 
 function PanelFallback(): ReactNode {
   return <div style={{ padding: 24, color: '#94A3B8' }}>Loading…</div>;
-}
-
-function ComingSoonPanel({ name }: { name: string }): ReactNode {
-  return (
-    <div style={{ padding: 32, color: '#94A3B8', textAlign: 'center' }}>
-      <div style={{ fontSize: 18, color: '#F8FAFC', marginBottom: 8 }}>{name}</div>
-      <div style={{ fontSize: 13 }}>Arrives in a future phase.</div>
-    </div>
-  );
 }
 
 const panelShell: React.CSSProperties = {

@@ -32,15 +32,32 @@ one-file change.
 - Pure actions: `grantCash`, `grantYieldSeconds`, `fillFuel`,
   `startSpeedUp` (+ store wiring). Tests in `engine/monetize.test.ts`.
 
-## Stage B — IAP (next)
-- VIP Pass (7 days): +50% revenue, +50% fuel supply, +5h income on
-  purchase. (`vipUntilMs` already in state; revenue/supply effects live.)
-- 6 direct cash packs: 5 / 10 / 24 / 50 / 100 / 300 hours of yield —
-  granted as cash via `grantYieldSeconds`; the hour count is a backend
-  detail, the store shows the resulting cash amount.
-- Store panel (replaces the "Executive Deals" ComingSoon placeholder),
-  Restore Purchases, and a Cloud Function for Play receipt validation.
+## Stage B — IAP ✅
+
+Direct-purchase store (no premium currency), billing **simulated**
+(`ui/monetize/iap.ts`) until Play Billing is wired.
+
+- **VIP Pass (7 days)** — `activateVip()`: sets `vipUntilMs` (extends
+  from the later of existing/now) and pays a one-time 5-hour income
+  bonus. Ongoing effects already live via `engine/yield.ts`: **+50%
+  revenue** and **+50% fuel supply** while active.
+- **6 cash packs** — 5 / 10 / 24 / 50 / 100 / 300 hours of yield, granted
+  as cash via `grantYieldSeconds`. The hour count is a backend detail
+  (product id); the store card shows only the resulting in-game cash,
+  computed live from the player's effective income.
+- **`StorePanel`** replaces the "Executive Deals" ComingSoon placeholder
+  (wired in `PanelHost`); reachable via the in-game Store. Includes
+  **Restore purchases**.
 - No Remove-Ads product (no interstitials). No premium currency.
+- Test: `activateVip` in `engine/monetize.test.ts`.
+
+### Deferred
+- **Server-side receipt validation Cloud Function** — intentionally not
+  added yet: it needs real Play Billing + the Play Developer API +
+  service account, all owner-gated, and isn't meaningfully testable
+  while billing is simulated. The client grants entitlements locally for
+  now (VIP persists in `SaveState` and cloud-syncs). Wire validation
+  alongside the native Billing plugin.
 
 ## Owner setup (gates real ads/IAP; until then simulated)
 - AdMob: account + app + rewarded unit ids + link to Firebase + app-ads.txt.

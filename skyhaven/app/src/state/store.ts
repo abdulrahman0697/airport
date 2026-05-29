@@ -29,6 +29,7 @@ import {
   createHub as createHubAction,
   creditGift as creditGiftAction,
   dismissHubPick as dismissHubPickAction,
+  activateVip as activateVipAction,
   fillFuel as fillFuelAction,
   grantCash as grantCashAction,
   grantYieldSeconds as grantYieldSecondsAction,
@@ -89,6 +90,7 @@ interface GameStore {
   grantYieldSeconds: (seconds: number, nowMs: number) => ActionResult;
   fillFuel: () => ActionResult;
   startSpeedUp: (nowMs: number, durationMs: number) => ActionResult;
+  activateVip: (nowMs: number) => ActionResult;
   claimDailyReward: () => ActionResult;
   claimDailyMission: (missionId: string) => ActionResult;
   /** Credit a claimed friend gift to the local state (Phase 12.3). */
@@ -183,6 +185,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   grantYieldSeconds: (seconds, nowMs) => runAction(set, get, (s) => grantYieldSecondsAction(s, seconds, nowMs)),
   fillFuel: () => runAction(set, get, (s) => fillFuelAction(s)),
   startSpeedUp: (nowMs, durationMs) => runAction(set, get, (s) => startSpeedUpAction(s, nowMs, durationMs)),
+  activateVip: (nowMs) => runAction(set, get, (s) => activateVipAction(s, nowMs)),
   claimDailyReward: () => runAction(set, get, (s) => claimDailyRewardAction(s)),
   claimDailyMission: (missionId) => runAction(set, get, (s) => claimDailyMissionAction(s, missionId)),
   creditGift: (kind, amount) => runAction(set, get, (s) => creditGiftAction(s, kind, amount)),

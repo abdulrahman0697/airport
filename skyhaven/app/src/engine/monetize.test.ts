@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { fillFuel, grantCash, grantYieldSeconds, startSpeedUp } from './actions';
+import {
+  activateVip,
+  fillFuel,
+  grantCash,
+  grantYieldSeconds,
+  startSpeedUp,
+  VIP_DURATION_MS,
+} from './actions';
 import { createInitialState } from './initialState';
 import { loadedTestState } from './test-fixtures';
 import { migrate } from './migrations';
 import { CURRENT_SCHEMA_VERSION } from './types';
-import { globalYieldMultFor } from './yield';
+import { globalYieldMultFor, isVipActive } from './yield';
 
 const NOW = 1_700_000_000_000;
 
@@ -37,6 +44,20 @@ describe('monetization grants', () => {
     const s0 = loadedTestState();
     const s1 = grantYieldSeconds(s0, 60, NOW);
     expect(s1.cash).toBeGreaterThan(s0.cash);
+  });
+});
+
+describe('VIP pass', () => {
+  it('sets a 7-day expiry, pays the welcome bonus, and reads active', () => {
+    const s0 = loadedTestState();
+    const s1 = activateVip(s0, NOW);
+    expect(s1.vipUntilMs).toBe(NOW + VIP_DURATION_MS);
+    expect(isVipActive(s1, NOW)).toBe(true);
+    // 5h welcome bonus credited (loaded fixture has earning routes).
+    expect(s1.cash).toBeGreaterThan(s0.cash);
+    // Re-purchasing extends from the existing expiry.
+    const s2 = activateVip(s1, NOW + 1000);
+    expect(s2.vipUntilMs).toBe(NOW + VIP_DURATION_MS + VIP_DURATION_MS);
   });
 });
 
