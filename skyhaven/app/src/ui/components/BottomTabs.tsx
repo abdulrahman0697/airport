@@ -7,7 +7,6 @@ import {
   NetworkIcon,
   OperationsIcon,
   StaffIcon,
-  TowerIcon,
   type IconProps,
 } from '../design/icons';
 import { usePanelStore, type PanelId } from './PanelHost';
@@ -33,8 +32,10 @@ interface TabSpec {
  *
  *  - Operations  ← first route opened
  *  - Staff HQ    ← first hub created (managers become hireable)
- *  - Control Tower ← Tier 3 reached
- *  - Executive Deals ← tutorial complete (monetization surface)
+ *  - Executive Deals ← tutorial complete / value-moment (monetization)
+ *
+ * Leaderboards and the Control Tower are reachable from the home screen
+ * and the side launcher, so they're not duplicated as bottom tabs.
  *
  * Locked tabs are simply not rendered. When a tab reveals, the bar
  * gently re-flows. The aviation theme is preserved.
@@ -48,14 +49,12 @@ const TABS: readonly TabSpec[] = [
   { id: 'crew',    label: 'Staff HQ',        Icon: StaffIcon,
     unlock: (s) => s.tier >= 2 || (s.tutorialDone && s.fleetSize >= 2),
     unlockHint: 'Hub managers available' },
-  { id: 'leaders', label: 'Control Tower',   Icon: TowerIcon,
-    unlock: (s) => s.tier >= 3 || s.tutorialDone, unlockHint: 'Leaderboards unlocked' },
   { id: 'store',   label: 'Executive Deals', Icon: DealsIcon,
-    // Design Review v4 — point 24. Don't surface monetization until
-    // the player has clear value-moment proof: 3 routes, 2 aircraft,
-    // and at least the first airport tier-up. Showing the store
-    // before this point makes the game read as commercial too early.
-    unlock: (s) => s.routeCount >= 3 && s.fleetSize >= 2 && s.tier >= 2,
+    // Owner request: Executive Deals lives in the bottom bar (it replaced
+    // the Control Tower tab, which is reachable from the home screen).
+    // Surfaces after the tutorial — or earlier given clear value-moment
+    // proof (3 routes, 2 aircraft, first tier-up).
+    unlock: (s) => s.tutorialDone || (s.routeCount >= 3 && s.fleetSize >= 2 && s.tier >= 2),
     unlockHint: 'Premium services unlocked' },
 ];
 
