@@ -111,8 +111,18 @@ function HangarSlot({
   const milestones = computeMilestones(aircraft, def, lifetimeRevenueEst);
 
   // Rough flight count: condition-decay rate × hours accumulated → flights.
+  // Effective capacity / speed / burn after cabin / engine / fuelEff
+  // upgrades. We display these instead of raw `def.*` so the player
+  // sees their upgrade money showing up on the card.
+  const effCapacity = Math.round(def.capacity * (1 + 0.10 * aircraft.upgrades.cabin));
+  const effSpeed = Math.round(def.cruiseSpeedKmh * (1 + 0.10 * aircraft.upgrades.engine));
+  const effBurn = Math.round(def.fuelPerHour * Math.max(0.5, 1 - 0.10 * aircraft.upgrades.fuelEff));
+  const upgradedCap = effCapacity !== def.capacity;
+  const upgradedSpd = effSpeed !== def.cruiseSpeedKmh;
+  const upgradedBurn = effBurn !== def.fuelPerHour;
+
   const totalFlights = Math.max(0, Math.round(aircraft.flightHoursAccumulated / 1.4));
-  const totalPassengers = Math.round(totalFlights * def.capacity * 0.62);
+  const totalPassengers = Math.round(totalFlights * effCapacity * 0.62);
 
   return (
     <li style={slotShell(tailColor)}>
@@ -129,8 +139,27 @@ function HangarSlot({
             <span style={nameplateRivet} />
           </div>
           <div style={slotSub}>
-            {def.displayName}  ·  Tier {def.tier === 0 ? 'CARGO' : def.tier}  ·  {def.capacity}{def.category === 'cargo' ? ' t' : ' seats'}
+            {def.displayName}  ·  Tier {def.tier === 0 ? 'CARGO' : def.tier}  ·{' '}
+            <span style={{ color: upgradedCap ? COLOR.success : undefined, fontWeight: upgradedCap ? 800 : undefined }}>
+              {effCapacity}{def.category === 'cargo' ? ' t' : ' seats'}
+              {upgradedCap && <span style={{ color: COLOR.ink.muted, fontWeight: 400 }}> · was {def.capacity}</span>}
+            </span>
           </div>
+          {(upgradedSpd || upgradedBurn) && (
+            <div style={slotSub}>
+              {upgradedSpd && (
+                <span style={{ color: COLOR.success, fontWeight: 700 }}>
+                  {effSpeed} km/h
+                </span>
+              )}
+              {upgradedSpd && upgradedBurn && <span style={{ color: COLOR.ink.muted }}>  ·  </span>}
+              {upgradedBurn && (
+                <span style={{ color: COLOR.accent.cyan, fontWeight: 700 }}>
+                  {effBurn}/hr fuel
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
           <div style={{ ...condValue, color: condColor }}>{aircraft.condition.toFixed(0)}%</div>

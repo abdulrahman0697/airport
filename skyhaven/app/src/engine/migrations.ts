@@ -163,6 +163,30 @@ const MIGRATIONS: Record<number, Migration> = {
       })),
     };
   },
+  // v9 → v10: aircraft upgrades capped at 5 levels per kind (was 10).
+  // Older saves may have engine / cabin / marketing values up to 10;
+  // clamp them so the new max-level UI doesn't show "8/5" oddities.
+  // Players don't lose effect — the per-level coefficient was doubled
+  // at the same time so a clamped L5 matches the old L10.
+  9: (s) => {
+    const fleet = (Array.isArray(s.fleet) ? s.fleet : []) as Array<Record<string, unknown>>;
+    return {
+      ...s,
+      schemaVersion: 10,
+      fleet: fleet.map((a) => {
+        const u = (a.upgrades ?? {}) as Record<string, number>;
+        return {
+          ...a,
+          upgrades: {
+            engine: Math.min(5, Math.max(0, u.engine ?? 0)),
+            cabin: Math.min(5, Math.max(0, u.cabin ?? 0)),
+            fuelEff: Math.min(5, Math.max(0, u.fuelEff ?? 0)),
+            marketing: Math.min(5, Math.max(0, u.marketing ?? 0)),
+          },
+        };
+      }),
+    };
+  },
 };
 
 /**

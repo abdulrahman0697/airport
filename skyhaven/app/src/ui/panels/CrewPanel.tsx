@@ -21,6 +21,7 @@
  */
 import { useMemo, useState } from 'react';
 import { MANAGER_DEFS, managerCost, type ManagerKind } from '../../data/managers';
+import { planBulkUpgrade } from '../../engine/actions';
 import {
   LOGISTICS_DIRECTOR_FUEL_MULT,
   MARKETING_LEAD_LOAD_BONUS,
@@ -141,8 +142,200 @@ function HubCard({ hub }: { hub: Hub }) {
 
       <HubBonusSummary hub={hub} totalBoostPct={totalBoost} />
 
+      <AutoUpgradeRow hub={hub} />
+
       {error && <div style={errorText}>{error}</div>}
     </li>
+  );
+}
+
+/* ─── Fleet Engineer auto-upgrade CTA + modal ────────────────────── */
+
+function AutoUpgradeRow({ hub }: { hub: Hub }) {
+  const [open, setOpen] = useState(false);
+  const fleetEngineerHired = hub.managers.fleetEngineer;
+  return (
+    <>
+      <button
+        onClick={(): void => {
+          if (!fleetEngineerHired) {
+            haptics.warning();
+            return;
+          }
+          haptics.medium();
+          sfx.confirm();
+          setOpen(true);
+        }}
+        disabled={!fleetEngineerHired}
+        style={{
+          ...autoUpgradeBtn,
+          opacity: fleetEngineerHired ? 1 : 0.55,
+          cursor: fleetEngineerHired ? 'pointer' : 'default',
+          borderColor: fleetEngineerHired ? `${COLOR.success}55` : 'rgba(255,255,255,0.10)',
+        }}
+      >
+        <span style={autoUpgradeIcon}>{fleetEngineerHired ? '⚙' : '🔒'}</span>
+        <span style={autoUpgradeLabel}>
+          {fleetEngineerHired ? 'Auto-upgrade hub fleet' : 'Auto-upgrade · locked'}
+        </span>
+        <span style={autoUpgradeSub}>
+          {fleetEngineerHired
+            ? 'Spend a budget on the cheapest available upgrades'
+            : 'Hire the Fleet Engineer to unlock'}
+        </span>
+      </button>
+      {open && <AutoUpgradeModal hub={hub} onClose={(): void => setOpen(false)} />}
+    </>
+  );
+}
+
+function AutoUpgradeModal({ hub, onClose }: { hub: Hub; onClose: () => void }) {
+  const cash = useGameStore(selectCash);
+  const state = useGameStore((s) => s.state);
+  const bulkUpgrade = useGameStore((s) => s.bulkUpgradeHubFleet);
+  // Default budget: 10% of cash, rounded to nearest $1K. Reasonable
+  // first nudge; the player tweaks the slider.
+  const defaultBudget = Math.min(cash, Math.round(cash * 0.10 / 1000) * 1000);
+  const [budget, setBudget] = useState<number>(defaultBudget);
+  const [error, setError] = useState<string | null>(null);
+  const [committed, setCommitted] = useState(false);
+
+  const plan = useMemo(() => {
+    if (!state) return null;
+    return planBulkUpgrade(state, hub.iata, budget);
+  }, [state, hub.iata, budget]);
+
+  // Rough revenue uplift forecast: aggregate effective revenue
+  // multipliers across the hub's fleet before vs after the plan.
+  const upliftPct = useMemo(() => {
+    if (!state || !plan) return 0;
+    const hubFleet = state.fleet.filter((a) => a.homeHubIata === hub.iata);
+    if (hubFleet.length === 0) return 0;
+    const levelsByUid = new Map<string, { engine: number; cabin: number; fuelEff: number; marketing: number }>();
+    for (const a of hubFleet) levelsByUid.set(a.uid, { ...a.upgrades });
+    for (const s of plan.steps) levelsByUid.get(s.aircraftUid)![s.kind]++;
+    let beforeMult = 0, afterMult = 0;
+    for (const a of hubFleet) {
+      const before = a.upgrades;
+      const after = levelsByUid.get(a.uid)!;
+      // Per-aircraft revenue/sec scales with capacity (cabin),
+      // legs-per-second (engine speed), and load factor (marketing).
+      // Fuel-eff doesn't directly scale revenue but reduces burn so
+      // we keep it in the per-kind breakdown only.
+      beforeMult += (1 + 0.10 * before.engine) * (1 + 0.10 * before.cabin) * (1 + 0.06 * before.marketing);
+      afterMult  += (1 + 0.10 * after.engine)  * (1 + 0.10 * after.cabin)  * (1 + 0.06 * after.marketing);
+    }
+    if (beforeMult <= 0) return 0;
+    return Math.round(((afterMult - beforeMult) / beforeMult) * 100);
+  }, [state, plan, hub.iata]);
+
+  const confirm = (): void => {
+    if (!plan || plan.steps.length === 0) {
+      setError('Budget is too small to buy any upgrade.');
+      return;
+    }
+    const res = bulkUpgrade(hub.iata, plan.totalCost);
+    if (res.ok) {
+      haptics.success();
+      sfx.success();
+      setCommitted(true);
+      window.setTimeout(onClose, 700);
+    } else {
+      haptics.warning();
+      setError(res.message);
+    }
+  };
+
+  // Budget slider in increments of $1K, capped at min(cash, $5M) for
+  // sanity — players above that need to bump multiple times anyway.
+  const maxBudget = Math.min(cash, 5_000_000);
+
+  return (
+    <div style={modalBackdrop} onClick={onClose}>
+      <div style={modalShell} onClick={(e): void => e.stopPropagation()}>
+        <div style={modalKicker}>FLEET ENGINEER · AUTO-UPGRADE</div>
+        <h3 style={modalTitle}>{hub.iata} hub fleet</h3>
+        <p style={modalBody}>
+          Spend up to the budget below. The Fleet Engineer installs
+          the cheapest available upgrades across this hub's aircraft
+          until either every plane is maxed or the budget runs out.
+        </p>
+
+        <label style={modalFieldLabel}>Budget</label>
+        <input
+          type="range"
+          min={0}
+          max={maxBudget}
+          step={1000}
+          value={budget}
+          onChange={(e): void => setBudget(Number(e.target.value))}
+          style={modalSlider}
+        />
+        <div style={modalBudgetRow}>
+          <span>$0</span>
+          <span style={modalBudgetValue}>${formatCash(budget, 1)}</span>
+          <span>${formatCash(maxBudget, 1)}</span>
+        </div>
+
+        <div style={previewBox}>
+          <div style={previewKicker}>Preview</div>
+          {!plan || plan.steps.length === 0 ? (
+            <div style={previewEmpty}>
+              Budget too small or every aircraft at {hub.iata} is maxed.
+            </div>
+          ) : (
+            <>
+              <div style={previewGrid}>
+                <PreviewCell label="Engine" count={plan.perKind.engine} tint={COLOR.accent.cyan} />
+                <PreviewCell label="Cabin" count={plan.perKind.cabin} tint={COLOR.gold.base} />
+                <PreviewCell label="Fuel Eff" count={plan.perKind.fuelEff} tint={COLOR.success} />
+                <PreviewCell label="Marketing" count={plan.perKind.marketing} tint={COLOR.accent.cyan} />
+              </div>
+              <div style={previewRow}>
+                <span>Total upgrades</span>
+                <span style={{ fontWeight: 800 }}>{plan.steps.length}</span>
+              </div>
+              <div style={previewRow}>
+                <span>Will cost</span>
+                <span style={{ fontWeight: 800, color: COLOR.gold.base }}>${formatCash(plan.totalCost, 1)}</span>
+              </div>
+              <div style={previewRow}>
+                <span>Est. revenue uplift</span>
+                <span style={{ fontWeight: 800, color: COLOR.success }}>+{upliftPct}%</span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {error && <div style={errorText}>{error}</div>}
+        {committed && <div style={committedText}>Upgrades installed ✓</div>}
+
+        <div style={modalActions}>
+          <button onClick={onClose} style={modalCancel}>Cancel</button>
+          <button
+            onClick={confirm}
+            disabled={!plan || plan.steps.length === 0 || committed}
+            style={{
+              ...modalConfirm,
+              opacity: (!plan || plan.steps.length === 0 || committed) ? 0.5 : 1,
+            }}
+          >
+            Auto-Upgrade ✓
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PreviewCell({ label, count, tint }: { label: string; count: number; tint: string }) {
+  return (
+    <div style={previewCell}>
+      <div style={previewCellLabel}>{label}</div>
+      <div style={{ ...previewCellValue, color: count > 0 ? tint : COLOR.ink.faint }}>
+        +{count}
+      </div>
+    </div>
   );
 }
 
@@ -535,4 +728,149 @@ const summaryTotal: React.CSSProperties = {
 const errorText: React.CSSProperties = {
   marginTop: 4, padding: '6px 10px', fontSize: 11, color: COLOR.danger,
   background: COLOR.dangerDim, borderRadius: 6,
+};
+const committedText: React.CSSProperties = {
+  marginTop: 4, padding: '6px 10px', fontSize: 12, color: COLOR.success,
+  background: 'rgba(52,211,153,0.10)', borderRadius: 6, fontWeight: 800,
+  letterSpacing: '0.06em', textAlign: 'center',
+};
+
+/* Auto-upgrade CTA. */
+const autoUpgradeBtn: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'auto 1fr',
+  gridTemplateRows: 'auto auto',
+  gridTemplateAreas: '"icon label" "icon sub"',
+  rowGap: 1,
+  columnGap: 10,
+  alignItems: 'center',
+  padding: '10px 12px',
+  background: 'linear-gradient(160deg, rgba(15,23,47,0.85), rgba(11,17,32,0.95))',
+  border: '1px solid',
+  borderRadius: 12,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  color: COLOR.ink.primary,
+  textAlign: 'left',
+};
+const autoUpgradeIcon: React.CSSProperties = {
+  gridArea: 'icon',
+  width: 36, height: 36,
+  borderRadius: 10,
+  display: 'grid', placeItems: 'center',
+  background: 'rgba(52,211,153,0.10)',
+  border: `1px solid ${COLOR.success}40`,
+  fontSize: 18,
+};
+const autoUpgradeLabel: React.CSSProperties = {
+  gridArea: 'label',
+  fontSize: 13, fontWeight: 900, letterSpacing: '0.03em',
+  color: COLOR.ink.primary,
+};
+const autoUpgradeSub: React.CSSProperties = {
+  gridArea: 'sub',
+  fontSize: 10, color: COLOR.ink.muted,
+  letterSpacing: '0.02em',
+};
+
+/* Auto-upgrade modal. */
+const modalBackdrop: React.CSSProperties = {
+  position: 'fixed', inset: 0,
+  background: 'rgba(0,0,0,0.65)',
+  backdropFilter: 'blur(6px)',
+  display: 'grid', placeItems: 'center',
+  zIndex: 110, padding: 16,
+};
+const modalShell: React.CSSProperties = {
+  width: '100%', maxWidth: 420,
+  background: 'linear-gradient(170deg, #111A2E, #0B1120)',
+  border: `1px solid ${COLOR.success}55`,
+  borderRadius: 16, padding: 18,
+  boxShadow: '0 24px 70px rgba(0,0,0,0.6), 0 0 32px rgba(52,211,153,0.20)',
+  color: COLOR.ink.primary,
+  fontFamily: 'inherit',
+};
+const modalKicker: React.CSSProperties = {
+  fontSize: 9, fontWeight: 800, letterSpacing: '0.24em',
+  color: COLOR.success,
+};
+const modalTitle: React.CSSProperties = {
+  margin: '6px 0 6px',
+  fontSize: 20, fontWeight: 900, color: COLOR.ink.primary,
+  letterSpacing: '0.02em',
+};
+const modalBody: React.CSSProperties = {
+  margin: '0 0 12px',
+  fontSize: 12, color: COLOR.ink.secondary, lineHeight: 1.5,
+};
+const modalFieldLabel: React.CSSProperties = {
+  display: 'block', fontSize: 10, fontWeight: 800,
+  letterSpacing: '0.16em', textTransform: 'uppercase',
+  color: COLOR.ink.muted, marginBottom: 6,
+};
+const modalSlider: React.CSSProperties = {
+  width: '100%', accentColor: COLOR.success,
+};
+const modalBudgetRow: React.CSSProperties = {
+  display: 'flex', justifyContent: 'space-between',
+  fontSize: 11, color: COLOR.ink.muted,
+  fontFeatureSettings: '"tnum" 1',
+  marginTop: 4, marginBottom: 12,
+};
+const modalBudgetValue: React.CSSProperties = {
+  color: COLOR.gold.base, fontWeight: 800, fontSize: 13,
+};
+const previewBox: React.CSSProperties = {
+  background: 'rgba(11,17,32,0.6)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 10,
+  padding: '10px 12px',
+  display: 'flex', flexDirection: 'column', gap: 8,
+};
+const previewKicker: React.CSSProperties = {
+  fontSize: 9, fontWeight: 800, letterSpacing: '0.22em',
+  color: COLOR.accent.cyan,
+};
+const previewEmpty: React.CSSProperties = {
+  fontSize: 11, color: COLOR.ink.muted,
+};
+const previewGrid: React.CSSProperties = {
+  display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6,
+};
+const previewCell: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.04)',
+  borderRadius: 8, padding: '6px 4px',
+  textAlign: 'center',
+};
+const previewCellLabel: React.CSSProperties = {
+  fontSize: 9, letterSpacing: '0.12em',
+  textTransform: 'uppercase', fontWeight: 700,
+  color: COLOR.ink.muted,
+};
+const previewCellValue: React.CSSProperties = {
+  fontSize: 14, fontWeight: 900, marginTop: 2,
+};
+const previewRow: React.CSSProperties = {
+  display: 'flex', justifyContent: 'space-between',
+  fontSize: 12, color: COLOR.ink.secondary,
+  fontFeatureSettings: '"tnum" 1',
+};
+const modalActions: React.CSSProperties = {
+  display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 8,
+  marginTop: 14,
+};
+const modalCancel: React.CSSProperties = {
+  padding: '10px 12px',
+  background: 'transparent',
+  color: COLOR.ink.muted,
+  border: '1px solid rgba(255,255,255,0.12)',
+  borderRadius: 10, cursor: 'pointer',
+  fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
+};
+const modalConfirm: React.CSSProperties = {
+  padding: '10px 12px',
+  background: COLOR.success, color: '#0B1120',
+  border: 0, borderRadius: 10, cursor: 'pointer',
+  fontFamily: 'inherit', fontSize: 13, fontWeight: 800,
+  letterSpacing: '0.04em',
 };

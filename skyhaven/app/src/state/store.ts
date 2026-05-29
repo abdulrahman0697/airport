@@ -18,6 +18,7 @@ import {
   advanceTutorial as advanceTutorialAction,
   applyServerEvents as applyServerEventsAction,
   applyUpgrade as applyUpgradeAction,
+  bulkUpgradeHubFleet as bulkUpgradeHubFleetAction,
   buyAircraft as buyAircraftAction,
   chooseStartingRegion as chooseStartingRegionAction,
   claimCollectible as claimCollectibleAction,
@@ -59,6 +60,7 @@ interface GameStore {
   closeRoute: (routeId: string) => ActionResult;
   setRoutePricing: (routeId: string, pricing: RoutePricing) => ActionResult;
   applyUpgrade: (aircraftUid: string, kind: UpgradeKind) => ActionResult;
+  bulkUpgradeHubFleet: (hubIata: string, budget: number) => ActionResult;
   repairAircraft: (aircraftUid: string, mode?: 'quick' | 'full' | 'premium') => ActionResult;
   signFuelContract: (contractId: string) => ActionResult;
   upgradeFuelCapacity: () => ActionResult;
@@ -135,6 +137,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     runAction(set, get, (s) => setRoutePricingAction(s, routeId, pricing)),
   applyUpgrade: (aircraftUid, kind) =>
     runAction(set, get, (s) => applyUpgradeAction(s, aircraftUid, kind)),
+  bulkUpgradeHubFleet: (hubIata, budget) =>
+    runAction(set, get, (s) => bulkUpgradeHubFleetAction(s, hubIata, budget)),
   repairAircraft: (aircraftUid, mode) =>
     runAction(set, get, (s) => repairAircraftAction(s, aircraftUid, mode)),
   signFuelContract: (contractId) =>

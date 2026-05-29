@@ -71,10 +71,32 @@ export function AircraftDetailModal({
             <div style={statGrid}>
               <Stat label="Condition" value={`${aircraft.condition.toFixed(0)}%`} colorBy={conditionBand(aircraft.condition)} />
               <Stat label="Hours" value={Math.round(aircraft.flightHoursAccumulated).toLocaleString()} />
-              <Stat label="Speed" value={`${def.cruiseSpeedKmh.toLocaleString()} km/h`} />
-              <Stat label="Burn rate" value={`${def.fuelPerHour.toLocaleString()}/hr`} />
-              <Stat label="Cost" value={`$${formatCash(def.basePurchaseCost)}`} accent={COLOR.gold.base} />
-              <Stat label="Range" value={`${def.rangeKm.toLocaleString()} km`} accent={COLOR.accent.cyan} />
+              {(() => {
+                const effSpeed = Math.round(def.cruiseSpeedKmh * (1 + 0.10 * aircraft.upgrades.engine));
+                const effBurn = Math.round(def.fuelPerHour * Math.max(0.5, 1 - 0.10 * aircraft.upgrades.fuelEff));
+                const effCap = Math.round(def.capacity * (1 + 0.10 * aircraft.upgrades.cabin));
+                return (
+                  <>
+                    <Stat
+                      label="Speed"
+                      value={`${effSpeed.toLocaleString()} km/h`}
+                      delta={effSpeed - def.cruiseSpeedKmh}
+                    />
+                    <Stat
+                      label="Burn rate"
+                      value={`${effBurn.toLocaleString()}/hr`}
+                      delta={effBurn - def.fuelPerHour}
+                      lowerIsBetter
+                    />
+                    <Stat
+                      label={def.category === 'cargo' ? 'Capacity' : 'Seats'}
+                      value={`${effCap.toLocaleString()}`}
+                      delta={effCap - def.capacity}
+                    />
+                    <Stat label="Range" value={`${def.rangeKm.toLocaleString()} km`} accent={COLOR.accent.cyan} />
+                  </>
+                );
+              })()}
             </div>
 
             <div style={sectionHead}>Upgrades — tap to install</div>
@@ -147,20 +169,45 @@ function Stat({
   value,
   accent = COLOR.ink.primary,
   colorBy,
+  delta,
+  lowerIsBetter,
 }: {
   label: string;
   value: string;
   accent?: string;
   colorBy?: 'normal' | 'degraded' | 'critical';
+  /** Difference from the base (un-upgraded) value. */
+  delta?: number;
+  /** Burn rate goes the other way — a negative delta is good. */
+  lowerIsBetter?: boolean;
 }) {
   let color = accent;
   if (colorBy === 'normal') color = COLOR.success;
   else if (colorBy === 'degraded') color = COLOR.warn;
   else if (colorBy === 'critical') color = COLOR.danger;
+
+  const showDelta = delta !== undefined && delta !== 0;
+  const positive = showDelta && (lowerIsBetter ? delta! < 0 : delta! > 0);
+  const deltaText = showDelta
+    ? `${delta! > 0 ? '+' : ''}${delta!.toLocaleString()}`
+    : null;
+
   return (
     <div style={statCell}>
       <div style={statLabel}>{label}</div>
-      <div style={{ ...statValue, color }}>{value}</div>
+      <div style={{ ...statValue, color: positive ? COLOR.success : color }}>
+        {value}
+        {showDelta && (
+          <span style={{
+            marginLeft: 6,
+            fontSize: 11,
+            fontWeight: 700,
+            color: positive ? COLOR.success : COLOR.warn,
+          }}>
+            ({deltaText})
+          </span>
+        )}
+      </div>
     </div>
   );
 }

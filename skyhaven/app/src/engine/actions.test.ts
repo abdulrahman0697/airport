@@ -107,7 +107,10 @@ describe('applyUpgrade', () => {
     let s = freshState();
     s = buyAircraft(s, 't1.atr42');
     const acUid = s.fleet[s.fleet.length - 1]!.uid;
-    for (let i = 0; i < 10; i++) s = applyUpgrade(s, acUid, 'engine');
+    // Engine upgrades cap at 5 levels (was 10 — capped after the
+    // upgrade-pacing rebalance). Install all 5 then expect the
+    // sixth to throw UPGRADE_MAXED.
+    for (let i = 0; i < 5; i++) s = applyUpgrade(s, acUid, 'engine');
     try {
       applyUpgrade(s, acUid, 'engine');
       throw new Error('should have thrown');

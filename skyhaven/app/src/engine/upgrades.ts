@@ -26,15 +26,16 @@ export interface UpgradeSpec {
   growth: number;
 }
 
-// Rebalance pass: baseFractions roughly doubled so upgrades stay a
-// real cash sink even after the 4× yield cut in economy.ts. The 1.15×
-// per-level growth is unchanged, so the ratio between consecutive
-// levels still scales as before — only the floor moved up.
+// Rebalance pass: 5 levels per kind across the board. Per-level
+// effects (configured in economy.ts) were doubled so a max-level
+// upgrade matches the impact of the old 10-level scheme. Costs
+// scale by 1.18× per level so spending compounds harder than the
+// flat 1.15× we had before.
 export const UPGRADE_SPECS: Record<UpgradeKind, UpgradeSpec> = {
-  engine:    { maxLevel: 10, baseFraction: 0.22, growth: 1.18 },
-  cabin:     { maxLevel: 10, baseFraction: 0.26, growth: 1.18 },
-  fuelEff:   { maxLevel: 5,  baseFraction: 0.36, growth: 1.18 },
-  marketing: { maxLevel: 10, baseFraction: 0.20, growth: 1.18 },
+  engine:    { maxLevel: 5, baseFraction: 0.22, growth: 1.18 },
+  cabin:     { maxLevel: 5, baseFraction: 0.26, growth: 1.18 },
+  fuelEff:   { maxLevel: 5, baseFraction: 0.36, growth: 1.18 },
+  marketing: { maxLevel: 5, baseFraction: 0.20, growth: 1.18 },
 };
 
 export const UPGRADE_LABELS: Record<UpgradeKind, string> = {

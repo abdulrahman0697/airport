@@ -252,10 +252,12 @@ export function openRoute(
   }
 
   // Cargo always ships full (BRD §4.5). Passenger uses the marketing
-  // upgrade + initial-load curve we've used since Phase 3.
+  // upgrade + initial-load curve. Per-level effect bumped to +6% so
+  // a maxed-out (5-level) marketing stack still tops the load
+  // factor near 0.85 — comparable to the old 10-level cap.
   const loadFactor = def.category === 'cargo'
     ? 1.0
-    : Math.min(0.98, 0.55 + 0.03 * aircraft.upgrades.marketing);
+    : Math.min(0.98, 0.55 + 0.06 * aircraft.upgrades.marketing);
   // The very first route the airline ever opens is the Inaugural —
   // we mark it once and persist a state-level commit flag so closing
   // and re-opening doesn't "regenerate" the badge (Design Review v5
@@ -316,7 +318,7 @@ export function setRoutePricing(state: SaveState, routeId: string, pricing: Rout
   if (def?.category === 'cargo') {
     throw new ActionError('CARGO_NO_PRICING', 'Cargo routes ship full at a fixed rate');
   }
-  const baseLoad = 0.55 + 0.03 * (aircraft?.upgrades.marketing ?? 0);
+  const baseLoad = 0.55 + 0.06 * (aircraft?.upgrades.marketing ?? 0);
   const newLoad = Math.min(0.98, baseLoad * PRICING_LOAD_RECALC[pricing]);
   const routes = state.routes.slice();
   routes[rIdx] = { ...route, pricing, loadFactor: newLoad };
@@ -348,7 +350,7 @@ export function applyUpgrade(state: SaveState, aircraftUid: string, kind: Upgrad
     const rIdx = routes.findIndex((r) => r.id === aircraft.routeId);
     if (rIdx >= 0) {
       const route = routes[rIdx]!;
-      const baseLoad = 0.55 + 0.03 * (curLevel + 1);
+      const baseLoad = 0.55 + 0.06 * (curLevel + 1);
       const newLoad = Math.min(0.98, baseLoad * (
         route.pricing === 'economy' ? 1.10
         : route.pricing === 'premium' ? 0.70
@@ -363,6 +365,106 @@ export function applyUpgrade(state: SaveState, aircraftUid: string, kind: Upgrad
   // Fuel Eff lowers burn → recompute demand. Other upgrades are no-ops
   // for fuel but the helper short-circuits when the value is unchanged.
   return kind === 'fuelEff' ? withRecomputedDemand(next) : next;
+}
+
+// ─── Fleet Engineer bulk upgrade ─────────────────────────────────────
+/**
+ * Plan a budget-bounded auto-upgrade pass over a single hub's fleet.
+ *
+ * Greedy: at every step we pick the cheapest still-affordable next
+ * upgrade across every {aircraft, kind} pair, install it virtually,
+ * and repeat until either nothing else fits in the remaining budget
+ * or every plane at the hub is maxed.
+ *
+ * Returns the planned step list + per-kind totals so the UI can show
+ * a clear "+5 engine, +3 cabin, ..." preview before the player
+ * commits.
+ */
+export interface BulkUpgradeStep {
+  readonly aircraftUid: string;
+  readonly kind: UpgradeKind;
+  readonly cost: number;
+}
+export interface BulkUpgradePlan {
+  readonly steps: readonly BulkUpgradeStep[];
+  readonly totalCost: number;
+  readonly perKind: Record<UpgradeKind, number>;
+}
+
+export function planBulkUpgrade(
+  state: SaveState,
+  hubIata: string,
+  budget: number,
+): BulkUpgradePlan {
+  const hubFleet = state.fleet.filter((a) => a.homeHubIata === hubIata);
+  // Working levels — mutated as we virtually install each step.
+  const levels = new Map<string, { engine: number; cabin: number; fuelEff: number; marketing: number }>();
+  for (const a of hubFleet) levels.set(a.uid, { ...a.upgrades });
+
+  const steps: BulkUpgradeStep[] = [];
+  let remaining = budget;
+  const KINDS: readonly UpgradeKind[] = ['engine', 'cabin', 'fuelEff', 'marketing'];
+
+  while (remaining > 0) {
+    let cheapest: BulkUpgradeStep | null = null;
+    for (const a of hubFleet) {
+      const cur = levels.get(a.uid)!;
+      for (const k of KINDS) {
+        if (cur[k] >= UPGRADE_SPECS[k].maxLevel) continue;
+        // Compute the next-level cost against the virtual aircraft.
+        const virtualAc: OwnedAircraft = { ...a, upgrades: cur };
+        const cost = upgradeCost(virtualAc, k);
+        if (!isFinite(cost) || cost > remaining) continue;
+        if (!cheapest || cost < cheapest.cost) {
+          cheapest = { aircraftUid: a.uid, kind: k, cost };
+        }
+      }
+    }
+    if (!cheapest) break;
+    steps.push(cheapest);
+    remaining -= cheapest.cost;
+    levels.get(cheapest.aircraftUid)![cheapest.kind]++;
+  }
+
+  const perKind: Record<UpgradeKind, number> = { engine: 0, cabin: 0, fuelEff: 0, marketing: 0 };
+  let totalCost = 0;
+  for (const s of steps) {
+    perKind[s.kind]++;
+    totalCost += s.cost;
+  }
+  return { steps, totalCost, perKind };
+}
+
+/**
+ * Apply the plan computed above. Requires a Fleet Engineer hired at
+ * the hub; throws if absent so the UI can keep the auto-upgrade
+ * button locked until the manager's on staff.
+ */
+export function bulkUpgradeHubFleet(
+  state: SaveState,
+  hubIata: string,
+  budget: number,
+): SaveState {
+  const hub = state.hubs.find((h) => h.iata === hubIata);
+  if (!hub) throw new ActionError('NO_HUB', `${hubIata} is not a hub`);
+  if (!hub.managers.fleetEngineer) {
+    throw new ActionError('NO_FLEET_ENGINEER',
+      'Hire a Fleet Engineer at this hub to unlock auto-upgrade.');
+  }
+  if (budget > state.cash) {
+    throw new ActionError('INSUFFICIENT_CASH',
+      `Budget exceeds available cash ($${state.cash.toLocaleString()})`);
+  }
+  const plan = planBulkUpgrade(state, hubIata, budget);
+  if (plan.steps.length === 0) {
+    throw new ActionError('NOTHING_TO_DO',
+      'Budget is below the cheapest next upgrade, or the fleet is maxed.');
+  }
+  let s = state;
+  for (const step of plan.steps) {
+    s = applyUpgrade(s, step.aircraftUid, step.kind);
+  }
+  return s;
 }
 
 // ─── Repair aircraft ─────────────────────────────────────────────────
