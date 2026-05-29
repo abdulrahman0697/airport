@@ -16,11 +16,10 @@
 
 export type MissionTemplateId =
   | 'open_routes'
-  | 'earn_cash'
   | 'repair_aircraft'
-  | 'claim_collectibles'
-  | 'hire_managers'
-  | 'upgrade_aircraft';
+  | 'upgrade_aircraft'
+  | 'buy_aircraft'
+  | 'fleet_diversity';
 
 export interface DailyScenario {
   readonly id: string;
@@ -42,8 +41,8 @@ export const DAILY_SCENARIOS: readonly DailyScenario[] = [
     tagline: 'Commuters everywhere. Move them fast.',
     badge: 'Rush Handled',
     accent: 'cyan',
-    templates: ['open_routes', 'earn_cash', 'upgrade_aircraft'],
-    briefing: 'Demand spikes early. Open new routes, push revenue, keep the fleet sharp.',
+    templates: ['open_routes', 'buy_aircraft', 'upgrade_aircraft'],
+    briefing: 'Demand spikes early. Open new routes, add metal to the ramp, and keep the fleet sharp.',
   },
   {
     id: 'fuel-shock',
@@ -51,8 +50,8 @@ export const DAILY_SCENARIOS: readonly DailyScenario[] = [
     tagline: 'Spot prices are up 22% today.',
     badge: 'Crisis Controlled',
     accent: 'warn',
-    templates: ['earn_cash', 'upgrade_aircraft', 'repair_aircraft'],
-    briefing: 'Survive a fuel-price spike: keep margins positive, deploy fuel-efficient aircraft, fix the worn ones.',
+    templates: ['upgrade_aircraft', 'repair_aircraft', 'open_routes'],
+    briefing: 'Survive a fuel-price spike: tune for efficiency, fix the worn aircraft, and keep the network earning.',
   },
   {
     id: 'cargo-surge',
@@ -60,8 +59,8 @@ export const DAILY_SCENARIOS: readonly DailyScenario[] = [
     tagline: 'Pharma + express parcels need moving.',
     badge: 'Cargo Cleared',
     accent: 'gold',
-    templates: ['claim_collectibles', 'open_routes', 'earn_cash'],
-    briefing: 'Sweep loose crates off the map, open lanes, and pad the books with cargo revenue.',
+    templates: ['buy_aircraft', 'open_routes', 'fleet_diversity'],
+    briefing: 'Add lift fast, open new lanes, and broaden the fleet to cover every parcel run.',
   },
   {
     id: 'premium-day',
@@ -69,8 +68,8 @@ export const DAILY_SCENARIOS: readonly DailyScenario[] = [
     tagline: 'High-yield passengers, your day.',
     badge: 'VIP Delivered',
     accent: 'violet',
-    templates: ['earn_cash', 'hire_managers', 'upgrade_aircraft'],
-    briefing: 'Capture business travellers: top revenue, hire the right managers, tune cabins for yield.',
+    templates: ['upgrade_aircraft', 'fleet_diversity', 'buy_aircraft'],
+    briefing: 'Capture business travellers: tune cabins for yield, diversify the fleet, and scale up capacity.',
   },
   {
     id: 'maintenance-window',
@@ -87,8 +86,8 @@ export const DAILY_SCENARIOS: readonly DailyScenario[] = [
     tagline: 'Holiday traffic is hot — capture it.',
     badge: 'Boom Captured',
     accent: 'cyan',
-    templates: ['open_routes', 'claim_collectibles', 'hire_managers'],
-    briefing: 'Open leisure lanes, catch event collectibles, and put more hands on deck.',
+    templates: ['open_routes', 'fleet_diversity', 'buy_aircraft'],
+    briefing: 'Open leisure lanes, broaden the fleet for every market, and put more aircraft to work.',
   },
 ];
 

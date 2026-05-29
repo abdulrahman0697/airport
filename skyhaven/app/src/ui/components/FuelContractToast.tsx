@@ -62,7 +62,7 @@ export function FuelContractToast() {
     });
     setStamped(false);
     haptics.medium();
-    sfx.confirm();
+    sfx.play('fuel_contract_sign');
   }, [contracts]);
 
   // Stamp + auto-dismiss timeline.
@@ -71,7 +71,7 @@ export function FuelContractToast() {
     const stampId = window.setTimeout(() => {
       setStamped(true);
       haptics.success();
-      sfx.success();
+      sfx.play('fuel_contract_stamp');
     }, 600);
     const closeId = window.setTimeout(() => {
       setPending(null);

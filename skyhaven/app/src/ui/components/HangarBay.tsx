@@ -285,7 +285,7 @@ function MaintenanceMenu({
     const res = repair(aircraft.uid, mode);
     if (res.ok) {
       haptics.success();
-      sfx.confirm();
+      sfx.play('repair_complete');
       setError(null);
       onClose();
     } else {

@@ -1,6 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useRef } from 'react';
 import { STREAK_REWARDS } from '../../engine/dailyLogin';
 import { selectPendingDailyReward, useGameStore } from '../../state/store';
+import { sfx } from '../juice/sfx';
 import { formatCash } from '../format';
 
 /**
@@ -14,6 +16,12 @@ export function DailyReward() {
   const reward = useGameStore(selectPendingDailyReward);
   const claim = useGameStore((s) => s.claimDailyReward);
   const tailColor = useGameStore((s) => s.state?.tailColor ?? '#5AC8FA');
+
+  const sounded = useRef(false);
+  useEffect(() => {
+    if (reward && !sounded.current) { sfx.play('reward_login'); sounded.current = true; }
+    if (!reward) sounded.current = false;
+  }, [reward]);
 
   return (
     <AnimatePresence>

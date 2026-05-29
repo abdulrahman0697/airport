@@ -57,7 +57,7 @@ export function FirstTakeoffCinematic() {
     const timers: number[] = [];
     timers.push(window.setTimeout(() => setStage(1), 200));   // walking (boarding)
     timers.push(window.setTimeout(() => { setStage(2); haptics.medium(); }, 1300)); // pushback
-    timers.push(window.setTimeout(() => { setStage(3); sfx.confirm(); }, 2300));    // takeoff
+    timers.push(window.setTimeout(() => { setStage(3); sfx.play('takeoff_whoosh'); }, 2300));    // takeoff
     timers.push(window.setTimeout(() => { setStage(4); haptics.success(); sfx.success(); }, 3600)); // money burst + status
     // At TOTAL_MS we auto-mark the cinematic as seen and clear it.
     // No welcome card — the founder flow takes over directly.

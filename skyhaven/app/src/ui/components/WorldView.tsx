@@ -3,6 +3,7 @@ import type { Airport } from '../../data/airports';
 import type { Route } from '../../engine/types';
 import { selectRoutes, selectUnlockedRegions, useGameStore } from '../../state/store';
 import type { WorldStage } from '../../world/WorldStage';
+import { sfx } from '../juice/sfx';
 import { AirportTooltip } from './AirportTooltip';
 import { RouteTooltip } from './RouteTooltip';
 
@@ -30,7 +31,8 @@ export function WorldView() {
         stageRef.current = stage;
 
         stage.setCollectibleTapHandler((id) => {
-          useGameStore.getState().claimCollectible(id);
+          const res = useGameStore.getState().claimCollectible(id);
+          if (res.ok) sfx.play('claim_coin');
         });
         stage.setAirportTapHandler((airport, screen) => {
           setTapped({ airport, x: screen.x, y: screen.y });
@@ -94,6 +96,9 @@ export function WorldView() {
         stage.setTailColor(state.state.tailColor);
       }
       if (!prev.state || state.state.collectibles !== prev.state.collectibles) {
+        if (prev.state && state.state.collectibles.length > prev.state.collectibles.length) {
+          sfx.play('collectible_spawn');
+        }
         stage.setCollectibles(state.state.collectibles);
       }
       if (!prev.state || state.state.unlockedRegions !== prev.state.unlockedRegions) {

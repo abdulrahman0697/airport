@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { createGameLoop } from '../state/gameLoop';
+import { initAudio } from './juice/sfx';
 import { selectTutorialCompleted, useGameStore } from '../state/store';
 import { AchievementToast } from './components/AchievementToast';
 import { AircraftDeliveryRitual } from './components/AircraftDeliveryRitual';
@@ -8,6 +9,7 @@ import { EmpireJourney } from './components/EmpireJourney';
 import { BottomTabs } from './components/BottomTabs';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { DailyReward } from './components/DailyReward';
+import { FuelAlerts } from './components/FuelAlerts';
 import { FirstFlightStory } from './components/FirstFlightStory';
 import { FirstRouteCeremony } from './components/FirstRouteCeremony';
 import { FuelContractToast } from './components/FuelContractToast';
@@ -31,6 +33,9 @@ import { WorldView } from './components/WorldView';
 
 export function App() {
   useEffect(() => {
+    // Audio unlock: installs a one-shot gesture listener that resumes
+    // the AudioContext and starts the music/ambience bed (if enabled).
+    initAudio();
     const loop = createGameLoop();
     void loop.start();
     // Cloud sync runs alongside the local game loop. Firebase is a
@@ -80,6 +85,7 @@ export function App() {
       <EventPopup />
       <VintageDropPopup />
       <HeroMoments />
+      <FuelAlerts />
       <AchievementToast />
       <AircraftDeliveryRitual />
       <EmpireJourney />

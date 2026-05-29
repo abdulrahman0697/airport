@@ -1,6 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useRef } from 'react';
 import { selectPendingOfflineSummary, useGameStore } from '../../state/store';
 import { useUiStore } from '../../state/uiStore';
+import { sfx } from '../juice/sfx';
 import { formatCash } from '../format';
 
 /**
@@ -24,6 +26,12 @@ export function OfflineSummary() {
   const ackBase = useGameStore((s) => s.acknowledgeOfflineSummary);
   const tailColor = useGameStore((s) => s.state?.tailColor ?? '#5AC8FA');
   const setStayInTouchCard = useUiStore((s) => s.setStayInTouchCard);
+
+  const sounded = useRef(false);
+  useEffect(() => {
+    if (summary && !sounded.current) { sfx.play('offline_welcome'); sounded.current = true; }
+    if (!summary) sounded.current = false;
+  }, [summary]);
 
   // Design Review v4 — point 1. The first time the player completes
   // an offline summary, fire the in-game "stay-in-touch" card *after*

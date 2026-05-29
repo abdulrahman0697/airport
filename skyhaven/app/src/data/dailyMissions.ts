@@ -14,11 +14,10 @@ import type { SaveState } from '../engine/types';
 
 export type MissionTemplateId =
   | 'open_routes'
-  | 'earn_cash'
   | 'repair_aircraft'
-  | 'claim_collectibles'
-  | 'hire_managers'
-  | 'upgrade_aircraft';
+  | 'upgrade_aircraft'
+  | 'buy_aircraft'
+  | 'fleet_diversity';
 
 export interface DailyMissionTemplate {
   readonly id: MissionTemplateId;
@@ -33,32 +32,32 @@ export interface DailyMissionTemplate {
   readonly progress: (now: SaveState, start: SaveState) => number;
 }
 
-// Reward coefficients trimmed (player feedback: too generous early).
-// Each daily mission now pays ~half what it used to, in line with the
-// achievement-reward rescale and the engine-wide yield cut.
+// Owner-tuned daily pool (5 templates, 3 roll per day). Every mission
+// now shares a 5 / 10 / 15 target ladder so the day's goals read at a
+// consistent scale; rewards are flat cash, scaled per template by the
+// coefficient below.
+//
+// Progress note: `buy_aircraft`, `fleet_diversity` and `upgrade_aircraft`
+// measure a delta against the day-start snapshot. The reconstructed
+// `start` state passed to `progress()` can't represent fleet size /
+// type-set / upgrade totals, so the engine (engine/dailyMissions.ts)
+// special-cases those three from `DailyMissionSnapshot`. The functions
+// here describe the intended semantics and act as the fallback.
 export const DAILY_MISSION_TEMPLATES: readonly DailyMissionTemplate[] = [
   {
     id: 'open_routes',
     label: 'Open the Skies',
     description: 'Launch %target% new routes today — expand the network.',
-    targets: [1, 2, 3],
-    reward: (t) => 6_000 * t,
+    targets: [5, 10, 15],
+    reward: (t) => 1_500 * t,
     progress: (now, start) => Math.max(0, now.routes.length - start.routes.length),
-  },
-  {
-    id: 'earn_cash',
-    label: 'Morning Rush Revenue',
-    description: 'Clear $%target% in revenue today — feed the empire.',
-    targets: [100_000, 500_000, 2_000_000],
-    reward: (t) => Math.round(t * 0.025),
-    progress: (now, start) => Math.max(0, now.lifetimeEarnings - start.lifetimeEarnings),
   },
   {
     id: 'repair_aircraft',
     label: 'Hangar Maintenance',
     description: 'Restore %target% aircraft to top condition today.',
-    targets: [1, 2, 3],
-    reward: (t) => 4_000 * t,
+    targets: [5, 10, 15],
+    reward: (t) => 1_000 * t,
     progress: (now, start) => {
       // Approximate: count aircraft whose condition is materially
       // higher than what we had at day start (i.e., they were repaired).
@@ -72,41 +71,11 @@ export const DAILY_MISSION_TEMPLATES: readonly DailyMissionTemplate[] = [
     },
   },
   {
-    id: 'claim_collectibles',
-    label: 'Cargo Sweep',
-    description: 'Catch %target% loose cargo crates on the world map today.',
-    targets: [1, 2, 3],
-    reward: (t) => 2_500 * t,
-    progress: (now, start) => {
-      // Collectibles ids that disappeared since day start, minus any
-      // that simply expired by `now`. Cheaper proxy: count fewer
-      // collectibles + extra cash earned. We just compare set lengths
-      // — false positives on simultaneous spawn/expire are
-      // acceptable for a daily mission.
-      return Math.max(0, start.collectibles.length - now.collectibles.length);
-    },
-  },
-  {
-    id: 'hire_managers',
-    label: 'Strategic Hires',
-    description: 'Sign %target% new managers today — strengthen your hubs.',
-    targets: [1, 2],
-    reward: (t) => 10_000 * t,
-    progress: (now, start) => {
-      const count = (s: SaveState): number => {
-        let n = 0;
-        for (const h of s.hubs) for (const v of Object.values(h.managers)) if (v) n++;
-        return n;
-      };
-      return Math.max(0, count(now) - count(start));
-    },
-  },
-  {
     id: 'upgrade_aircraft',
     label: 'Fleet Tune-Up',
     description: 'Spec up your aircraft with %target% upgrade levels today.',
-    targets: [1, 3, 5],
-    reward: (t) => 6_000 * t,
+    targets: [5, 10, 15],
+    reward: (t) => 1_500 * t,
     progress: (now, start) => {
       const tot = (s: SaveState): number => {
         let n = 0;
@@ -117,6 +86,27 @@ export const DAILY_MISSION_TEMPLATES: readonly DailyMissionTemplate[] = [
         return n;
       };
       return Math.max(0, tot(now) - tot(start));
+    },
+  },
+  {
+    id: 'buy_aircraft',
+    label: 'Hangar Expansion',
+    description: 'Add %target% new aircraft to your fleet today.',
+    targets: [5, 10, 15],
+    reward: (t) => 3_000 * t,
+    // Engine special-cases this against the day-start fleet count.
+    progress: (now, start) => Math.max(0, now.fleet.length - start.fleet.length),
+  },
+  {
+    id: 'fleet_diversity',
+    label: 'Mix It Up',
+    description: 'Add %target% new aircraft type(s) to your fleet today.',
+    targets: [5, 10, 15],
+    reward: (t) => 3_000 * t,
+    // Engine special-cases this against the day-start unique-type count.
+    progress: (now, start) => {
+      const types = (s: SaveState): number => new Set(s.fleet.map((a) => a.defId)).size;
+      return Math.max(0, types(now) - types(start));
     },
   },
 ];

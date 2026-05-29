@@ -1,9 +1,10 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { EVENT_DEFS } from '../../data/events';
 import { getRegion } from '../../data/regions';
 import { isRunning } from '../../engine/events';
 import { selectActiveEvents, useGameStore } from '../../state/store';
+import { sfx } from '../juice/sfx';
 
 /**
  * Live-event HUD banner (BRD §4.12).
@@ -26,6 +27,19 @@ export function EventBanner() {
   // Only show events whose effects are actually applying. Announced
   // events live in the EventPopup until their start time.
   const events = allEvents.filter((e) => isRunning(e, now));
+
+  // Fire the resolve cue when a running event drops out of the set.
+  const runningKey = events.map((e) => e.id).join(',');
+  const prevRunning = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const cur = new Set(events.map((e) => e.id));
+    let ended = false;
+    for (const id of prevRunning.current) if (!cur.has(id)) ended = true;
+    if (ended) sfx.play('event_end');
+    prevRunning.current = cur;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runningKey]);
+
   if (events.length === 0) return null;
 
   return (

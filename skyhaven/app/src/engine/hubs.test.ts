@@ -115,7 +115,10 @@ describe('networkBonusForRoute', () => {
 describe('hub bonus is applied to leg revenue', () => {
   it('raises revenue when the route touches a hub', () => {
     const s = loaded();
-    const r = s.routes[0]!;
+    // Use a long-haul distance so the flat landing fee is a negligible
+    // fraction of gross — otherwise the post-fee lift ratio drifts with
+    // the aircraft's tier revenue multiplier (T1 starter earns little).
+    const r = { ...s.routes[0]!, distanceKm: 5000 };
     const a = s.fleet[0]!;
     const baseline = legRevenue(r, a, []);
     const withHub = legRevenue(r, a, [{

@@ -14,7 +14,8 @@ describe('dailyMissions', () => {
     expect(s1.dailyMissions!.missions).toHaveLength(DAILY_MISSION_COUNT);
     expect(s1.dailyMissions!.date).toBe(localDateKey(now));
     expect(s1.dailyMissionSnapshot).not.toBeNull();
-    expect(s1.dailyMissionSnapshot!.lifetimeEarnings).toBe(s0.lifetimeEarnings);
+    expect(s1.dailyMissionSnapshot!.routesCount).toBe(s0.routes.length);
+    expect(s1.dailyMissionSnapshot!.fleetCount).toBe(s0.fleet.length);
   });
 
   it('is idempotent within the same day', () => {
@@ -35,16 +36,19 @@ describe('dailyMissions', () => {
     expect(s2.dailyMissions!.date).not.toBe(s1.dailyMissions!.date);
   });
 
-  it('updates earn_cash progress as lifetime earnings grow', () => {
+  it('updates buy_aircraft progress as the fleet grows', () => {
     let s = createInitialState(0);
     const now = 1_700_000_000_000;
     s = rollIfNeeded(s, now);
-    // Inject some lifetime earnings to drive earn_cash progress.
-    s = { ...s, lifetimeEarnings: s.lifetimeEarnings + 1_000_000 };
+    // Add an aircraft to drive buy_aircraft progress against the snapshot.
+    const first = s.fleet[0];
+    if (first) {
+      s = { ...s, fleet: [...s.fleet, { ...first, uid: 'ac-test-2' }] };
+    }
     const s2 = recomputeProgress(s);
-    const earnMission = s2.dailyMissions?.missions.find((m) => m.templateId === 'earn_cash');
-    if (earnMission) {
-      expect(earnMission.progress).toBeGreaterThan(0);
+    const mission = s2.dailyMissions?.missions.find((m) => m.templateId === 'buy_aircraft');
+    if (mission) {
+      expect(mission.progress).toBeGreaterThan(0);
     }
   });
 });
