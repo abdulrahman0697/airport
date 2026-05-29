@@ -36,13 +36,8 @@ export function DailyMissionsCard() {
           if (!tmpl) return null;
           const pct = Math.max(0, Math.min(1, m.progress / m.target));
           const done = m.progress >= m.target;
-          const desc = tmpl.description.replace(
-            '%target%',
-            tmpl.id === 'earn_cash' ? `$${formatCash(m.target)}` : String(m.target),
-          );
-          const progDisplay = tmpl.id === 'earn_cash'
-            ? `$${formatCash(m.progress)} / $${formatCash(m.target)}`
-            : `${m.progress} / ${m.target}`;
+          const desc = tmpl.description.replace('%target%', String(m.target));
+          const progDisplay = `${m.progress} / ${m.target}`;
           return (
             <li key={m.id} style={row}>
               <div style={rowMain}>

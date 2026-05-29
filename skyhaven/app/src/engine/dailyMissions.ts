@@ -34,22 +34,19 @@ export function localDateKey(nowMs: number): string {
 function snapshot(state: SaveState, date: string): DailyMissionSnapshot {
   const conditionByUid: Record<string, number> = {};
   let upgradeLevels = 0;
+  const types = new Set<string>();
   for (const a of state.fleet) {
     conditionByUid[a.uid] = a.condition;
+    types.add(a.defId);
     const u = a.upgrades;
     upgradeLevels += u.engine + u.cabin + u.fuelEff + u.marketing;
-  }
-  let managersCount = 0;
-  for (const h of state.hubs) {
-    for (const v of Object.values(h.managers)) if (v) managersCount++;
   }
   return {
     date,
     routesCount: state.routes.length,
-    lifetimeEarnings: state.lifetimeEarnings,
-    managersCount,
     upgradeLevels,
-    collectiblesCount: state.collectibles.length,
+    fleetCount: state.fleet.length,
+    fleetTypeCount: types.size,
     conditionByUid,
   };
 }
@@ -128,36 +125,37 @@ export function rollIfNeeded(state: SaveState, nowMs: number): SaveState {
 export function recomputeProgress(state: SaveState): SaveState {
   if (!state.dailyMissions || !state.dailyMissionSnapshot) return state;
   const snap = state.dailyMissionSnapshot;
+  // Reconstruct just enough of the day-start state for the generic
+  // progress() path (open_routes reads routes.length; repair_aircraft
+  // reads per-aircraft condition). Aggregate counters that have no clean
+  // SaveState shape are handled by the special cases below.
   const start: SaveState = {
     ...state,
     routes: new Array(snap.routesCount),
-    lifetimeEarnings: snap.lifetimeEarnings,
     fleet: state.fleet.map((a) => ({
       ...a,
       condition: snap.conditionByUid[a.uid] ?? a.condition,
       upgrades: { engine: 0, cabin: 0, fuelEff: 0, marketing: 0 },
     })),
-    collectibles: new Array(snap.collectiblesCount).fill(null) as never,
     hubs: state.hubs,
   };
-  // Manually account for snapshot counters that don't have a clean
-  // SaveState equivalent (managers, upgrade levels).
   let mutated = false;
   const nextMissions = state.dailyMissions.missions.map((m) => {
     const tmpl = DAILY_MISSION_TEMPLATES.find((t) => t.id === m.templateId);
     if (!tmpl) return m;
     let progress: number;
-    if (m.templateId === 'hire_managers') {
-      let managersNow = 0;
-      for (const h of state.hubs) for (const v of Object.values(h.managers)) if (v) managersNow++;
-      progress = Math.max(0, managersNow - snap.managersCount);
-    } else if (m.templateId === 'upgrade_aircraft') {
+    if (m.templateId === 'upgrade_aircraft') {
       let levels = 0;
       for (const a of state.fleet) {
         const u = a.upgrades;
         levels += u.engine + u.cabin + u.fuelEff + u.marketing;
       }
       progress = Math.max(0, levels - snap.upgradeLevels);
+    } else if (m.templateId === 'buy_aircraft') {
+      progress = Math.max(0, state.fleet.length - snap.fleetCount);
+    } else if (m.templateId === 'fleet_diversity') {
+      const typesNow = new Set(state.fleet.map((a) => a.defId)).size;
+      progress = Math.max(0, typesNow - snap.fleetTypeCount);
     } else {
       progress = tmpl.progress(state, start);
     }

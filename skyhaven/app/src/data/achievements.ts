@@ -56,74 +56,79 @@ function uniqueTypes(s: SaveState): number {
 // to per-tick income — finishing one achievement could front-load
 // hours of revenue. Sub-$1M tiers have been roughly halved; mid
 // tiers cut by ~1/3; multi-million prestige rewards left alone.
+//
+// Second rescale (owner-tuned table): early/route + operations rewards
+// pulled down further so they read as small accelerants rather than
+// jackpots; the prestige cash/lifetime ladders (Industry Heavyweight
+// onward) keep their seven-to-nine-figure payouts.
 const NETWORK_DEFS: AchievementDef[] = [
-  { id: 'net.route.5',  category: 'network', name: 'Regional Backbone',   description: 'Run 5 simultaneous routes.',   reward:    25_000, predicate: (s) => s.routes.length >= 5 },
-  { id: 'net.route.10', category: 'network', name: 'Network Architect',   description: 'Operate 10 active routes.',     reward:   100_000, predicate: (s) => s.routes.length >= 10 },
-  { id: 'net.route.20', category: 'network', name: 'Sky Highway',         description: 'Operate 20 active routes.',     reward:   400_000, predicate: (s) => s.routes.length >= 20 },
-  { id: 'net.route.40', category: 'network', name: 'Sky Alliance Founder', description: 'Operate 40 active routes.',    reward: 2_000_000, predicate: (s) => s.routes.length >= 40 },
-  { id: 'net.hub.3',    category: 'network', name: 'Hub Builder',          description: 'Operate 3 hubs.',               reward:    75_000, predicate: (s) => s.hubs.length >= 3 },
-  { id: 'net.hub.5',    category: 'network', name: 'Continental Carrier',  description: 'Operate 5 hubs.',               reward:   300_000, predicate: (s) => s.hubs.length >= 5 },
+  { id: 'net.route.5',  category: 'network', name: 'Regional Backbone',   description: 'Run 5 simultaneous routes.',   reward:     7_000, predicate: (s) => s.routes.length >= 5 },
+  { id: 'net.route.10', category: 'network', name: 'Network Architect',   description: 'Operate 10 active routes.',     reward:    10_000, predicate: (s) => s.routes.length >= 10 },
+  { id: 'net.route.20', category: 'network', name: 'Sky Highway',         description: 'Operate 20 active routes.',     reward:    20_000, predicate: (s) => s.routes.length >= 20 },
+  { id: 'net.route.40', category: 'network', name: 'Sky Alliance Founder', description: 'Operate 40 active routes.',    reward:    50_000, predicate: (s) => s.routes.length >= 40 },
+  { id: 'net.hub.3',    category: 'network', name: 'Hub Builder',          description: 'Operate 3 hubs.',               reward:    30_000, predicate: (s) => s.hubs.length >= 3 },
+  { id: 'net.hub.5',    category: 'network', name: 'Continental Carrier',  description: 'Operate 5 hubs.',               reward:    50_000, predicate: (s) => s.hubs.length >= 5 },
   { id: 'net.region.3', category: 'network', name: 'Multi-Region Ops',     description: 'Unlock 3 regions.',             reward:    50_000, predicate: (s) => s.unlockedRegions.length >= 3 },
-  { id: 'net.region.6', category: 'network', name: 'Hemisphere Player',    description: 'Unlock 6 regions.',             reward:   400_000, predicate: (s) => s.unlockedRegions.length >= 6 },
-  { id: 'net.region.9', category: 'network', name: 'Pole-to-Pole Network', description: 'Unlock all 9 regions.',         reward: 5_000_000, predicate: (s) => s.unlockedRegions.length >= 9 },
+  { id: 'net.region.6', category: 'network', name: 'Hemisphere Player',    description: 'Unlock 6 regions.',             reward:   150_000, predicate: (s) => s.unlockedRegions.length >= 6 },
+  { id: 'net.region.9', category: 'network', name: 'Pole-to-Pole Network', description: 'Unlock all 9 regions.',         reward:   300_000, predicate: (s) => s.unlockedRegions.length >= 9 },
 ];
 
 const FLEET_DEFS: AchievementDef[] = [
-  { id: 'fleet.size.5',  category: 'fleet', name: 'Real Airline Status',     description: 'Own 5 aircraft.',                            reward:    25_000, predicate: (s) => s.fleet.length >= 5 },
-  { id: 'fleet.size.10', category: 'fleet', name: 'Double-Digit Fleet',      description: 'Own 10 aircraft.',                           reward:   100_000, predicate: (s) => s.fleet.length >= 10 },
-  { id: 'fleet.size.25', category: 'fleet', name: 'Hangar Tycoon',           description: 'Own 25 aircraft.',                           reward:   400_000, predicate: (s) => s.fleet.length >= 25 },
-  { id: 'fleet.size.50', category: 'fleet', name: 'Sky Fleet',               description: 'Own 50 aircraft.',                           reward: 2_000_000, predicate: (s) => s.fleet.length >= 50 },
-  { id: 'fleet.tier.3',  category: 'fleet', name: 'Narrow-body Operator',    description: 'Unlock Tier 3 aircraft.',                    reward:    35_000, predicate: (s) => s.tierUnlocked >= 3 },
-  { id: 'fleet.tier.5',  category: 'fleet', name: 'Wide-body Era',           description: 'Unlock Tier 5 aircraft.',                    reward:   250_000, predicate: (s) => s.tierUnlocked >= 5 },
-  { id: 'fleet.tier.7',  category: 'fleet', name: 'Heavy Flagship',          description: 'Unlock Tier 7 aircraft.',                    reward: 2_000_000, predicate: (s) => s.tierUnlocked >= 7 },
-  { id: 'fleet.tier.8',  category: 'fleet', name: 'Mega-liner Carrier',      description: 'Unlock Tier 8 mega-liners.',                 reward: 10_000_000, predicate: (s) => s.tierUnlocked >= 8 },
+  { id: 'fleet.size.5',  category: 'fleet', name: 'Real Airline Status',     description: 'Own 5 aircraft.',                            reward:    10_000, predicate: (s) => s.fleet.length >= 5 },
+  { id: 'fleet.size.10', category: 'fleet', name: 'Double-Digit Fleet',      description: 'Own 10 aircraft.',                           reward:    15_000, predicate: (s) => s.fleet.length >= 10 },
+  { id: 'fleet.size.25', category: 'fleet', name: 'Hangar Tycoon',           description: 'Own 25 aircraft.',                           reward:    50_000, predicate: (s) => s.fleet.length >= 25 },
+  { id: 'fleet.size.50', category: 'fleet', name: 'Sky Fleet',               description: 'Own 50 aircraft.',                           reward:   200_000, predicate: (s) => s.fleet.length >= 50 },
+  { id: 'fleet.tier.3',  category: 'fleet', name: 'Narrow-body Operator',    description: 'Unlock Tier 3 aircraft.',                    reward:    25_000, predicate: (s) => s.tierUnlocked >= 3 },
+  { id: 'fleet.tier.5',  category: 'fleet', name: 'Wide-body Era',           description: 'Unlock Tier 5 aircraft.',                    reward:    40_000, predicate: (s) => s.tierUnlocked >= 5 },
+  { id: 'fleet.tier.7',  category: 'fleet', name: 'Heavy Flagship',          description: 'Unlock Tier 7 aircraft.',                    reward:   100_000, predicate: (s) => s.tierUnlocked >= 7 },
+  { id: 'fleet.tier.8',  category: 'fleet', name: 'Mega-liner Carrier',      description: 'Unlock Tier 8 mega-liners.',                 reward: 1_000_000, predicate: (s) => s.tierUnlocked >= 8 },
   { id: 'fleet.types.6', category: 'fleet', name: 'Diversified Fleet',       description: 'Own 6 different aircraft types.',            reward:   100_000, predicate: (s) => uniqueTypes(s) >= 6 },
 ];
 
 const ECONOMY_DEFS: AchievementDef[] = [
-  { id: 'econ.cash.1m',   category: 'economy', name: 'Millionaire Operator',  description: 'Hold $1M in cash.',          reward:    75_000, predicate: (s) => s.cash >= 1_000_000 },
-  { id: 'econ.cash.10m',  category: 'economy', name: 'Treasury Lifted',       description: 'Hold $10M in cash.',         reward:   400_000, predicate: (s) => s.cash >= 10_000_000 },
-  { id: 'econ.cash.100m', category: 'economy', name: 'Industry Heavyweight',  description: 'Hold $100M in cash.',        reward: 2_000_000, predicate: (s) => s.cash >= 100_000_000 },
-  { id: 'econ.cash.1b',   category: 'economy', name: 'Billionaire Holder',    description: 'Hold $1B in cash.',          reward: 30_000_000, predicate: (s) => s.cash >= 1_000_000_000 },
-  { id: 'econ.life.1m',   category: 'economy', name: 'First Million Earned',  description: 'Earn $1M lifetime.',         reward:    35_000, predicate: (s) => s.lifetimeEarnings >= 1_000_000 },
+  { id: 'econ.cash.1m',   category: 'economy', name: 'Millionaire Operator',  description: 'Hold $1M in cash.',          reward:    30_000, predicate: (s) => s.cash >= 1_000_000 },
+  { id: 'econ.cash.10m',  category: 'economy', name: 'Treasury Lifted',       description: 'Hold $10M in cash.',         reward:   150_000, predicate: (s) => s.cash >= 10_000_000 },
+  { id: 'econ.cash.100m', category: 'economy', name: 'Industry Heavyweight',  description: 'Hold $100M in cash.',        reward: 1_000_000, predicate: (s) => s.cash >= 100_000_000 },
+  { id: 'econ.cash.1b',   category: 'economy', name: 'Billionaire Holder',    description: 'Hold $1B in cash.',          reward: 10_000_000, predicate: (s) => s.cash >= 1_000_000_000 },
+  { id: 'econ.life.1m',   category: 'economy', name: 'First Million Earned',  description: 'Earn $1M lifetime.',         reward:    30_000, predicate: (s) => s.lifetimeEarnings >= 1_000_000 },
   { id: 'econ.life.10m',  category: 'economy', name: 'Million Passenger Club', description: 'Earn $10M lifetime.',       reward:   150_000, predicate: (s) => s.lifetimeEarnings >= 10_000_000 },
-  { id: 'econ.life.100m', category: 'economy', name: 'Centurion of the Skies', description: 'Earn $100M lifetime.',      reward:   750_000, predicate: (s) => s.lifetimeEarnings >= 100_000_000 },
-  { id: 'econ.life.1b',   category: 'economy', name: 'Sky Mogul',             description: 'Earn $1B lifetime.',         reward: 12_000_000, predicate: (s) => s.lifetimeEarnings >= 1_000_000_000 },
+  { id: 'econ.life.100m', category: 'economy', name: 'Centurion of the Skies', description: 'Earn $100M lifetime.',      reward: 1_000_000, predicate: (s) => s.lifetimeEarnings >= 100_000_000 },
+  { id: 'econ.life.1b',   category: 'economy', name: 'Sky Mogul',             description: 'Earn $1B lifetime.',         reward: 10_000_000, predicate: (s) => s.lifetimeEarnings >= 1_000_000_000 },
   { id: 'econ.life.10b',  category: 'economy', name: 'Aviation Legend',       description: 'Earn $10B lifetime.',        reward: 100_000_000, predicate: (s) => s.lifetimeEarnings >= 10_000_000_000 },
 ];
 
 const OPERATIONS_DEFS: AchievementDef[] = [
-  { id: 'ops.contracts.3', category: 'operations', name: 'Supply Network',     description: 'Sign 3 fuel contracts.',              reward:    50_000, predicate: (s) => s.fuel.contracts.length >= 3 },
-  { id: 'ops.contracts.5', category: 'operations', name: 'Fuel Tycoon',        description: 'Sign 5 fuel contracts.',              reward:   400_000, predicate: (s) => s.fuel.contracts.length >= 5 },
-  { id: 'ops.contracts.all', category: 'operations', name: 'Energy Cartel',    description: 'Sign every fuel contract.',           reward: 5_000_000, predicate: (s) => s.fuel.contracts.length >= 8 },
-  { id: 'ops.capacity.3',  category: 'operations', name: 'Industrial Reserve', description: 'Upgrade fuel capacity to tier 3.',    reward:    50_000, predicate: (s) => s.fuel.capacity >= 28_000 },
-  { id: 'ops.capacity.5',  category: 'operations', name: 'Strategic Reserve',  description: 'Upgrade fuel capacity to tier 5.',    reward:   400_000, predicate: (s) => s.fuel.capacity >= 250_000 },
-  { id: 'ops.managers.5',  category: 'operations', name: 'Building a Team',    description: 'Hire 5 managers across your hubs.',   reward:    75_000, predicate: (s) => totalManagers(s) >= 5 },
-  { id: 'ops.managers.15', category: 'operations', name: 'Crew Complete',      description: 'Hire 15 managers across your hubs.',  reward:   500_000, predicate: (s) => totalManagers(s) >= 15 },
-  { id: 'ops.hublv.3',     category: 'operations', name: 'Hub Investment',     description: 'Upgrade a hub to level 3.',           reward:    40_000, predicate: (s) => s.hubs.some((h) => h.level >= 3) },
-  { id: 'ops.hublv.5',     category: 'operations', name: 'Maxed Hub',          description: 'Upgrade a hub to level 5.',           reward:   300_000, predicate: (s) => s.hubs.some((h) => h.level >= 5) },
+  { id: 'ops.contracts.3', category: 'operations', name: 'Supply Network',     description: 'Sign 3 fuel contracts.',              reward:    30_000, predicate: (s) => s.fuel.contracts.length >= 3 },
+  { id: 'ops.contracts.5', category: 'operations', name: 'Fuel Tycoon',        description: 'Sign 5 fuel contracts.',              reward:   100_000, predicate: (s) => s.fuel.contracts.length >= 5 },
+  { id: 'ops.contracts.all', category: 'operations', name: 'Energy Cartel',    description: 'Sign every fuel contract.',           reward:   200_000, predicate: (s) => s.fuel.contracts.length >= 8 },
+  { id: 'ops.capacity.3',  category: 'operations', name: 'Industrial Reserve', description: 'Upgrade fuel capacity to tier 3.',    reward:    30_000, predicate: (s) => s.fuel.capacity >= 28_000 },
+  { id: 'ops.capacity.5',  category: 'operations', name: 'Strategic Reserve',  description: 'Upgrade fuel capacity to tier 5.',    reward:   100_000, predicate: (s) => s.fuel.capacity >= 250_000 },
+  { id: 'ops.managers.5',  category: 'operations', name: 'Building a Team',    description: 'Hire 5 managers across your hubs.',   reward:    10_000, predicate: (s) => totalManagers(s) >= 5 },
+  { id: 'ops.managers.15', category: 'operations', name: 'Crew Complete',      description: 'Hire 15 managers across your hubs.',  reward:    25_000, predicate: (s) => totalManagers(s) >= 15 },
+  { id: 'ops.hublv.3',     category: 'operations', name: 'Hub Investment',     description: 'Upgrade a hub to level 3.',           reward:    10_000, predicate: (s) => s.hubs.some((h) => h.level >= 3) },
+  { id: 'ops.hublv.5',     category: 'operations', name: 'Maxed Hub',          description: 'Upgrade a hub to level 5.',           reward:    20_000, predicate: (s) => s.hubs.some((h) => h.level >= 5) },
 ];
 
 const MASTERY_DEFS: AchievementDef[] = [
-  { id: 'mas.cond.95',     category: 'mastery', name: 'Perfectionist',      description: 'Average fleet condition ≥ 95% (10+ aircraft).', reward:   100_000, predicate: (s) => s.fleet.length >= 10 && avgCondition(s) >= 95 },
-  { id: 'mas.eco.50',      category: 'mastery', name: 'Green Skies',        description: 'Reach an Eco rating of 50.',                    reward:    75_000, predicate: (s) => s.ecoRating >= 50 },
-  { id: 'mas.eco.75',      category: 'mastery', name: 'Sustainable Carrier', description: 'Reach an Eco rating of 75.',                    reward:   300_000, predicate: (s) => s.ecoRating >= 75 },
-  { id: 'mas.eco.100',     category: 'mastery', name: 'Carbon Neutral',     description: 'Reach a perfect Eco rating of 100.',            reward: 2_500_000, predicate: (s) => s.ecoRating >= 100 },
-  { id: 'mas.upg.10',      category: 'mastery', name: 'Master Mechanic',    description: 'Reach 10+ total upgrade levels on one aircraft.', reward:  125_000, predicate: (s) => s.fleet.some((a) => totalUpgrades(a) >= 10) },
-  { id: 'mas.upg.25',      category: 'mastery', name: 'Workshop Floor',     description: 'Spend 25+ upgrade levels across the fleet.',    reward:   300_000, predicate: (s) => totalFleetUpgrades(s) >= 25 },
-  { id: 'mas.cargo.1',     category: 'mastery', name: 'Freight Forward',    description: 'Open your first cargo route.',                   reward:   100_000, predicate: (s) => s.fleet.some((a) => a.routeId !== null && a.defId.startsWith('cargo.')) },
+  { id: 'mas.cond.95',     category: 'mastery', name: 'Perfectionist',      description: 'Average fleet condition ≥ 95% (10+ aircraft).', reward:    10_000, predicate: (s) => s.fleet.length >= 10 && avgCondition(s) >= 95 },
+  { id: 'mas.eco.50',      category: 'mastery', name: 'Green Skies',        description: 'Reach an Eco rating of 50.',                    reward:    30_000, predicate: (s) => s.ecoRating >= 50 },
+  { id: 'mas.eco.75',      category: 'mastery', name: 'Sustainable Carrier', description: 'Reach an Eco rating of 75.',                    reward:    75_000, predicate: (s) => s.ecoRating >= 75 },
+  { id: 'mas.eco.100',     category: 'mastery', name: 'Carbon Neutral',     description: 'Reach a perfect Eco rating of 100.',            reward:   150_000, predicate: (s) => s.ecoRating >= 100 },
+  { id: 'mas.upg.10',      category: 'mastery', name: 'Master Mechanic',    description: 'Reach 10+ total upgrade levels on one aircraft.', reward:   10_000, predicate: (s) => s.fleet.some((a) => totalUpgrades(a) >= 10) },
+  { id: 'mas.upg.25',      category: 'mastery', name: 'Workshop Floor',     description: 'Spend 25+ upgrade levels across the fleet.',    reward:    25_000, predicate: (s) => totalFleetUpgrades(s) >= 25 },
+  { id: 'mas.cargo.1',     category: 'mastery', name: 'Freight Forward',    description: 'Open your first cargo route.',                   reward:    30_000, predicate: (s) => s.fleet.some((a) => a.routeId !== null && a.defId.startsWith('cargo.')) },
   { id: 'mas.vintage.3',   category: 'mastery', name: 'Curator',            description: 'Collect 3 vintage classics.',                    reward:    75_000, predicate: (s) => s.vintage.length >= 3 },
   { id: 'mas.vintage.6',   category: 'mastery', name: 'Restoration Wing',   description: 'Collect 6 vintage classics.',                    reward:   300_000, predicate: (s) => s.vintage.length >= 6 },
-  { id: 'mas.vintage.12',  category: 'mastery', name: 'Museum Director',    description: 'Collect all 12 vintage classics.',               reward: 5_000_000, predicate: (s) => s.vintage.length >= 12 },
+  { id: 'mas.vintage.12',  category: 'mastery', name: 'Museum Director',    description: 'Collect all 12 vintage classics.',               reward:   500_000, predicate: (s) => s.vintage.length >= 12 },
 ];
 
 const MILESTONE_DEFS: AchievementDef[] = [
   { id: 'mil.tutorial',    category: 'milestone', name: 'First Solo Route',     description: 'Complete the onboarding tutorial.',     reward:     5_000, predicate: (s) => s.tutorialCompleted },
-  { id: 'mil.goalchain',   category: 'milestone', name: 'All Missions Cleared', description: 'Complete the early-goal chain.',        reward:    75_000, predicate: (s) => s.goalChainStep >= 8 },
+  { id: 'mil.goalchain',   category: 'milestone', name: 'All Missions Cleared', description: 'Complete the early-goal chain.',        reward:    10_000, predicate: (s) => s.goalChainStep >= 8 },
   { id: 'mil.login.3',     category: 'milestone', name: 'Returning Pilot',      description: 'Sign in 3 days in a row.',              reward:     5_000, predicate: (s) => s.loginStreak >= 3 },
-  { id: 'mil.login.7',     category: 'milestone', name: 'Week of Service',      description: 'Sign in 7 days in a row.',              reward:    35_000, predicate: (s) => s.loginStreak >= 7 },
-  { id: 'mil.login.30',    category: 'milestone', name: 'Loyal Operator',       description: 'Sign in 30 days in a row.',             reward:   500_000, predicate: (s) => s.loginStreak >= 30 },
-  { id: 'mil.fuelevent',   category: 'milestone', name: 'Storm Survivor',       description: 'Survive a Fuel Price Spike event.',     reward:    25_000, predicate: () => false /* set by tick on event expiry */ },
+  { id: 'mil.login.7',     category: 'milestone', name: 'Week of Service',      description: 'Sign in 7 days in a row.',              reward:    15_000, predicate: (s) => s.loginStreak >= 7 },
+  { id: 'mil.login.30',    category: 'milestone', name: 'Loyal Operator',       description: 'Sign in 30 days in a row.',             reward:    25_000, predicate: (s) => s.loginStreak >= 30 },
+  { id: 'mil.fuelevent',   category: 'milestone', name: 'Storm Survivor',       description: 'Survive a Fuel Price Spike event.',     reward:     5_000, predicate: () => false /* set by tick on event expiry */ },
 ];
 
 function totalUpgrades(a: SaveState['fleet'][number]): number {

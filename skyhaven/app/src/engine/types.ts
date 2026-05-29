@@ -234,9 +234,10 @@ export interface DailyMissionState {
 export interface DailyMissionSnapshot {
   date: string;
   routesCount: number;
-  lifetimeEarnings: number;
-  managersCount: number;
   upgradeLevels: number;
-  collectiblesCount: number;
+  /** Fleet size at day start — drives the `buy_aircraft` mission delta. */
+  fleetCount: number;
+  /** Distinct aircraft types at day start — drives `fleet_diversity`. */
+  fleetTypeCount: number;
   conditionByUid: Record<string, number>;
 }
