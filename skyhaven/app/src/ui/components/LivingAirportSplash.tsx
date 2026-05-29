@@ -118,6 +118,14 @@ export function LivingAirportSplash() {
 
           {/* TOP: logo + slogan */}
           <div style={topArea}>
+            <motion.img
+              src="/logo-badge.png"
+              alt="SkyHaven"
+              initial={{ scale: 0.6, opacity: 0, y: -8 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              style={badgeImg as Record<string, unknown>}
+            />
             <Wordmark text="SKYHAVEN" tailColor={tailColor} />
             <div style={brandSepRow}>
               <span style={brandSepLine} />
@@ -646,6 +654,13 @@ const topArea: React.CSSProperties = {
   alignItems: 'center',
   padding: '0 16px',
   zIndex: 5,
+};
+const badgeImg: React.CSSProperties = {
+  width: 96,
+  height: 96,
+  objectFit: 'contain',
+  marginBottom: 8,
+  filter: 'drop-shadow(0 6px 18px rgba(0,0,0,0.6))',
 };
 const wordmarkRow: React.CSSProperties = {
   display: 'flex',
