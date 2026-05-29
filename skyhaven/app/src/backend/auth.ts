@@ -71,6 +71,23 @@ export function subscribeAuth(fn: AuthListener): () => void {
 }
 
 /**
+ * Resolves once Firebase has replayed any persisted session — i.e. the
+ * first `onAuthStateChanged` emission after cold start. Callers can await
+ * this before deciding the user is signed out, so they don't race the
+ * restore (which previously let anonymous sign-in shadow a returning
+ * Google account). Memoised: the listener is installed once.
+ */
+let authReady: Promise<void> | null = null;
+export function waitForAuthReady(): Promise<void> {
+  if (authReady) return authReady;
+  const auth = getFirebaseAuth();
+  authReady = new Promise<void>((resolve) => {
+    const unsub = onAuthStateChanged(auth, () => { unsub(); resolve(); });
+  });
+  return authReady;
+}
+
+/**
  * Get the current uid synchronously, or null if signed out.
  */
 export function currentUid(): string | null {
@@ -84,6 +101,11 @@ export function currentUid(): string | null {
  */
 export async function ensureAnonymous(): Promise<AuthUser | null> {
   const auth = getFirebaseAuth();
+  // Wait for Firebase to finish restoring any persisted session before
+  // concluding there's no user. Without this, cold-start fires anonymous
+  // sign-in before the saved Google session is replayed, replacing it —
+  // which is why returning Google users were dropped back to anonymous.
+  await waitForAuthReady();
   if (auth.currentUser) return toAuthUser(auth.currentUser);
   try {
     const cred = await signInAnonymously(auth);

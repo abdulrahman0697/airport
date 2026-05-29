@@ -7,10 +7,10 @@
  */
 import { useState } from 'react';
 import { signInWithGoogle, signOut } from '../../backend/auth';
-import { useAuth } from '../../backend/useAuth';
+import { useAuthState } from '../../backend/useAuth';
 
 export function CloudAccountCard() {
-  const user = useAuth();
+  const { user, ready } = useAuthState();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,11 +27,12 @@ export function CloudAccountCard() {
   };
 
   const status =
+    !ready ? 'Checking…' :
     !user ? 'Offline' :
     user.providerId === 'google.com' ? 'Cloud sync enabled' :
     'Anonymous device sync';
   const statusColor =
-    !user ? '#94A3B8' :
+    !ready || !user ? '#94A3B8' :
     user.providerId === 'google.com' ? '#34D399' :
     '#5AC8FA';
 
@@ -42,14 +43,18 @@ export function CloudAccountCard() {
         <div>
           <div style={{ fontSize: 14, fontWeight: 700, color: statusColor }}>{status}</div>
           <div style={subStat}>
-            {!user
-              ? 'Trying to connect — local progress is always safe.'
-              : user.providerId === 'google.com'
-                ? `Signed in as ${user.displayName ?? user.email ?? user.uid.slice(0, 8)}`
-                : 'Sign in to keep your progress across devices.'}
+            {!ready
+              ? 'Restoring your session…'
+              : !user
+                ? 'Trying to connect — local progress is always safe.'
+                : user.providerId === 'google.com'
+                  ? `Signed in as ${user.displayName ?? user.email ?? user.uid.slice(0, 8)}`
+                  : 'Sign in to keep your progress across devices.'}
           </div>
         </div>
-        {user?.providerId === 'google.com' ? (
+        {!ready ? (
+          <button disabled style={btnSecondary}>…</button>
+        ) : user?.providerId === 'google.com' ? (
           <button onClick={(): void => { void onSignOut(); }} disabled={busy} style={btnSecondary}>
             Sign out
           </button>
