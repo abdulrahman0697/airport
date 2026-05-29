@@ -119,23 +119,13 @@ export function LivingAirportSplash() {
           {/* TOP: logo + slogan */}
           <div style={topArea}>
             <motion.img
-              src="/logo-badge.png"
-              alt="SkyHaven"
-              initial={{ scale: 0.6, opacity: 0, y: -8 }}
+              src="/logo-lockup.png"
+              alt="SkyHaven Tycoon"
+              initial={{ scale: 0.7, opacity: 0, y: -8 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-              style={badgeImg as Record<string, unknown>}
+              style={lockupImg as Record<string, unknown>}
             />
-            <Wordmark text="SKYHAVEN" tailColor={tailColor} />
-            <div style={brandSepRow}>
-              <span style={brandSepLine} />
-              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden style={{ margin: '0 12px' }}>
-                <path d="M 21 14 L 13 14 L 11 22 L 8 22 L 9 14 L 5 14 L 3 16 L 1 16 L 3 12 L 1 8 L 3 8 L 5 10 L 9 10 L 8 2 L 11 2 L 13 10 L 21 10 Z"
-                  fill={COLOR.gold.base} />
-              </svg>
-              <span style={brandSepLine} />
-            </div>
-            <div style={subMarkText}>TYCOON</div>
 
             <motion.div
               initial={{ opacity: 0, y: 8 }}
@@ -469,27 +459,6 @@ function CeoRimLight() {
   );
 }
 
-function Wordmark({ text, tailColor }: { text: string; tailColor: string }) {
-  return (
-    <div style={wordmarkRow}>
-      {text.split('').map((ch, i) => (
-        <motion.span
-          key={i}
-          initial={{ y: 22, opacity: 0, filter: 'blur(6px)' }}
-          animate={{ y: 0, opacity: 1, filter: 'blur(0px)' }}
-          transition={{ delay: 0.08 + i * 0.05, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          style={{
-            ...wordmarkChar,
-            textShadow: `0 2px 14px rgba(0,0,0,0.85), 0 0 22px ${tailColor}55, 0 0 60px ${tailColor}33`,
-          } as Record<string, unknown>}
-        >
-          {ch}
-        </motion.span>
-      ))}
-    </div>
-  );
-}
-
 /* ─── Styles ──────────────────────────────────────────────────────── */
 
 const shell: React.CSSProperties = {
@@ -655,42 +624,12 @@ const topArea: React.CSSProperties = {
   padding: '0 16px',
   zIndex: 5,
 };
-const badgeImg: React.CSSProperties = {
-  width: 96,
-  height: 96,
+const lockupImg: React.CSSProperties = {
+  width: '90%',
+  maxWidth: 440,
+  height: 'auto',
   objectFit: 'contain',
-  marginBottom: 8,
-  filter: 'drop-shadow(0 6px 18px rgba(0,0,0,0.6))',
-};
-const wordmarkRow: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'center',
-};
-const wordmarkChar: React.CSSProperties = {
-  fontSize: 36,
-  fontWeight: 900,
-  letterSpacing: '0.18em',
-  color: '#F8FAFC',
-  display: 'inline-block',
-};
-const brandSepRow: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  marginTop: 2,
-};
-const brandSepLine: React.CSSProperties = {
-  width: 62,
-  height: 1,
-  background: 'linear-gradient(90deg, transparent, rgba(244,199,91,0.85), transparent)',
-};
-const subMarkText: React.CSSProperties = {
-  fontSize: 14,
-  fontWeight: 800,
-  letterSpacing: '0.55em',
-  color: COLOR.gold.base,
-  marginTop: 2,
-  textShadow: '0 2px 10px rgba(0,0,0,0.85)',
+  filter: 'drop-shadow(0 6px 22px rgba(0,0,0,0.6))',
 };
 const slogan: React.CSSProperties = {
   marginTop: 14,
