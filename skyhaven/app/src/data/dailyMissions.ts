@@ -33,13 +33,16 @@ export interface DailyMissionTemplate {
   readonly progress: (now: SaveState, start: SaveState) => number;
 }
 
+// Reward coefficients trimmed (player feedback: too generous early).
+// Each daily mission now pays ~half what it used to, in line with the
+// achievement-reward rescale and the engine-wide yield cut.
 export const DAILY_MISSION_TEMPLATES: readonly DailyMissionTemplate[] = [
   {
     id: 'open_routes',
     label: 'Open the Skies',
     description: 'Launch %target% new routes today — expand the network.',
     targets: [1, 2, 3],
-    reward: (t) => 15_000 * t,
+    reward: (t) => 6_000 * t,
     progress: (now, start) => Math.max(0, now.routes.length - start.routes.length),
   },
   {
@@ -47,7 +50,7 @@ export const DAILY_MISSION_TEMPLATES: readonly DailyMissionTemplate[] = [
     label: 'Morning Rush Revenue',
     description: 'Clear $%target% in revenue today — feed the empire.',
     targets: [100_000, 500_000, 2_000_000],
-    reward: (t) => Math.round(t * 0.05),
+    reward: (t) => Math.round(t * 0.025),
     progress: (now, start) => Math.max(0, now.lifetimeEarnings - start.lifetimeEarnings),
   },
   {
@@ -55,7 +58,7 @@ export const DAILY_MISSION_TEMPLATES: readonly DailyMissionTemplate[] = [
     label: 'Hangar Maintenance',
     description: 'Restore %target% aircraft to top condition today.',
     targets: [1, 2, 3],
-    reward: (t) => 8_000 * t,
+    reward: (t) => 4_000 * t,
     progress: (now, start) => {
       // Approximate: count aircraft whose condition is materially
       // higher than what we had at day start (i.e., they were repaired).
@@ -73,7 +76,7 @@ export const DAILY_MISSION_TEMPLATES: readonly DailyMissionTemplate[] = [
     label: 'Cargo Sweep',
     description: 'Catch %target% loose cargo crates on the world map today.',
     targets: [1, 2, 3],
-    reward: (t) => 5_000 * t,
+    reward: (t) => 2_500 * t,
     progress: (now, start) => {
       // Collectibles ids that disappeared since day start, minus any
       // that simply expired by `now`. Cheaper proxy: count fewer
@@ -88,7 +91,7 @@ export const DAILY_MISSION_TEMPLATES: readonly DailyMissionTemplate[] = [
     label: 'Strategic Hires',
     description: 'Sign %target% new managers today — strengthen your hubs.',
     targets: [1, 2],
-    reward: (t) => 20_000 * t,
+    reward: (t) => 10_000 * t,
     progress: (now, start) => {
       const count = (s: SaveState): number => {
         let n = 0;
@@ -103,7 +106,7 @@ export const DAILY_MISSION_TEMPLATES: readonly DailyMissionTemplate[] = [
     label: 'Fleet Tune-Up',
     description: 'Spec up your aircraft with %target% upgrade levels today.',
     targets: [1, 3, 5],
-    reward: (t) => 12_000 * t,
+    reward: (t) => 6_000 * t,
     progress: (now, start) => {
       const tot = (s: SaveState): number => {
         let n = 0;
