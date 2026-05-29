@@ -6,7 +6,7 @@ import { AircraftDetailModal } from '../components/AircraftDetailModal';
 import { HangarBay } from '../components/HangarBay';
 import { HangarShowroomCard } from '../components/HangarShowroomCard';
 import { PanelHeader } from '../design/PanelHeader';
-import type { AircraftDef, OwnedAircraft } from '../../engine/types';
+import type { AircraftDef } from '../../engine/types';
 import {
   selectFleet,
   selectTier,
@@ -79,11 +79,19 @@ export function FleetPanel() {
 
 // ──── Owned tab — Design Review v4, point 20: Hangar Bay ────────────
 function OwnedList() {
-  const [detail, setDetail] = useState<OwnedAircraft | null>(null);
+  // Store just the uid (not the snapshot) and look the aircraft up
+  // from the live store on every render — this way an in-modal
+  // upgrade (which mutates state.fleet[i].upgrades) is reflected
+  // immediately without having to close and re-open the modal.
+  const [detailUid, setDetailUid] = useState<string | null>(null);
+  const fleet = useGameStore(selectFleet);
+  const liveDetail = detailUid
+    ? fleet.find((a) => a.uid === detailUid) ?? null
+    : null;
   return (
     <>
-      <HangarBay onOpenDetail={setDetail} />
-      <AircraftDetailModal aircraft={detail} onClose={(): void => setDetail(null)} />
+      <HangarBay onOpenDetail={(a): void => setDetailUid(a.uid)} />
+      <AircraftDetailModal aircraft={liveDetail} onClose={(): void => setDetailUid(null)} />
     </>
   );
 }

@@ -11,6 +11,7 @@
  */
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { COLOR, MOTION, RADIUS, SHADOW, SPACE, Z } from './tokens';
 
 export interface ModalProps {
@@ -51,7 +52,12 @@ export function Modal({
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
-  return (
+  // Render to document.body so the modal escapes any panel /
+  // stacking context that would otherwise trap its z-index. Without
+  // this the panel host (z:20) sits below the top bar (z:30), so
+  // even with modal z:100 the close button vanished behind TopBar.
+  if (typeof document === 'undefined') return null;
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -93,18 +99,25 @@ export function Modal({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 
+/* Backdrop starts BELOW the top bar (var(--world-top)) so the
+   close button on the modal sheet sits in reachable space and
+   the player can still see / use the cash + CEO chrome above. */
 const backdrop: React.CSSProperties = {
   position: 'fixed',
-  inset: 0,
+  top: 'var(--world-top)',
+  left: 0,
+  right: 0,
+  bottom: 0,
   background: 'rgba(0,0,0,0.65)',
   backdropFilter: 'blur(6px)',
   display: 'grid',
-  placeItems: 'center',
-  padding: SPACE.l,
+  placeItems: 'start center',
+  padding: `${SPACE.m}px ${SPACE.l}px ${SPACE.l}px`,
   zIndex: Z.modal,
 };
 
@@ -115,7 +128,8 @@ const sheet: React.CSSProperties = {
   borderRadius: RADIUS.l,
   padding: 0,
   overflow: 'hidden',
-  maxHeight: '92dvh',
+  // Fit inside the (viewport − top bar) area the backdrop occupies.
+  maxHeight: '100%',
   display: 'flex',
   flexDirection: 'column',
 };
