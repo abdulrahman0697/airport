@@ -38,6 +38,9 @@ export function createInitialState(nowMs: number, homeRegion = 3): SaveState {
     flightHoursAccumulated: 0,
     upgrades: { engine: 0, cabin: 0, fuelEff: 0, marketing: 0 },
     routeId: null,
+    // Auto-assigned to the player's first hub by `pickHub` once they
+    // pick it through the HubPicker.
+    homeHubIata: null,
   };
 
   const starterContract = FUEL_CONTRACTS.find((c) => c.id === STARTER_CONTRACT)!;

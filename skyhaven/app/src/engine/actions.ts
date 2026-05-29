@@ -59,7 +59,7 @@ function nextRouteUid(state: SaveState): string {
 }
 
 // ─── Buy aircraft ────────────────────────────────────────────────────
-export function buyAircraft(state: SaveState, defId: string): SaveState {
+export function buyAircraft(state: SaveState, defId: string, hubIata?: string): SaveState {
   const def = getAircraftDef(defId);
   if (!def) throw new ActionError('UNKNOWN_AIRCRAFT', `No aircraft def ${defId}`);
   if (def.category === 'cargo') {
@@ -74,6 +74,27 @@ export function buyAircraft(state: SaveState, defId: string): SaveState {
     throw new ActionError('INSUFFICIENT_CASH',
       `Need $${def.basePurchaseCost.toLocaleString()}`);
   }
+  // Hub-scoped fleet: every purchase must name the home hub. The very
+  // first aircraft (starter) is permitted to defer the choice when no
+  // hubs exist yet — pickHub will back-assign it on the first hub pick.
+  // When the caller doesn't specify a hub but the player only has one
+  // available we default to it (single-hub players don't need a picker
+  // and tests pass freely); ambiguous cases (multi-hub + no choice)
+  // throw so the UI is forced to ask the player.
+  let resolvedHub: string | null = null;
+  if (state.hubs.length === 0) {
+    resolvedHub = null;
+  } else if (hubIata) {
+    if (!state.hubs.some((h) => h.iata === hubIata)) {
+      throw new ActionError('UNKNOWN_HUB', `${hubIata} is not one of your hubs`);
+    }
+    resolvedHub = hubIata;
+  } else if (state.hubs.length === 1) {
+    resolvedHub = state.hubs[0]!.iata;
+  } else {
+    throw new ActionError('NO_HUB_SELECTED',
+      'Pick a hub for the aircraft before purchasing');
+  }
   const aircraft: OwnedAircraft = {
     uid: nextAircraftUid(state),
     defId,
@@ -81,6 +102,7 @@ export function buyAircraft(state: SaveState, defId: string): SaveState {
     flightHoursAccumulated: 0,
     upgrades: { engine: 0, cabin: 0, fuelEff: 0, marketing: 0 },
     routeId: null,
+    homeHubIata: resolvedHub,
   };
   return { ...state, cash: state.cash - def.basePurchaseCost, fleet: [...state.fleet, aircraft] };
 }
@@ -185,6 +207,15 @@ export function openRoute(
   if (aIdx < 0) throw new ActionError('NO_AIRCRAFT', `No aircraft ${aircraftUid}`);
   const aircraft = state.fleet[aIdx]!;
   if (aircraft.routeId) throw new ActionError('AIRCRAFT_BUSY', 'Aircraft is on another route');
+
+  // Hub-scoped fleet: the aircraft's home hub must match the route's
+  // origin. We allow null home (legacy starter, pre-pickHub) only
+  // when there are no hubs at all — once any exist, the player must
+  // base their plane somewhere.
+  if (aircraft.homeHubIata !== null && aircraft.homeHubIata !== originIata) {
+    throw new ActionError('WRONG_HUB',
+      `This aircraft is based at ${aircraft.homeHubIata} — open the route from there instead.`);
+  }
 
   const def = getAircraftDef(aircraft.defId);
   if (!def) throw new ActionError('UNKNOWN_AIRCRAFT', `No def ${aircraft.defId}`);
@@ -469,10 +500,18 @@ export function pickHub(state: SaveState, iata: string): SaveState {
   }
 
   const hub: Hub = { iata, level: 1, managers: emptyHubManagers() };
+  // Any aircraft that doesn't yet have a home hub (the starter at
+  // game start, or a v8-migrated save with no hubs) joins the
+  // freshly-picked one. Aircraft that already belong somewhere stay
+  // put — picking a SECOND hub doesn't poach them.
+  const fleet = state.fleet.map((a) =>
+    a.homeHubIata === null ? { ...a, homeHubIata: iata } : a,
+  );
   return {
     ...state,
     cash: state.cash - cost,
     hubs: [...state.hubs, hub],
+    fleet,
     pendingHubPickRegion:
       state.pendingHubPickRegion === ap.region ? null : state.pendingHubPickRegion,
   };

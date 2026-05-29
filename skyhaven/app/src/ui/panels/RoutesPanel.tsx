@@ -646,6 +646,7 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
   const cash = useGameStore(selectCash);
   const unlocked = useGameStore(selectUnlockedRegions);
   const hubs = useGameStore(selectHubs);
+  const routes = useGameStore(selectRoutes);
   const openRoute = useGameStore((s) => s.openRoute);
   const airports = useMemo(() => loadTopAirports(), []);
   const unlockedAirports = useMemo(
@@ -657,7 +658,16 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
   const [acUid, setAcUid] = useState<string>(idleAircraft[0]?.uid ?? '');
   const selectedAc = idleAircraft.find((a) => a.uid === acUid);
   const def = selectedAc ? getAircraftDef(selectedAc.defId) : undefined;
-  const [originIata, setOriginIata] = useState<string>(hubs[0]?.iata ?? '');
+  // Aircraft are hub-scoped now: the origin is the aircraft's home
+  // hub (locked). If the player wants to fly out of a different hub
+  // they have to switch to an aircraft based there.
+  const aircraftHub = selectedAc?.homeHubIata ?? null;
+  const [originIata, setOriginIata] = useState<string>(
+    aircraftHub ?? hubs[0]?.iata ?? '',
+  );
+  useEffect(() => {
+    if (aircraftHub && aircraftHub !== originIata) setOriginIata(aircraftHub);
+  }, [aircraftHub, originIata]);
   const [destIata, setDestIata] = useState<string>('');
   const [destExpanded, setDestExpanded] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
@@ -684,15 +694,25 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
     if (!def) return [];
     const origin = unlockedAirports.find((a) => a.iata === originIata);
     if (!origin) return [];
+    // Drop any destination the player ALREADY has a route to from
+    // this origin — the network can't carry two identical routes,
+    // and showing the destination tricks players into thinking
+    // they're opening something new.
+    const taken = new Set(
+      routes
+        .filter((r) => r.originIata === originIata)
+        .map((r) => r.destIata),
+    );
     return sortAirports(
       unlockedAirports.filter((a) => {
         if (a.iata === originIata) return false;
         if (!a.intl) return false;
+        if (taken.has(a.iata)) return false;
         const d = haversineKm(origin.lat, origin.lon, a.lat, a.lon);
         return d <= def.rangeKm && d >= 100;
       }),
     );
-  }, [unlockedAirports, originIata, def]);
+  }, [unlockedAirports, originIata, def, routes]);
 
   // Group destinations by country (ISO → friendly name) so the picker
   // is navigable even with hundreds of airports per region.
@@ -754,12 +774,25 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
   const onConfirm = (): void => {
     if (!selectedAc) return;
     if (authorizing) return;
-    setAuthorizing(true);
     haptics.medium();
+    // Resolve the action FIRST. If the engine rejects it (fuel limit,
+    // out-of-range, wrong hub, etc.) we surface the inline error and
+    // never paint the stamp — previously the stamp landed for ~950 ms
+    // before the failure popped, which read as "route authorised"
+    // even though the route never opened.
+    const res = openRoute(originIata, destIata, selectedAc.uid);
+    if (!res.ok) {
+      haptics.warning();
+      setError(res.message);
+      return;
+    }
+    // Success path: hold the stamp briefly as a celebration, then
+    // dismiss.
+    setAuthorizing(true);
+    setError(null);
     window.setTimeout(() => {
-      const res = openRoute(originIata, destIata, selectedAc.uid);
-      if (res.ok) { haptics.heavy(); onClose(); }
-      else { haptics.warning(); setError(res.message); setAuthorizing(false); }
+      haptics.heavy();
+      onClose();
     }, 950);
   };
 
@@ -775,9 +808,10 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
             <select value={acUid} onChange={(e): void => setAcUid(e.target.value)} style={selectStyle}>
               {idleAircraft.map((a) => {
                 const ad = getAircraftDef(a.defId);
+                const baseLabel = a.homeHubIata ? ` · base ${a.homeHubIata}` : '';
                 return (
                   <option key={a.uid} value={a.uid}>
-                    {ad?.displayName ?? '?'} · {a.condition.toFixed(0)}% cond · range {ad?.rangeKm.toLocaleString()} km
+                    {ad?.displayName ?? '?'}{baseLabel} · {a.condition.toFixed(0)}% cond · range {ad?.rangeKm.toLocaleString()} km
                   </option>
                 );
               })}
@@ -790,6 +824,10 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
               <select
                 {...(!originIata ? { 'data-tutorial': 'routes-origin-select' } : {})}
                 value={originIata}
+                // Origin is locked to the aircraft's home hub when set;
+                // switching it would just throw a WRONG_HUB error from
+                // the engine.
+                disabled={aircraftHub !== null}
                 onChange={(e): void => { setOriginIata(e.target.value); setDestIata(''); }}
                 style={selectStyle}
               >

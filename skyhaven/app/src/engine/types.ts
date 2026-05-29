@@ -8,7 +8,7 @@
  * `migrations.ts` and bumps `CURRENT_SCHEMA_VERSION`.
  */
 
-export const CURRENT_SCHEMA_VERSION = 8;
+export const CURRENT_SCHEMA_VERSION = 9;
 
 export type AircraftCategory = 'passenger' | 'cargo' | 'classic';
 export type RoutePricing = 'economy' | 'balanced' | 'premium';
@@ -42,6 +42,14 @@ export interface OwnedAircraft {
   };
   /** Assigned route uid, or null if idle in hangar. */
   routeId: string | null;
+  /**
+   * Home hub IATA the aircraft is based at. Routes opened with this
+   * aircraft must touch the home hub (origin matches). Set at purchase
+   * time; can be null for the very first starter aircraft until the
+   * player picks their first hub via HubPicker (pickHub then assigns
+   * any null-hub aircraft to that hub).
+   */
+  homeHubIata: string | null;
 }
 
 export interface Route {

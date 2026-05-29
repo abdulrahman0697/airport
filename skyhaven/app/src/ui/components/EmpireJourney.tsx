@@ -11,6 +11,7 @@
  * "I can see exactly where I'm going" not "look at this locked grid".
  */
 import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useRef } from 'react';
 import { AIRPORT_GROWTH } from '../../data/tierGrowth';
 import { TIER_UNLOCK_THRESHOLDS } from '../../engine/tierUnlocks';
 import {
@@ -47,6 +48,24 @@ export function EmpireJourney() {
   const open = useUiStore((s) => s.empireJourneyOpen);
   const close = (): void => useUiStore.getState().setEmpireJourneyOpen(false);
   const tier = useGameStore(selectTier);
+  const muralRef = useRef<HTMLDivElement | null>(null);
+  // When the panel opens, scroll the mural so the player's CURRENT
+  // tier tile is centred. Players were landing on T1 every time and
+  // having to swipe right to find themselves.
+  useEffect(() => {
+    if (!open) return;
+    const scroller = muralRef.current;
+    if (!scroller) return;
+    // Defer one frame so the layout has measurable child widths.
+    const id = requestAnimationFrame(() => {
+      const tiles = scroller.querySelectorAll<HTMLElement>('[data-mural-tile]');
+      const target = tiles[Math.max(0, tier - 1)];
+      if (!target) return;
+      const left = target.offsetLeft - (scroller.clientWidth - target.clientWidth) / 2;
+      scroller.scrollTo({ left: Math.max(0, left), behavior: 'auto' });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [open, tier]);
   const lifetime = useGameStore(selectLifetime);
   const tailColor = useGameStore(selectTailColor);
 
@@ -92,13 +111,14 @@ export function EmpireJourney() {
               roadmap. */}
           <div style={muralWrap}>
             <div style={muralKicker(tailColor)}>WORLD PROGRESSION</div>
-            <div style={muralScroller}>
+            <div style={muralScroller} ref={muralRef}>
               {rows.map((r) => {
                 const reached = tier >= r.tier;
                 const current = tier === r.tier;
                 return (
                   <div
                     key={`mural-${r.tier}`}
+                    data-mural-tile
                     style={muralTile(reached, current, tailColor)}
                   >
                     <div style={muralTileLabel(reached, current, tailColor)}>

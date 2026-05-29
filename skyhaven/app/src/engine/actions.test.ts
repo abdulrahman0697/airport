@@ -56,7 +56,7 @@ describe('openRoute / closeRoute / setRoutePricing', () => {
       hubDirector: false, maintenanceChief: false, logisticsDirector: false,
       fleetEngineer: false, marketingLead: false, crisisManager: false,
     } }] };
-    s = buyAircraft(s, 't1.atr42'); // 1450 km
+    s = buyAircraft(s, 't1.atr42', 'LAX'); // 1450 km, based at LAX
     const ac = s.fleet[s.fleet.length - 1]!;
     try {
       openRoute(s, 'LAX', 'JFK', ac.uid);

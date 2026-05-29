@@ -16,9 +16,10 @@
  * review and treats each aircraft as a collectible asset with
  * personality.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { loadTopAirports } from '../../data/airports';
 import type { AircraftDef } from '../../engine/types';
-import { selectCash, selectTailColor, useGameStore } from '../../state/store';
+import { selectCash, selectHubs, selectTailColor, useGameStore } from '../../state/store';
 import { useUiStore } from '../../state/uiStore';
 import { Button } from '../design/Button';
 import { Chip } from '../design/Chip';
@@ -44,10 +45,29 @@ export function HangarShowroomCard({
 }: HangarShowroomCardProps) {
   const cash = useGameStore(selectCash);
   const tailColor = useGameStore(selectTailColor);
+  const hubs = useGameStore(selectHubs);
   const buy = useGameStore((s) => s.buyAircraft);
   const setPendingDelivery = useUiStore((s) => s.setPendingDelivery);
   const [error, setError] = useState<string | null>(null);
   const [justBought, setJustBought] = useState(false);
+  // Hub the new aircraft will be based at. Defaults to the first hub
+  // so single-hub players don't have to think about it; multi-hub
+  // players get a dropdown above the buy button.
+  const [hubIata, setHubIata] = useState<string>(hubs[0]?.iata ?? '');
+  if (hubs.length > 0 && !hubs.some((h) => h.iata === hubIata)) {
+    // Coverage for the (rare) case where the chosen hub disappeared
+    // (e.g. tutorial reset). Fall back to the first available.
+    setHubIata(hubs[0]!.iata);
+  }
+  const hubCities = useMemo(() => {
+    const all = loadTopAirports();
+    const out = new Map<string, string>();
+    for (const h of hubs) {
+      const ap = all.find((a) => a.iata === h.iata);
+      out.set(h.iata, ap?.city || h.iata);
+    }
+    return out;
+  }, [hubs]);
 
   const afford = cash >= def.basePurchaseCost;
   const isCargo = def.category === 'cargo';
@@ -55,7 +75,7 @@ export function HangarShowroomCard({
   const reasons = whyBuy(def);
 
   const tryBuy = (): void => {
-    const res = buy(def.id);
+    const res = buy(def.id, hubs.length > 0 ? hubIata : undefined);
     if (res.ok) {
       haptics.heavy();
       sfx.confirm();
@@ -134,6 +154,34 @@ export function HangarShowroomCard({
           <Stat label="Burn" value={`${def.fuelPerHour}/h`} />
           <Stat label="Range" value={`${def.rangeKm.toLocaleString()} km`} />
         </div>
+
+        {/* Hub selector — only when there are 2+ hubs to choose between.
+            With a single hub the aircraft is auto-based there. */}
+        {hubs.length >= 2 && (
+          <div style={hubPickerWrap}>
+            <div style={hubPickerLabel}>Base aircraft at</div>
+            <div style={hubChipRow}>
+              {hubs.map((h) => {
+                const active = h.iata === hubIata;
+                return (
+                  <button
+                    key={h.iata}
+                    onClick={(): void => setHubIata(h.iata)}
+                    style={{
+                      ...hubChip,
+                      borderColor: active ? tailColor : 'rgba(255,255,255,0.12)',
+                      background: active ? `${tailColor}26` : 'rgba(11,17,32,0.55)',
+                      color: active ? COLOR.ink.primary : COLOR.ink.secondary,
+                    }}
+                  >
+                    <span style={hubChipIata}>{h.iata}</span>
+                    <span style={hubChipCity}>{hubCities.get(h.iata) ?? h.iata}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Action */}
         <Button
@@ -341,6 +389,50 @@ const statValue: React.CSSProperties = {
   color: COLOR.ink.primary,
   marginTop: 2,
   fontFeatureSettings: '"tnum" 1',
+};
+
+/* Hub selector chips (multi-hub only). */
+const hubPickerWrap: React.CSSProperties = {
+  background: 'rgba(11,17,32,0.55)',
+  border: `1px solid ${COLOR.border.soft}`,
+  borderRadius: RADIUS.s,
+  padding: '8px 10px',
+};
+const hubPickerLabel: React.CSSProperties = {
+  fontSize: 9,
+  fontWeight: 800,
+  letterSpacing: '0.18em',
+  textTransform: 'uppercase',
+  color: COLOR.ink.muted,
+  marginBottom: 6,
+};
+const hubChipRow: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 6,
+};
+const hubChip: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  gap: 1,
+  border: '1px solid',
+  borderRadius: RADIUS.s,
+  padding: '6px 10px',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  minWidth: 72,
+};
+const hubChipIata: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: '0.08em',
+  fontFamily: '"Courier New", monospace',
+};
+const hubChipCity: React.CSSProperties = {
+  fontSize: 9,
+  color: COLOR.ink.muted,
+  letterSpacing: '0.04em',
 };
 
 const errorText: React.CSSProperties = {

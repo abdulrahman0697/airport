@@ -36,7 +36,10 @@ export interface GameLoop {
   stop: () => Promise<void>;
 }
 
-const OFFLINE_CAP_HOURS = 8;
+// Player-requested cap: at most 60 minutes of offline earnings on
+// return, regardless of how long the player was away. Idle income
+// is a comeback nudge, not a "leave it on overnight" engine.
+const OFFLINE_CAP_HOURS = 1;
 const OFFLINE_CAP_MS = OFFLINE_CAP_HOURS * 3600 * 1000;
 
 export function createGameLoop(deps: GameLoopDeps = { now: () => Date.now() }): GameLoop {

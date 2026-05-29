@@ -9,6 +9,7 @@ function aircraft(overrides: Partial<OwnedAircraft> = {}): OwnedAircraft {
     flightHoursAccumulated: 0,
     upgrades: { engine: 0, cabin: 0, fuelEff: 0, marketing: 0 },
     routeId: null,
+    homeHubIata: null,
     ...overrides,
   };
 }

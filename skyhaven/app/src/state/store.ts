@@ -54,7 +54,7 @@ interface GameStore {
   setState: (next: SaveState) => void;
   applyTick: (ctx: TickContext) => void;
 
-  buyAircraft: (defId: string) => ActionResult;
+  buyAircraft: (defId: string, hubIata?: string) => ActionResult;
   openRoute: (originIata: string, destIata: string, aircraftUid: string, pricing?: RoutePricing) => ActionResult;
   closeRoute: (routeId: string) => ActionResult;
   setRoutePricing: (routeId: string, pricing: RoutePricing) => ActionResult;
@@ -127,7 +127,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!cur) return;
     set({ state: tick(cur, ctx) });
   },
-  buyAircraft: (defId) => runAction(set, get, (s) => buyAircraftAction(s, defId)),
+  buyAircraft: (defId, hubIata) => runAction(set, get, (s) => buyAircraftAction(s, defId, hubIata)),
   openRoute: (originIata, destIata, aircraftUid, pricing) =>
     runAction(set, get, (s) => openRouteAction(s, originIata, destIata, aircraftUid, pricing)),
   closeRoute: (routeId) => runAction(set, get, (s) => closeRouteAction(s, routeId)),

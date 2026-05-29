@@ -8,6 +8,7 @@ function aircraft(level: number, kind: 'engine' | 'cabin' = 'engine'): OwnedAirc
     uid: 'test', defId: AIRCRAFT_DEFS[0]!.id, condition: 100, flightHoursAccumulated: 0,
     upgrades: { engine: 0, cabin: 0, fuelEff: 0, marketing: 0, [kind]: level },
     routeId: null,
+    homeHubIata: null,
   };
 }
 

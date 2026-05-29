@@ -9,7 +9,7 @@
  * unless they reach for it manually in Settings.
  */
 import { AnimatePresence, motion } from 'framer-motion';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { requestPushPermissionInGame } from '../../backend/push';
 import { selectTailColor, useGameStore } from '../../state/store';
 import { useUiStore } from '../../state/uiStore';
@@ -18,13 +18,52 @@ import { COLOR, RADIUS, SHADOW, SPACE } from '../design/tokens';
 import { haptics } from '../juice/haptics';
 import { sfx } from '../juice/sfx';
 
+// Once the player has answered the OS permission prompt (allow OR
+// deny), we never show this card again. Persisted across reloads
+// via localStorage; the `stay-in-touch.answered.v1` key flips to
+// "1" the first time either button is tapped, and the in-store flag
+// is also dismissed.
+const ANSWERED_KEY = 'skyhaven.stayInTouch.answered.v1';
+
+function readAnswered(): boolean {
+  if (typeof window === 'undefined') return false;
+  try { return window.localStorage.getItem(ANSWERED_KEY) === '1'; }
+  catch { return false; }
+}
+
+function markAnswered(): void {
+  if (typeof window === 'undefined') return;
+  try { window.localStorage.setItem(ANSWERED_KEY, '1'); }
+  catch { /* private mode etc. — just won't persist */ }
+}
+
+function permissionAlreadyResolved(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (typeof Notification === 'undefined') return false;
+  // 'granted' OR 'denied' both mean the player has already answered
+  // the OS prompt at least once — don't pester them again.
+  return Notification.permission !== 'default';
+}
+
 export function StayInTouchCard() {
   const open = useUiStore((s) => s.stayInTouchCard);
   const close = useUiStore((s) => s.setStayInTouchCard);
   const tailColor = useGameStore(selectTailColor);
   const [busy, setBusy] = useState(false);
 
+  // Suppress mount entirely if we already have an answer on file
+  // (either OS-level grant/deny, or our own answered flag from a
+  // prior session). Defensive: if some other code path opened the
+  // card flag, we close it before paint.
+  useEffect(() => {
+    if (!open) return;
+    if (readAnswered() || permissionAlreadyResolved()) {
+      close(false);
+    }
+  }, [open, close]);
+
   if (!open) return null;
+  if (readAnswered() || permissionAlreadyResolved()) return null;
 
   const onAllow = async (): Promise<void> => {
     setBusy(true);
@@ -35,11 +74,13 @@ export function StayInTouchCard() {
     } catch {
       // Ignored — the user can always re-enable from Settings.
     }
+    markAnswered();
     close(false);
   };
 
   const onDecline = (): void => {
     haptics.light();
+    markAnswered();
     close(false);
   };
 

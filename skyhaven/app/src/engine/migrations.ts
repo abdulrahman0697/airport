@@ -127,6 +127,42 @@ const MIGRATIONS: Record<number, Migration> = {
     dailyMissions: null,
     dailyMissionSnapshot: null,
   }),
+  // v8 → v9: aircraft become hub-scoped. Each OwnedAircraft gains a
+  // homeHubIata field. We back-fill from the aircraft's current route
+  // origin if there is one, falling back to the first hub. Aircraft
+  // with no route and no hubs stay null (legacy starter case) — the
+  // first pickHub call after upgrade will assign them.
+  8: (s) => {
+    const fleet = (Array.isArray(s.fleet) ? s.fleet : []) as Array<Record<string, unknown>>;
+    const routes = (Array.isArray(s.routes) ? s.routes : []) as Array<{
+      id: string; originIata: string;
+    }>;
+    const hubs = (Array.isArray(s.hubs) ? s.hubs : []) as Array<{ iata: string }>;
+    const firstHub = hubs[0]?.iata ?? null;
+    const routeOriginByAircraft = new Map<string, string>();
+    for (const r of routes) {
+      // Routes' aircraftUid lives outside the route id; resolve via
+      // fleet entries below if necessary.
+      void r;
+    }
+    for (const a of fleet) {
+      const routeId = typeof a.routeId === 'string' ? a.routeId : null;
+      if (routeId) {
+        const r = routes.find((x) => x.id === routeId);
+        if (r) routeOriginByAircraft.set(String(a.uid), r.originIata);
+      }
+    }
+    return {
+      ...s,
+      schemaVersion: 9,
+      fleet: fleet.map((a) => ({
+        ...a,
+        homeHubIata: typeof a.homeHubIata === 'string'
+          ? a.homeHubIata
+          : (routeOriginByAircraft.get(String(a.uid)) ?? firstHub),
+      })),
+    };
+  },
 };
 
 /**
