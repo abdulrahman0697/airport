@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { cashPerSecond } from '../../engine/economy';
-import { getAircraftDef } from '../../data/aircraft';
+import { effectiveIncomePerSec } from '../../engine/economy';
 import { MAX_TIER, TIER_UNLOCK_THRESHOLDS } from '../../engine/tierUnlocks';
 import { AIRPORT_GROWTH } from '../../data/tierGrowth';
 import {
@@ -37,14 +36,10 @@ export function TopBar() {
   const [perSec, setPerSec] = useState(0);
   useEffect(() => {
     if (!state) return;
-    const fleetById = new Map(state.fleet.map((a) => [a.uid, a]));
-    let total = 0;
-    for (const r of state.routes) {
-      const a = fleetById.get(r.aircraftUid);
-      if (!a || !getAircraftDef(a.defId)) continue;
-      total += cashPerSecond(r, a, hubs, activeEvents);
-    }
-    setPerSec(total);
+    // Real-time effective income: includes hub bonus + active events AND
+    // the airline-wide multipliers (Eco, Vintage, Remote Config, VIP,
+    // 2× speed-up), time-checked live so it reflects boosts as they run.
+    setPerSec(effectiveIncomePerSec(state, Date.now()));
   }, [state, hubs, activeEvents]);
 
   // Design Review v3 — point 8. Pulse the rate when income first
