@@ -17,9 +17,9 @@
       "description": "Maximum offline accrual window in hours. Matches the shipped 1h cap (idle income is a comeback nudge, not an overnight engine)."
     },
     "fuel_demand_mult": {
-      "defaultValue": { "value": "2.0" },
+      "defaultValue": { "value": "1.0" },
       "valueType": "NUMBER",
-      "description": "Multiplies total fleet fuel demand. 2.0 since the Arrivals & Time update restored the fuel gate after strict-linear timing halved burn rate."
+      "description": "Multiplies total fleet fuel demand. 1.0 — the Arrivals & Time update left the fuel gate ~2x looser (strict-linear timing halved per-real-second burn)."
     },
     "fuel_contract_cost_mult": {
       "defaultValue": { "value": "1.0" },

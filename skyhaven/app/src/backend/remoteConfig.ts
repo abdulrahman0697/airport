@@ -55,7 +55,7 @@ const DEFAULTS: ResolvedConfig = {
   globalYieldMult: 1,
   hubBonusPerLevel: 0.05,
   conditionDecayMult: 1,
-  fuelDemandMult: 2,
+  fuelDemandMult: 1,
   repairCostMult: 1,
   fuelContractCostMult: 1,
   fuelCapacityCostMult: 1,

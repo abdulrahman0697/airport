@@ -13,14 +13,14 @@ function mkAircraft(defId: string): OwnedAircraft {
   return {
     uid: 'a1', defId, condition: 100, flightHoursAccumulated: 0,
     upgrades: { engine: 0, cabin: 0, fuelEff: 0, marketing: 0 },
-    routeId: 'r1',
+    routeId: 'r1', homeHubIata: null,
   };
 }
 function mkRoute(distanceKm: number): Route {
   return {
     id: 'r1', originIata: 'AAA', destIata: 'BBB', distanceKm,
     aircraftUid: 'a1', pricing: 'balanced', loadFactor: 0.8,
-    legProgress: 0, legDirection: 'outbound', aircraftType: undefined as never,
+    legProgress: 0, legDirection: 'outbound',
   };
 }
 
@@ -43,15 +43,11 @@ describe('longHaulMultiplier', () => {
 });
 
 describe('legRevenue long-haul premium', () => {
-  it('pays more per km on a long route than a short one (same plane)', () => {
+  it('pays a higher per-km yield on a long route than a short one (same plane)', () => {
+    expect(getAircraftDef('t5.b787-9')).toBeTruthy();
     const a = mkAircraft('t5.b787-9');
-    const def = getAircraftDef('t5.b787-9')!;
-    expect(def).toBeTruthy();
-    const shortR = legRevenue(mkRoute(1000), a);
-    const longR = legRevenue(mkRoute(12000), a);
-    const shortPerKm = shortR / 1000;
-    const longPerKm = longR / 12000;
-    // Long route earns a higher per-km yield thanks to the long-haul bonus.
+    const shortPerKm = legRevenue(mkRoute(1000), a) / 1000;
+    const longPerKm = legRevenue(mkRoute(12000), a) / 12000;
     expect(longPerKm).toBeGreaterThan(shortPerKm);
   });
 });
