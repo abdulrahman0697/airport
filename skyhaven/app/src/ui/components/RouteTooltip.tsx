@@ -29,11 +29,19 @@ export function RouteTooltip({ route, x, y, onClose }: Props) {
   const hubs = useGameStore(selectHubs);
   const events = useGameStore(selectActiveEvents);
 
+  // Keep onClose in a ref so the outside-tap listener attaches exactly
+  // once (mount) and never tears down on re-render. Previously the effect
+  // depended on the inline onClose closure, so every parent re-render
+  // detached + re-attached the listener behind a 50ms timer — leaving a
+  // recurring gap where an outside tap was missed (the "tap 2-3 times to
+  // close" bug).
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
     const onDown = (e: PointerEvent): void => {
       if (!ref.current) return;
       const target = e.target as Node | null;
-      if (!target || !ref.current.contains(target)) onClose();
+      if (!target || !ref.current.contains(target)) onCloseRef.current();
     };
     const id = window.setTimeout(() => {
       window.addEventListener('pointerdown', onDown);
@@ -42,7 +50,7 @@ export function RouteTooltip({ route, x, y, onClose }: Props) {
       clearTimeout(id);
       window.removeEventListener('pointerdown', onDown);
     };
-  }, [onClose]);
+  }, []);
 
   const aircraft = fleet.find((a) => a.uid === route.aircraftUid);
   if (!aircraft) return null;

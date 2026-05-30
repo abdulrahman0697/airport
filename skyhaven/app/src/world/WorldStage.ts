@@ -125,9 +125,11 @@ export async function createWorldStage(host: HTMLElement): Promise<WorldStage> {
   root.addChild(countries.container);
   root.addChild(clouds.container);
   root.addChild(hubPulses.container);
-  root.addChild(arcsLayer.container);
   root.addChild(ripples.container);
   root.addChild(pinsLayer.container);
+  // Arcs (and their plane glyphs) sit ABOVE the airport pins so a plane
+  // hovering over an airport dot wins the tap — and renders on top.
+  root.addChild(arcsLayer.container);
   root.addChild(collectiblesLayer.container);
   // eslint-disable-next-line no-console
   console.info('[skyhaven] WorldStage layers ready', {

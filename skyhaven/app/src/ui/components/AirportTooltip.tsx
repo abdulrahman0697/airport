@@ -23,12 +23,16 @@ const TOOLTIP_H_EST = 110;
 export function AirportTooltip({ airport, x, y, unlocked, onClose }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
 
-  // Click outside to dismiss.
+  // Click outside to dismiss. onClose is kept in a ref so the listener
+  // attaches once and never re-detaches on parent re-render (avoids the
+  // recurring 50ms gap that made outside taps need 2-3 tries).
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
     const onDown = (e: PointerEvent): void => {
       if (!ref.current) return;
       const target = e.target as Node | null;
-      if (!target || !ref.current.contains(target)) onClose();
+      if (!target || !ref.current.contains(target)) onCloseRef.current();
     };
     const id = window.setTimeout(() => {
       window.addEventListener('pointerdown', onDown);
@@ -37,7 +41,7 @@ export function AirportTooltip({ airport, x, y, unlocked, onClose }: Props) {
       clearTimeout(id);
       window.removeEventListener('pointerdown', onDown);
     };
-  }, [onClose]);
+  }, []);
 
   // Position the tooltip so it stays on-screen.
   const left = Math.min(window.innerWidth - TOOLTIP_W - 12, Math.max(12, x - TOOLTIP_W / 2));
