@@ -6,6 +6,7 @@ import { loadTopAirports, type Airport } from '../../data/airports';
 import { REGIONS } from '../../data/regions';
 import { conditionBand } from '../../engine/condition';
 import { haversineKm } from '../../engine/distance';
+import { cashPerSecond } from '../../engine/economy';
 import { formatPerTrip } from '../routeRevenue';
 import { hubPickCost, routeOpenCost } from '../../engine/actions';
 import {
@@ -129,7 +130,7 @@ function RouteRow({ route }: { route: Route }) {
   const def = getAircraftDef(aircraft.defId);
   if (!def) return null;
 
-  const cps = cashPerSecond(route, aircraft, hubs);
+  const perTrip = formatPerTrip(route, aircraft, hubs);
   const band = conditionBand(aircraft.condition);
   const condColor = band === 'normal' ? '#34D399' : band === 'degraded' ? '#F59E0B' : '#F87171';
   const touchesHub = hubs.some((h) => h.iata === route.originIata || h.iata === route.destIata);
@@ -167,7 +168,7 @@ function RouteRow({ route }: { route: Route }) {
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={rateText}>{perTrip ?? '—'}</div>
+          <div style={rateText}>{perTrip}</div>
           <div style={{ color: condColor, fontSize: 11, marginTop: 2 }}>
             {aircraft.condition.toFixed(0)}%  ·  {Math.round(route.distanceKm).toLocaleString()} km
           </div>

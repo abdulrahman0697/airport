@@ -202,7 +202,33 @@ function tickMaintenanceChief(
   return { fleet: outFleet, cash, mutated };
 }
 
+/**
+ * Transient arrivals output (Arrivals & Time update).
+ *
+ * The pure tick credits arrival revenue silently into `cash`. To let the
+ * UI surface landings (recent-arrivals readout + on-map money pops)
+ * without persisting transient data into `SaveState`, each completed leg
+ * pushes `{ routeId, destIata, amount }` into this module-level buffer.
+ * `tick()` clears it at entry; the store drains it via `drainArrivals()`
+ * right after each tick. It's an output channel, not engine state, so the
+ * determinism of the returned `SaveState` is unaffected.
+ */
+export interface ArrivalEvent {
+  routeId: string;
+  destIata: string;
+  amount: number;
+}
+let arrivalSink: ArrivalEvent[] = [];
+/** Take and clear the arrivals recorded by the most recent `tick()`. */
+export function drainArrivals(): ArrivalEvent[] {
+  if (arrivalSink.length === 0) return [];
+  const out = arrivalSink;
+  arrivalSink = [];
+  return out;
+}
+
 export function tick(state: SaveState, ctx: TickContext): SaveState {
+  arrivalSink = [];
   if (ctx.dtMs <= 0) {
     return { ...state, lastSeenTimestamp: ctx.nowMs };
   }

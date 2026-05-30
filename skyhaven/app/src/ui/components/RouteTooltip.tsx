@@ -5,6 +5,7 @@ import { cashPerSecond, legDurationMs } from '../../engine/economy';
 import type { Route } from '../../engine/types';
 import { selectActiveEvents, selectFleet, selectHubs, useGameStore } from '../../state/store';
 import { popoverBottomCeiling, popoverTopFloor } from '../design/safeArea';
+import { formatRate } from '../format';
 
 /**
  * Popover for a tapped in-flight plane glyph. Mirrors AirportTooltip
@@ -81,7 +82,7 @@ export function RouteTooltip({ route, x, y, onClose }: Props) {
       </div>
       <div style={revenueRow}>
         <span style={meta}>Revenue</span>
-        <span style={revenue}>{perTrip}</span>
+        <span style={revenue}>{formatRate(cps)}</span>
       </div>
     </div>
   );
