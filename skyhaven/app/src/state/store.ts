@@ -48,7 +48,7 @@ import {
   upgradeHub as upgradeHubAction,
 } from '../engine/actions';
 import { applyDailyLogin } from '../engine/dailyLogin';
-import { tick, type TickContext } from '../engine/tick';
+import { drainArrivals, tick, type ArrivalEvent, type TickContext } from '../engine/tick';
 import type { ManagerKind } from '../data/managers';
 import type { RoutePricing, SaveState } from '../engine/types';
 import type { UpgradeKind } from '../engine/upgrades';
