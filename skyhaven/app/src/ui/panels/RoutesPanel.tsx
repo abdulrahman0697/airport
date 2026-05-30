@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useUiStore } from '../../state/uiStore';
 import { getAircraftDef } from '../../data/aircraft';
 import { loadTopAirports, type Airport } from '../../data/airports';
-import { REGIONS } from '../../data/regions';
+import { REGIONS, getRegion } from '../../data/regions';
 import { conditionBand } from '../../engine/condition';
 import { haversineKm } from '../../engine/distance';
 import { legDurationMs } from '../../engine/economy';
@@ -693,11 +693,19 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
   const def = selectedAc ? getAircraftDef(selectedAc.defId) : undefined;
   const [destIata, setDestIata] = useState<string>('');
   const [destExpanded, setDestExpanded] = useState<Set<string>>(new Set());
+  const [destRegionExpanded, setDestRegionExpanded] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const toggleDestCountry = (iso: string): void => {
     setDestExpanded((cur) => {
       const next = new Set(cur);
       if (next.has(iso)) next.delete(iso); else next.add(iso);
+      return next;
+    });
+  };
+  const toggleDestRegion = (region: number): void => {
+    setDestRegionExpanded((cur) => {
+      const next = new Set(cur);
+      if (next.has(region)) next.delete(region); else next.add(region);
       return next;
     });
   };
@@ -737,18 +745,36 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
     );
   }, [unlockedAirports, originIata, def, routes]);
 
-  // Group destinations by country (ISO → friendly name) so the picker
-  // is navigable even with hundreds of airports per region.
-  const destGroupedByCountry = useMemo(() => {
-    const groups = new Map<string, Airport[]>();
+  // Group destinations by region → country → airports, so a player with
+  // several regions unlocked can navigate one region at a time (ME,
+  // Europe, …) and only then drill into countries. With a single region
+  // unlocked this still works — there's just one region group.
+  const destGroupedByRegion = useMemo(() => {
+    const byRegion = new Map<number, Map<string, Airport[]>>();
     for (const a of destAirports) {
+      let countries = byRegion.get(a.region);
+      if (!countries) { countries = new Map(); byRegion.set(a.region, countries); }
       const key = a.country || '??';
-      const arr = groups.get(key);
-      if (arr) arr.push(a); else groups.set(key, [a]);
+      const arr = countries.get(key);
+      if (arr) arr.push(a); else countries.set(key, [a]);
     }
-    const out: { iso: string; label: string; airports: Airport[] }[] = [];
-    for (const [iso, arr] of groups) {
-      out.push({ iso, label: countryName(iso), airports: arr });
+    const out: {
+      region: number;
+      label: string;
+      count: number;
+      countries: { iso: string; label: string; airports: Airport[] }[];
+    }[] = [];
+    for (const [region, countries] of byRegion) {
+      const countryList = [...countries.entries()]
+        .map(([iso, arr]) => ({ iso, label: countryName(iso), airports: arr }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+      const count = countryList.reduce((n, c) => n + c.airports.length, 0);
+      out.push({
+        region,
+        label: getRegion(region)?.name ?? `Region ${region}`,
+        count,
+        countries: countryList,
+      });
     }
     out.sort((a, b) => a.label.localeCompare(b.label));
     return out;
@@ -932,45 +958,64 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
                       and confirm button. Tap "clear" to pick again. */}
                   {!destIata && (
                     <div style={destScroller}>
-                      {destGroupedByCountry.length === 0 ? (
+                      {destGroupedByRegion.length === 0 ? (
                         <div style={empty}>No reachable destinations in range.</div>
-                      ) : destGroupedByCountry.map((group) => {
-                        const open = destExpanded.has(group.iso);
+                      ) : destGroupedByRegion.map((rg) => {
+                        // Single-region results auto-expand so there's no
+                        // redundant tap; with multiple regions the player
+                        // opens one at a time.
+                        const regionOpen = destGroupedByRegion.length === 1
+                          ? true
+                          : destRegionExpanded.has(rg.region);
                         return (
-                          <section key={group.iso} style={addHubCountry}>
+                          <section key={rg.region} style={destRegionBlock}>
                             <button
-                              onClick={(): void => toggleDestCountry(group.iso)}
-                              style={addHubCountryHeaderBtn}
-                              aria-expanded={open}
+                              onClick={(): void => toggleDestRegion(rg.region)}
+                              style={destRegionHeaderBtn}
+                              aria-expanded={regionOpen}
                             >
-                              <span>{group.label}</span>
-                              <span style={addHubCountryChev}>{open ? '▾' : '▸'} {group.airports.length}</span>
+                              <span style={destRegionName}>{rg.label}</span>
+                              <span style={addHubCountryChev}>{regionOpen ? '▾' : '▸'} {rg.count}</span>
                             </button>
-                            {open && (
-                              <ul style={list}>
-                                {group.airports.map((a) => {
-                                  return (
-                                    <li key={a.iata} style={destListItem}>
-                                      <button
-                                        onClick={(): void => {
-                                          setDestIata(a.iata);
-                                          // Collapse all countries — the
-                                          // selected airport now stands
-                                          // alone in the header above.
-                                          setDestExpanded(new Set());
-                                        }}
-                                        style={destItemBtn}
-                                      >
-                                        <div style={destItemLeft}>
-                                          <div style={destItemIata}>{a.iata}</div>
-                                          <div style={destItemCity}>{a.city || group.label}</div>
-                                        </div>
-                                      </button>
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            )}
+                            {regionOpen && rg.countries.map((group) => {
+                              const open = destExpanded.has(group.iso);
+                              return (
+                                <section key={group.iso} style={addHubCountry}>
+                                  <button
+                                    onClick={(): void => toggleDestCountry(group.iso)}
+                                    style={addHubCountryHeaderBtn}
+                                    aria-expanded={open}
+                                  >
+                                    <span>{group.label}</span>
+                                    <span style={addHubCountryChev}>{open ? '▾' : '▸'} {group.airports.length}</span>
+                                  </button>
+                                  {open && (
+                                    <ul style={list}>
+                                      {group.airports.map((a) => (
+                                        <li key={a.iata} style={destListItem}>
+                                          <button
+                                            onClick={(): void => {
+                                              setDestIata(a.iata);
+                                              // Collapse country + region
+                                              // lists — the picked airport
+                                              // now stands alone above.
+                                              setDestExpanded(new Set());
+                                              setDestRegionExpanded(new Set());
+                                            }}
+                                            style={destItemBtn}
+                                          >
+                                            <div style={destItemLeft}>
+                                              <div style={destItemIata}>{a.iata}</div>
+                                              <div style={destItemCity}>{a.city || group.label}</div>
+                                            </div>
+                                          </button>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </section>
+                              );
+                            })}
                           </section>
                         );
                       })}
@@ -1547,6 +1592,24 @@ const addHubCountryHeaderBtn: React.CSSProperties = {
 const addHubCountryChev: React.CSSProperties = {
   fontSize: 11, color: '#94A3B8', letterSpacing: '0.02em',
 };
+const destRegionBlock: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', gap: 6,
+  paddingLeft: 6,
+  borderLeft: '2px solid rgba(244,199,91,0.35)',
+};
+const destRegionHeaderBtn: React.CSSProperties = {
+  width: '100%',
+  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+  fontSize: 12, letterSpacing: '0.1em', textTransform: 'uppercase',
+  color: '#F4C75B', fontWeight: 800,
+  padding: '9px 10px',
+  background: 'rgba(244,199,91,0.08)',
+  border: '1px solid rgba(244,199,91,0.22)',
+  borderRadius: 8,
+  cursor: 'pointer', fontFamily: 'inherit',
+  minHeight: 42,
+};
+const destRegionName: React.CSSProperties = { fontWeight: 800 };
 const destAccordion: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', gap: 8,
   background: 'rgba(255,255,255,0.04)',

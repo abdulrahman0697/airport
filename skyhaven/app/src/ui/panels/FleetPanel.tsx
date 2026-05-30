@@ -118,6 +118,26 @@ function BuyList() {
     return out;
   }, [category]);
 
+  // Collapsible tier sections. Default-collapse every tier except the
+  // player's current (highest unlocked) one, so they land on the planes
+  // they can actually buy without scrolling past locked tiers.
+  const [collapsed, setCollapsed] = useState<Set<number>>(() => new Set());
+  const openTier = useMemo(() => Math.min(tier, MAX_TIER), [tier]);
+  const isCollapsed = (t: number): boolean =>
+    collapsed.has(t) ? true : collapsed.has(-t) ? false : t !== openTier;
+  const toggle = (t: number): void => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      // Track explicit user intent with +t (force-collapsed) / -t
+      // (force-expanded) so toggling overrides the default-open rule.
+      const currentlyCollapsed = isCollapsed(t);
+      next.delete(t);
+      next.delete(-t);
+      next.add(currentlyCollapsed ? -t : t);
+      return next;
+    });
+  };
+
   return (
     <>
       <div style={categoryRow}>
@@ -139,21 +159,41 @@ function BuyList() {
           Cargo unlocks at Tier 5 (currently T{tier}). Reach $25M lifetime earnings to open the cargo lane.
         </div>
       )}
-      {grouped.map(({ tier: t, label, items }) => (
-        <section key={t} style={tierBlock}>
-          <h3 style={tierHeading}>{label}</h3>
-          <div style={showroomGrid}>
-            {items.map((d) => (
-              <HangarShowroomCard
-                key={d.id}
-                def={d}
-                unlocked={d.category === 'cargo' ? cargoUnlocked : d.tier <= tier}
-                isTutorialTarget={d.id === 't1.atr42'}
-              />
-            ))}
-          </div>
-        </section>
-      ))}
+      {grouped.map(({ tier: t, label, items }) => {
+        const sectionCollapsed = category === 'cargo' ? false : isCollapsed(t);
+        const tierUnlocked = items.some((d) => (d.category === 'cargo' ? cargoUnlocked : d.tier <= tier));
+        return (
+          <section key={t} style={tierBlock}>
+            {category === 'cargo' ? (
+              <h3 style={tierHeading}>{label}</h3>
+            ) : (
+              <button
+                type="button"
+                onClick={(): void => toggle(t)}
+                style={tierToggle}
+                aria-expanded={!sectionCollapsed}
+              >
+                <span style={{ transform: sectionCollapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 120ms', display: 'inline-block' }}>▾</span>
+                <span style={tierToggleLabel}>{label}</span>
+                {!tierUnlocked && <span style={tierLockPill}>LOCKED</span>}
+                <span style={tierCount}>{items.length}</span>
+              </button>
+            )}
+            {!sectionCollapsed && (
+              <div style={showroomGrid}>
+                {items.map((d) => (
+                  <HangarShowroomCard
+                    key={d.id}
+                    def={d}
+                    unlocked={d.category === 'cargo' ? cargoUnlocked : d.tier <= tier}
+                    isTutorialTarget={d.id === 't1.atr42'}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        );
+      })}
     </>
   );
 }
@@ -199,4 +239,44 @@ const tierHeading: React.CSSProperties = {
   letterSpacing: '0.14em',
   textTransform: 'uppercase',
   color: '#94A3B8',
+};
+const tierToggle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  width: '100%',
+  margin: '0 0 8px',
+  padding: '8px 10px',
+  background: 'rgba(11,17,32,0.55)',
+  border: '1px solid rgba(148,163,184,0.18)',
+  borderRadius: 8,
+  color: '#94A3B8',
+  cursor: 'pointer',
+  textAlign: 'left',
+};
+const tierToggleLabel: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 800,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  color: '#CBD5E1',
+};
+const tierLockPill: React.CSSProperties = {
+  fontSize: 8,
+  fontWeight: 800,
+  letterSpacing: '0.1em',
+  color: '#F59E0B',
+  border: '1px solid #F59E0B55',
+  borderRadius: 999,
+  padding: '1px 6px',
+};
+const tierCount: React.CSSProperties = {
+  marginLeft: 'auto',
+  fontSize: 10,
+  fontWeight: 700,
+  color: '#64748B',
+  background: 'rgba(148,163,184,0.12)',
+  borderRadius: 999,
+  padding: '1px 8px',
+  fontFeatureSettings: '"tnum" 1',
 };
