@@ -9,7 +9,7 @@ describe('engine tuning', () => {
     expect(TUNING.globalYieldMult).toBe(1);
     expect(TUNING.hubBonusPerLevel).toBe(0.05);
     expect(TUNING.conditionDecayMult).toBe(1);
-    expect(TUNING.fuelDemandMult).toBe(1);
+    expect(TUNING.fuelDemandMult).toBe(2); // restored fuel gate (Arrivals & Time update)
     expect(TUNING.repairCostMult).toBe(1);
   });
 

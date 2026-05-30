@@ -34,7 +34,10 @@ export const ENGINE_TUNING_DEFAULTS: EngineTuning = {
   globalYieldMult: 1,
   hubBonusPerLevel: 0.05,
   conditionDecayMult: 1,
-  fuelDemandMult: 1,
+  // Arrivals & Time update: strict-linear timing halved per-real-second
+  // fuel burn, which loosened the fuel gate ~2×. Default 2 restores the
+  // gate to its pre-update tightness (CLAUDE.md: strict fuel gate).
+  fuelDemandMult: 2,
   repairCostMult: 1,
 };
 
