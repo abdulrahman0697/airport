@@ -65,6 +65,28 @@ export function hubCreationCost(iata: string): number {
   return airport ? creationCostForSizeTier(airport.sizeTier) : 25_000;
 }
 
+/**
+ * Each additional hub costs more than the last, so sprawl competes
+ * fairly with leveling an existing hub. The Nth paid hub multiplies the
+ * size-tier base by HUB_CREATION_COST_GROWTH^(N-1):
+ *
+ *   1st hub  free (the starting foothold)
+ *   2nd hub  base × 1.6^0 = 1.0×
+ *   3rd hub  base × 1.6^1 = 1.6×
+ *   4th hub  base × 1.6^2 = 2.56×  …
+ *
+ * `existingHubCount` is how many hubs the player already owns. This
+ * multiplier applies ONLY to creation — `hubUpgradeCost` keeps using the
+ * flat size-tier base so leveling never inflates with hub count.
+ */
+export const HUB_CREATION_COST_GROWTH = 1.6;
+
+export function hubCreationCostScaled(iata: string, existingHubCount: number): number {
+  if (existingHubCount <= 0) return 0; // first hub is free
+  const base = hubCreationCost(iata);
+  return Math.round(base * Math.pow(HUB_CREATION_COST_GROWTH, existingHubCount - 1));
+}
+
 /** Cost to advance an existing hub from `level` to `level + 1`. */
 export function hubUpgradeCost(iata: string, currentLevel: number): number {
   if (currentLevel >= MAX_HUB_LEVEL) return Number.POSITIVE_INFINITY;

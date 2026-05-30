@@ -22,7 +22,7 @@ import {
   emptyHubManagers,
   fleetCountAtHub,
   fleetSlotsAtHub,
-  hubCreationCost,
+  hubCreationCostScaled,
   hubUpgradeCost,
   MAX_HUB_LEVEL,
 } from './hubs';
@@ -608,10 +608,10 @@ export function pickHub(state: SaveState, iata: string): SaveState {
     throw new ActionError('HUB_EXISTS', `${iata} is already a hub`);
   }
 
-  // Only the player's very first hub is free (it's the foothold
-  // granted with the starting region). Anything beyond that costs
-  // the standard creation fee, regardless of region.
-  const cost = state.hubs.length === 0 ? 0 : hubCreationCost(iata);
+  // Only the player's very first hub is free (it's the foothold granted
+  // with the starting region). Each subsequent hub costs progressively
+  // more (sprawl tax) so leveling existing hubs stays competitive.
+  const cost = hubCreationCostScaled(iata, state.hubs.length);
   if (state.cash < cost) {
     throw new ActionError('INSUFFICIENT_CASH', `Need $${cost.toLocaleString()} to add hub`);
   }
@@ -638,10 +638,10 @@ export function pickHub(state: SaveState, iata: string): SaveState {
  *  is gone; the store action still exists for any caller that wires it. */
 export const createHub = pickHub;
 
-/** Compute the cost to pick a hub at this airport given current state. */
+/** Compute the cost to pick a hub at this airport given current state.
+ *  Scales with how many hubs the player already owns (sprawl tax). */
 export function hubPickCost(state: SaveState, iata: string): number {
-  if (state.hubs.length === 0) return 0;
-  return hubCreationCost(iata);
+  return hubCreationCostScaled(iata, state.hubs.length);
 }
 
 /**

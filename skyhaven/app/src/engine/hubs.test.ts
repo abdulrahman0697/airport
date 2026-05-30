@@ -3,7 +3,9 @@ import { loadTopAirports } from '../data/airports';
 import { ActionError, createHub, openRoute, upgradeHub, buyAircraft, unlockRegion } from './actions';
 import {
   HUB_BONUS_PER_LEVEL,
+  HUB_CREATION_COST_GROWTH,
   hubCreationCost,
+  hubCreationCostScaled,
   hubUpgradeCost,
   MAX_HUB_LEVEL,
   networkBonusForRoute,
@@ -162,5 +164,31 @@ describe('hubCreationCost', () => {
   it('scales with airport size tier', () => {
     // LHR is a large_airport (sizeTier 4).
     expect(hubCreationCost('LHR')).toBe(50_000);
+  });
+});
+
+describe('hubCreationCostScaled (sprawl tax)', () => {
+  it('makes the first hub free', () => {
+    expect(hubCreationCostScaled('LHR', 0)).toBe(0);
+  });
+
+  it('charges the flat base for the second hub', () => {
+    // existingHubCount 1 → base × growth^0 = base.
+    expect(hubCreationCostScaled('LHR', 1)).toBe(50_000);
+  });
+
+  it('grows with each additional hub', () => {
+    const second = hubCreationCostScaled('LHR', 1);
+    const third = hubCreationCostScaled('LHR', 2);
+    const fourth = hubCreationCostScaled('LHR', 3);
+    expect(third).toBe(Math.round(50_000 * HUB_CREATION_COST_GROWTH));
+    expect(fourth).toBe(Math.round(50_000 * HUB_CREATION_COST_GROWTH ** 2));
+    expect(third).toBeGreaterThan(second);
+    expect(fourth).toBeGreaterThan(third);
+  });
+
+  it('does not affect upgrade cost (leveling uses the flat base)', () => {
+    // hubUpgradeCost must stay independent of how many hubs exist.
+    expect(hubUpgradeCost('LHR', 1)).toBe(Math.round(50_000 * 1.7));
   });
 });
