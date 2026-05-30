@@ -6,8 +6,8 @@ import { loadTopAirports, type Airport } from '../../data/airports';
 import { REGIONS } from '../../data/regions';
 import { conditionBand } from '../../engine/condition';
 import { haversineKm } from '../../engine/distance';
-import { cashPerSecond } from '../../engine/economy';
-import { formatPerTrip } from '../routeRevenue';
+import { legDurationMs } from '../../engine/economy';
+import { cyclePayout, formatDuration, formatPerTrip } from '../routeRevenue';
 import { hubPickCost, routeOpenCost } from '../../engine/actions';
 import {
   hubUpgradeCost,
@@ -770,10 +770,13 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
   const cost = distance > 0 ? routeOpenCost(distance) : 0;
   const canOpen = !!(selectedAc && originIata && destIata && originIata !== destIata && cost > 0 && cash >= cost);
 
-  // Estimated revenue per minute at the current state — uses the same
-  // formulas as the live engine so the player sees a realistic number.
-  const estimatedPerMin = useMemo(() => {
-    if (!selectedAc || !originIata || !destIata || distance <= 0) return 0;
+  // Estimated per-cycle payout + cycle time at the current state — uses
+  // the live engine formulas (Arrivals & Time model: revenue lands per
+  // arrival, so we show the lump per cycle and the real leg duration).
+  const estimate = useMemo(() => {
+    if (!selectedAc || !originIata || !destIata || distance <= 0) {
+      return { perCycle: 0, cycleMs: 0 };
+    }
     const baseLoad = 0.55 + 0.03 * selectedAc.upgrades.marketing;
     const estRoute = {
       id: 'est',
@@ -786,7 +789,10 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
       legProgress: 0,
       legDirection: 'outbound' as const,
     };
-    return cashPerSecond(estRoute, selectedAc, hubs) * 60;
+    return {
+      perCycle: cyclePayout(estRoute, selectedAc, hubs),
+      cycleMs: legDurationMs(estRoute, selectedAc),
+    };
   }, [selectedAc, originIata, destIata, distance, hubs]);
 
   // Route Authorization screen — Design Review v6 point 17. After
@@ -983,9 +989,9 @@ function NewRouteModal({ onClose }: { onClose: () => void }) {
                 </div>
                 <div style={routePreviewGrid}>
                   <Preview label="Distance" value={`${Math.round(distance).toLocaleString()} km`} />
-                  <Preview label="Cycle" value={`~${Math.round(distance / def.cruiseSpeedKmh * 3.6)} s`} />
+                  <Preview label="Cycle" value={`~${formatDuration(estimate.cycleMs)}`} />
                   <Preview label="Aircraft" value={def.displayName} />
-                  <Preview label="Est. revenue" value={`$${formatCash(estimatedPerMin, 1)}/min`} accent="#34D399" />
+                  <Preview label="Est. per cycle" value={`$${formatCash(estimate.perCycle, 1)}`} accent="#34D399" />
                   <Preview label="Opening fee" value={`$${formatCash(cost)}`} accent="#F4C75B" />
                   <Preview label="Demand" value="Stable" accent="#5AC8FA" />
                 </div>

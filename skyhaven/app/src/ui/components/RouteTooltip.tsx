@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { getAircraftDef } from '../../data/aircraft';
 import { conditionBand } from '../../engine/condition';
-import { cashPerSecond, legDurationMs } from '../../engine/economy';
+import { legDurationMs } from '../../engine/economy';
 import type { Route } from '../../engine/types';
 import { selectActiveEvents, selectFleet, selectHubs, useGameStore } from '../../state/store';
 import { popoverBottomCeiling, popoverTopFloor } from '../design/safeArea';
-import { formatRate } from '../format';
+import { formatCash } from '../format';
+import { cyclePayout, formatDuration } from '../routeRevenue';
 
 /**
  * Popover for a tapped in-flight plane glyph. Mirrors AirportTooltip
@@ -48,8 +49,10 @@ export function RouteTooltip({ route, x, y, onClose }: Props) {
   const def = getAircraftDef(aircraft.defId);
   if (!def) return null;
 
-  const cps = cashPerSecond(route, aircraft, hubs, events);
-  const leg = legDurationMs(route, aircraft) / 1000;
+  const perCycle = cyclePayout(route, aircraft, hubs, events);
+  const cycleMs = legDurationMs(route, aircraft);
+  // Time left until this plane lands and pays out (legProgress is 0..1).
+  const remainingMs = isFinite(cycleMs) ? Math.max(0, (1 - route.legProgress) * cycleMs) : 0;
   const band = conditionBand(aircraft.condition);
   const condColor = band === 'normal' ? '#34D399' : band === 'degraded' ? '#F59E0B' : '#F87171';
 
@@ -78,11 +81,15 @@ export function RouteTooltip({ route, x, y, onClose }: Props) {
         )}
       </div>
       <div style={meta}>
-        Distance: {Math.round(route.distanceKm).toLocaleString()} km · Leg {leg.toFixed(1)}s
+        Distance: {Math.round(route.distanceKm).toLocaleString()} km · Cycle {formatDuration(cycleMs)}
       </div>
       <div style={revenueRow}>
-        <span style={meta}>Revenue</span>
-        <span style={revenue}>{formatRate(cps)}</span>
+        <span style={meta}>Arrives in</span>
+        <span style={revenue}>{formatDuration(remainingMs)}</span>
+      </div>
+      <div style={revenueRow}>
+        <span style={meta}>Per cycle</span>
+        <span style={revenue}>+${formatCash(perCycle)}</span>
       </div>
     </div>
   );
