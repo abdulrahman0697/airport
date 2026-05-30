@@ -7,8 +7,10 @@ import {
   closeRoute,
   openRoute,
   repairAircraft,
+  sellAircraft,
   setRoutePricing,
 } from './actions';
+import { getAircraftDef } from '../data/aircraft';
 import { loadedTestState } from './test-fixtures';
 
 function freshState() {
@@ -58,6 +60,46 @@ describe('buyAircraft', () => {
     const s0 = { ...freshState(), tierUnlocked: 1 };
     const t4 = AIRCRAFT_DEFS.find((a) => a.tier === 4)!;
     expect(() => buyAircraft(s0, t4.id)).toThrow(ActionError);
+  });
+});
+
+describe('sellAircraft', () => {
+  it('removes the aircraft and refunds 50% of base × condition', () => {
+    let s = freshState();
+    s = buyAircraft(s, 't1.atr42', 'LHR');
+    const ac = s.fleet[s.fleet.length - 1]!;
+    const def = getAircraftDef('t1.atr42')!;
+    const before = s.cash;
+    const count = s.fleet.length;
+    const s1 = sellAircraft(s, ac.uid);
+    expect(s1.fleet.length).toBe(count - 1);
+    expect(s1.fleet.find((a) => a.uid === ac.uid)).toBeUndefined();
+    // Full-condition refund = 50% of base.
+    expect(s1.cash).toBe(before + Math.round(def.basePurchaseCost * 0.5));
+  });
+
+  it('refuses to sell an aircraft that is on a route', () => {
+    const s = freshState();
+    const onRoute = s.fleet.find((a) => a.routeId !== null);
+    expect(onRoute).toBeDefined();
+    try {
+      sellAircraft(s, onRoute!.uid);
+      throw new Error('expected AIRCRAFT_BUSY');
+    } catch (e) {
+      expect((e as ActionError).code).toBe('AIRCRAFT_BUSY');
+    }
+  });
+
+  it('a damaged aircraft refunds proportionally less', () => {
+    let s = freshState();
+    s = buyAircraft(s, 't1.atr42', 'LHR');
+    const idx = s.fleet.length - 1;
+    s = { ...s, fleet: s.fleet.map((a, i) => (i === idx ? { ...a, condition: 50 } : a)) };
+    const ac = s.fleet[idx]!;
+    const def = getAircraftDef('t1.atr42')!;
+    const before = s.cash;
+    const s1 = sellAircraft(s, ac.uid);
+    expect(s1.cash).toBe(before + Math.round(def.basePurchaseCost * 0.5 * 0.5));
   });
 });
 

@@ -7,7 +7,7 @@
  * Uses the design-system Modal primitive so motion / dismiss
  * behaviour matches every future modal in the game.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { conditionBand } from '../../engine/condition';
 import { getAircraftDef } from '../../data/aircraft';
 import type { OwnedAircraft } from '../../engine/types';
@@ -30,8 +30,36 @@ export function AircraftDetailModal({
   const tailColor = useGameStore(selectTailColor);
   const cash = useGameStore(selectCash);
   const applyUpgrade = useGameStore((s) => s.applyUpgrade);
+  const sell = useGameStore((s) => s.sellAircraft);
   const def = aircraft ? getAircraftDef(aircraft.defId) : null;
   const [error, setError] = useState<string | null>(null);
+  const [confirmSell, setConfirmSell] = useState(false);
+
+  // Resale value mirrors the engine: 50% of base price scaled by
+  // condition. Shown on the button so the player knows the payout.
+  const refund = aircraft && def
+    ? Math.round(def.basePurchaseCost * 0.5 * (aircraft.condition / 100))
+    : 0;
+  const onRoute = !!aircraft?.routeId;
+
+  // Reset the sell confirmation whenever the modal targets a different
+  // aircraft (or closes), so a pending confirm never leaks across planes.
+  useEffect(() => { setConfirmSell(false); setError(null); }, [aircraft?.uid]);
+
+  const trySell = (uid: string): void => {
+    const res = sell(uid);
+    if (res.ok) {
+      haptics.heavy();
+      sfx.play('upgrade_complete');
+      setError(null);
+      setConfirmSell(false);
+      onClose();
+    } else {
+      haptics.warning();
+      setError(res.message);
+      setConfirmSell(false);
+    }
+  };
 
   const tryUpgrade = (uid: string, kind: UpgradeKind): void => {
     const res = applyUpgrade(uid, kind);
@@ -157,6 +185,32 @@ export function AircraftDetailModal({
             </div>
 
             {error && <div style={errorText}>{error}</div>}
+
+            {/* Sell aircraft — recoups 50% of base price scaled by
+                condition, so you can trade up to better planes. Blocked
+                while the plane is flying a route. Two-tap confirm since
+                selling is irreversible. */}
+            <div style={sellRow}>
+              {onRoute ? (
+                <div style={sellHint}>Close this aircraft's route before selling.</div>
+              ) : !confirmSell ? (
+                <button style={sellBtn} onClick={(): void => setConfirmSell(true)}>
+                  Sell aircraft · +${formatCash(refund)}
+                </button>
+              ) : (
+                <div style={sellConfirmRow}>
+                  <button
+                    style={sellConfirmBtn}
+                    onClick={(): void => aircraft && trySell(aircraft.uid)}
+                  >
+                    Confirm · +${formatCash(refund)}
+                  </button>
+                  <button style={sellCancelBtn} onClick={(): void => setConfirmSell(false)}>
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -356,4 +410,34 @@ const errorText: React.CSSProperties = {
   marginTop: SPACE.s,
   padding: '8px 10px', fontSize: 11, color: COLOR.danger,
   background: COLOR.dangerDim, borderRadius: 6,
+};
+const sellRow: React.CSSProperties = {
+  marginTop: SPACE.m,
+  paddingTop: SPACE.m,
+  borderTop: `1px solid ${COLOR.border.soft}`,
+};
+const sellHint: React.CSSProperties = {
+  fontSize: 11, color: COLOR.ink.muted, textAlign: 'center', padding: '6px 0',
+};
+const sellBtn: React.CSSProperties = {
+  width: '100%', minHeight: 44, padding: '10px 12px',
+  fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+  color: COLOR.danger,
+  background: 'transparent',
+  border: `1px solid ${COLOR.danger}66`,
+  borderRadius: RADIUS.m, cursor: 'pointer',
+};
+const sellConfirmRow: React.CSSProperties = { display: 'flex', gap: 8 };
+const sellConfirmBtn: React.CSSProperties = {
+  flex: 1, minHeight: 44, padding: '10px 12px',
+  fontSize: 13, fontWeight: 800, fontFamily: 'inherit',
+  color: '#fff', background: COLOR.danger,
+  border: 'none', borderRadius: RADIUS.m, cursor: 'pointer',
+};
+const sellCancelBtn: React.CSSProperties = {
+  minHeight: 44, padding: '10px 16px',
+  fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+  color: COLOR.ink.secondary, background: 'transparent',
+  border: `1px solid ${COLOR.border.soft}`,
+  borderRadius: RADIUS.m, cursor: 'pointer',
 };

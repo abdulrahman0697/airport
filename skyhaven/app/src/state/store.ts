@@ -38,6 +38,7 @@ import {
   hireManager as hireManagerAction,
   openRoute as openRouteAction,
   repairAircraft as repairAircraftAction,
+  sellAircraft as sellAircraftAction,
   resetTutorial as resetTutorialAction,
   setAirlineIdentity as setAirlineIdentityAction,
   setOfflineSummary as setOfflineSummaryAction,
@@ -79,6 +80,7 @@ interface GameStore {
   applyUpgrade: (aircraftUid: string, kind: UpgradeKind) => ActionResult;
   bulkUpgradeHubFleet: (hubIata: string, budget: number) => ActionResult;
   repairAircraft: (aircraftUid: string, mode?: 'quick' | 'full' | 'premium') => ActionResult;
+  sellAircraft: (aircraftUid: string) => ActionResult;
   signFuelContract: (contractId: string) => ActionResult;
   upgradeFuelCapacity: () => ActionResult;
   unlockRegion: (regionId: number) => ActionResult;
@@ -178,6 +180,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     runAction(set, get, (s) => bulkUpgradeHubFleetAction(s, hubIata, budget)),
   repairAircraft: (aircraftUid, mode) =>
     runAction(set, get, (s) => repairAircraftAction(s, aircraftUid, mode)),
+  sellAircraft: (aircraftUid) => runAction(set, get, (s) => sellAircraftAction(s, aircraftUid)),
   signFuelContract: (contractId) =>
     runAction(set, get, (s) => signFuelContractAction(s, contractId)),
   upgradeFuelCapacity: () =>
