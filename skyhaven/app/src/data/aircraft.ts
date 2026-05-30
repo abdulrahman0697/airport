@@ -19,10 +19,10 @@ export const AIRCRAFT_DEFS: readonly AircraftDef[] = [
   // ── Tier 1 — Regional Turboprop ────────────────────────────────────
   { id: 't1.atr42', displayName: 'ATR 42', tier: 1, category: 'passenger',
     capacity: 48, rangeKm: 1450, cruiseSpeedKmh: 500, fuelPerHour: 280,
-    basePurchaseCost: 25_000, conditionDecayRate: 0.25, artId: 'placeholder.t1.atr42' },
+    basePurchaseCost: 50_000, conditionDecayRate: 0.25, artId: 'placeholder.t1.atr42' },
   { id: 't1.atr72', displayName: 'ATR 72', tier: 1, category: 'passenger',
     capacity: 72, rangeKm: 1500, cruiseSpeedKmh: 510, fuelPerHour: 320,
-    basePurchaseCost: 45_000, conditionDecayRate: 0.24, artId: 'placeholder.t1.atr72' },
+    basePurchaseCost: 60_000, conditionDecayRate: 0.24, artId: 'placeholder.t1.atr72' },
   { id: 't1.dash8', displayName: 'Dash 8 Q400', tier: 1, category: 'passenger',
     capacity: 78, rangeKm: 2040, cruiseSpeedKmh: 640, fuelPerHour: 380,
     basePurchaseCost: 65_000, conditionDecayRate: 0.23, artId: 'placeholder.t1.dash8' },
@@ -31,7 +31,7 @@ export const AIRCRAFT_DEFS: readonly AircraftDef[] = [
     basePurchaseCost: 80_000, conditionDecayRate: 0.22, artId: 'placeholder.t1.crj200' },
   { id: 't1.saab340', displayName: 'Saab 340', tier: 1, category: 'passenger',
     capacity: 34, rangeKm: 1730, cruiseSpeedKmh: 522, fuelPerHour: 240,
-    basePurchaseCost: 18_000, conditionDecayRate: 0.26, artId: 'placeholder.t1.saab340' },
+    basePurchaseCost: 40_000, conditionDecayRate: 0.26, artId: 'placeholder.t1.saab340' },
 
   // ── Tier 2 — Regional Jet ──────────────────────────────────────────
   { id: 't2.e170', displayName: 'E170', tier: 2, category: 'passenger',
@@ -39,7 +39,7 @@ export const AIRCRAFT_DEFS: readonly AircraftDef[] = [
     basePurchaseCost: 240_000, conditionDecayRate: 0.22, artId: 'placeholder.t2.e170' },
   { id: 't2.e190', displayName: 'E190', tier: 2, category: 'passenger',
     capacity: 100, rangeKm: 4540, cruiseSpeedKmh: 870, fuelPerHour: 820,
-    basePurchaseCost: 360_000, conditionDecayRate: 0.20, artId: 'placeholder.t2.e190' },
+    basePurchaseCost: 400_000, conditionDecayRate: 0.20, artId: 'placeholder.t2.e190' },
   { id: 't2.crj900', displayName: 'CRJ-900', tier: 2, category: 'passenger',
     capacity: 90, rangeKm: 2956, cruiseSpeedKmh: 829, fuelPerHour: 780,
     basePurchaseCost: 320_000, conditionDecayRate: 0.21, artId: 'placeholder.t2.crj900' },
