@@ -18,7 +18,7 @@ import { useUiStore } from '../../state/uiStore';
 import { formatCash } from '../format';
 
 interface Pop { key: number; destIata: string; amount: number }
-const LIFETIME_MS = 2600;
+const LIFETIME_MS = 3000;
 
 export function ArrivalPops() {
   const mapMode = useUiStore((s) => s.mapMode);
@@ -78,7 +78,7 @@ const card = (tail: string): React.CSSProperties => ({
   padding: '5px 12px',
   boxShadow: '0 6px 16px rgba(0,0,0,0.45)',
   backdropFilter: 'blur(6px)',
-  animation: 'arrivalRise 2.6s ease-out forwards',
+  animation: 'arrivalRise 3s ease-out forwards',
 });
 const amount: React.CSSProperties = {
   fontSize: 13,
