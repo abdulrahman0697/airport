@@ -12,6 +12,7 @@ initializeApp();
 
 export { submitLeaderboardScore } from './leaderboards';
 export { deleteAccount } from './deleteAccount';
+export { checkAirlineName, claimAirlineName } from './airlineName';
 export {
   claimFriendCode,
   sendFriendRequest,

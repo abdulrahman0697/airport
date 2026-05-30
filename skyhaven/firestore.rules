@@ -24,6 +24,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Airline-name reservation index (unique leaderboard names). Reads
+    // allow the client to probe availability; writes go only through the
+    // claimAirlineName Cloud Function so the claim-or-reject is atomic.
+    match /airlineNames/{name} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
     // Friend graph (Phase 12). Cloud Functions own creation so doc IDs
     // stay canonical and statuses can't be forged. Participants can
     // update (accept) or delete (decline / unfriend) directly.

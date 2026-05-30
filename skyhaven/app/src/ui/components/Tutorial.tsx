@@ -12,6 +12,7 @@ import { Button } from '../design/Button';
 import { COLOR, RADIUS, SPACE } from '../design/tokens';
 import { usePanelStore, type PanelId } from './PanelHost';
 import { useUiStore } from '../../state/uiStore';
+import { checkAirlineName, claimAirlineName } from '../../backend/airlineName';
 import type { SaveState } from '../../engine/types';
 
 /**
@@ -391,6 +392,12 @@ function useStripPlacement(targetRect: DOMRect | null): 'top' | 'bottom' {
 
 // ─── Founder Card (identity moment) ─────────────────────────────────
 const NAME_SUGGESTIONS = ['SkyHaven Air', 'HavenJet', 'GulfWing'];
+
+/** Random 4-digit suffix ("_1845") appended to quick-pick names so two
+ *  players who choose the same suggestion still get unique airlines. */
+function randomNameSuffix(): string {
+  return `_${1000 + Math.floor(Math.random() * 9000)}`;
+}
 const SWATCHES = ['#5AC8FA', '#F4C75B', '#8B5CF6', '#F87171', '#34D399', '#FFFFFF'];
 
 function FounderCard({
@@ -400,9 +407,73 @@ function FounderCard({
   tailColor: string;
   onConfirm: (name: string, color: string) => void;
 }) {
-  const [name, setName] = useState(airlineName || NAME_SUGGESTIONS[0]!);
+  // Two name modes:
+  //  - 'suggested': the player picked a quick-pick base; we auto-append
+  //    a random _NNNN suffix so two players who pick the same base still
+  //    end up unique (e.g. "SkyHaven Air_1845"). Approved without a
+  //    manual availability gate (the suffix makes collisions vanishingly
+  //    rare, and claimAirlineName re-checks server-side at confirm).
+  //  - 'custom': the player typed their own name; it must be unique, so
+  //    we live-check availability and block Register when taken.
+  const [mode, setMode] = useState<'suggested' | 'custom'>('suggested');
+  const [base, setBase] = useState(NAME_SUGGESTIONS[0]!);
+  const [suffix, setSuffix] = useState(() => randomNameSuffix());
+  const [custom, setCustom] = useState(airlineName || '');
+  const name = mode === 'suggested' ? `${base}${suffix}` : custom;
   const [color, setColor] = useState(tailColor);
   const [editing, setEditing] = useState(false);
+
+  // Live availability for custom names. 'idle' until the player types.
+  const [avail, setAvail] = useState<'idle' | 'checking' | 'free' | 'taken'>('idle');
+  useEffect(() => {
+    if (mode !== 'custom') { setAvail('idle'); return; }
+    const trimmed = custom.trim();
+    if (!trimmed) { setAvail('idle'); return; }
+    setAvail('checking');
+    let cancelled = false;
+    const id = window.setTimeout(() => {
+      void checkAirlineName(trimmed).then((r) => {
+        if (!cancelled) setAvail(r.available ? 'free' : 'taken');
+      });
+    }, 400);
+    return () => { cancelled = true; window.clearTimeout(id); };
+  }, [mode, custom]);
+
+  // Register is blocked only when a custom name is confirmed-taken or empty.
+  const canRegister = mode === 'suggested'
+    ? true
+    : custom.trim().length > 0 && avail !== 'taken' && avail !== 'checking';
+
+  const [claiming, setClaiming] = useState(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
+  const [confirmedName, setConfirmedName] = useState<string | null>(null);
+
+  // Atomically reserve the chosen name, then advance to the certificate.
+  // Handles the race where someone else grabs the name between the live
+  // check and the tap: a custom name surfaces the error; a suggested name
+  // silently re-rolls its suffix and retries once.
+  const registerName = async (): Promise<void> => {
+    if (claiming) return;
+    setClaiming(true);
+    setClaimError(null);
+    let candidate = name;
+    let res = await claimAirlineName(candidate);
+    if (!res.ok && res.code === 'taken' && mode === 'suggested') {
+      const retrySuffix = randomNameSuffix();
+      setSuffix(retrySuffix);
+      candidate = `${base}${retrySuffix}`;
+      res = await claimAirlineName(candidate);
+    }
+    setClaiming(false);
+    if (!res.ok) {
+      setClaimError(res.message);
+      if (mode === 'custom') setAvail('taken');
+      return;
+    }
+    // Carry the server-confirmed display name into the certificate.
+    setConfirmedName(res.name);
+    setPhase('certificate');
+  };
   // Design Review v4 — point 4. Two phases: identity setup and the
   // boarding-pass-style Founder Certificate stamp moment.
   const [phase, setPhase] = useState<'setup' | 'certificate'>('setup');
@@ -413,11 +484,15 @@ function FounderCard({
   const [livery, setLivery] = useState<'classic' | 'modern' | 'premium'>('modern');
 
   if (phase === 'certificate') {
+    // confirmedName is the server-reserved display name (set by
+    // registerName); fall back to the local name if the claim ran in
+    // fail-safe (offline) mode.
+    const finalName = confirmedName ?? name.trim() ?? 'SkyHaven Air';
     return (
       <FounderCertificate
-        name={name.trim() || 'SkyHaven Air'}
+        name={finalName}
         color={color}
-        onContinue={(): void => onConfirm(name.trim() || 'SkyHaven Air', color)}
+        onContinue={(): void => onConfirm(finalName, color)}
       />
     );
   }
@@ -491,19 +566,31 @@ function FounderCard({
               {NAME_SUGGESTIONS.map((s) => (
                 <button
                   key={s}
-                  onClick={(): void => setName(s)}
+                  onClick={(): void => {
+                    setMode('suggested');
+                    setBase(s);
+                    setSuffix(randomNameSuffix());
+                  }}
                   style={{
                     ...suggestionPill,
-                    borderColor: name === s ? color : 'rgba(148,163,184,0.3)',
-                    background: name === s ? `${color}22` : 'rgba(11,17,32,0.5)',
-                    color: name === s ? color : COLOR.ink.secondary,
+                    borderColor: mode === 'suggested' && base === s ? color : 'rgba(148,163,184,0.3)',
+                    background: mode === 'suggested' && base === s ? `${color}22` : 'rgba(11,17,32,0.5)',
+                    color: mode === 'suggested' && base === s ? color : COLOR.ink.secondary,
                   }}
                 >
                   {s}
                 </button>
               ))}
             </div>
-            <button onClick={(): void => setEditing(true)} style={customizeBtn}>
+            {mode === 'suggested' && (
+              <div style={suffixNote}>
+                You'll register as <b style={{ color }}>{base}{suffix}</b> — the number keeps your airline unique.
+              </div>
+            )}
+            <button
+              onClick={(): void => { setMode('custom'); setEditing(true); }}
+              style={customizeBtn}
+            >
               Customize name …
             </button>
           </>
@@ -512,12 +599,27 @@ function FounderCard({
             <div style={founderHint}>YOUR AIRLINE NAME</div>
             <input
               autoFocus
-              value={name}
-              onChange={(e): void => setName(e.target.value.slice(0, 20))}
-              style={nameInput}
+              value={custom}
+              onChange={(e): void => { setMode('custom'); setCustom(e.target.value.slice(0, 20)); }}
+              style={{
+                ...nameInput,
+                borderColor: avail === 'taken' ? '#F87171' : avail === 'free' ? '#34D399' : nameInput.borderColor,
+              }}
               maxLength={20}
-              placeholder="SkyHaven Air"
+              placeholder="Your unique airline name"
             />
+            <div style={availNote(avail)}>
+              {avail === 'checking' && 'Checking availability…'}
+              {avail === 'free' && '✓ Available'}
+              {avail === 'taken' && '✕ Already taken — try another name'}
+              {avail === 'idle' && 'Must be unique across all players'}
+            </div>
+            <button
+              onClick={(): void => { setEditing(false); setMode('suggested'); }}
+              style={customizeBtn}
+            >
+              ← Back to quick pick
+            </button>
           </>
         )}
 
@@ -544,10 +646,12 @@ function FounderCard({
             size="lg"
             fullWidth
             hapticOnPress="heavy"
-            onClick={(): void => setPhase('certificate')}
+            disabled={!canRegister || claiming}
+            onClick={(): void => { void registerName(); }}
           >
-            Register Airline  →
+            {claiming ? 'Reserving…' : 'Register Airline  →'}
           </Button>
+          {claimError && <div style={availNote('taken')}>{claimError}</div>}
         </div>
       </motion.div>
     </motion.div>
@@ -1143,6 +1247,18 @@ const nameInput: React.CSSProperties = {
   minHeight: 44,
   boxSizing: 'border-box',
 };
+const suffixNote: React.CSSProperties = {
+  fontSize: 11,
+  lineHeight: 1.4,
+  color: COLOR.ink.secondary,
+  margin: '2px 2px 6px',
+};
+const availNote = (state: 'idle' | 'checking' | 'free' | 'taken'): React.CSSProperties => ({
+  fontSize: 11,
+  fontWeight: 700,
+  margin: '6px 2px 0',
+  color: state === 'taken' ? '#F87171' : state === 'free' ? '#34D399' : COLOR.ink.muted,
+});
 const swatchRow: React.CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
