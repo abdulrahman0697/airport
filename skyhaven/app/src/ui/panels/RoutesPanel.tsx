@@ -6,7 +6,7 @@ import { loadTopAirports, type Airport } from '../../data/airports';
 import { REGIONS } from '../../data/regions';
 import { conditionBand } from '../../engine/condition';
 import { haversineKm } from '../../engine/distance';
-import { cashPerSecond } from '../../engine/economy';
+import { formatPerTrip } from '../routeRevenue';
 import { hubPickCost, routeOpenCost } from '../../engine/actions';
 import {
   hubUpgradeCost,
@@ -27,7 +27,7 @@ import {
 import { countryName } from '../countryNames';
 import { Button } from '../design/Button';
 import { PanelHeader } from '../design/PanelHeader';
-import { formatCash, formatRate } from '../format';
+import { formatCash } from '../format';
 import { haptics } from '../juice/haptics';
 import { sfx } from '../juice/sfx';
 import { track } from '../../backend/analytics';
@@ -167,7 +167,7 @@ function RouteRow({ route }: { route: Route }) {
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={rateText}>{formatRate(cps)}</div>
+          <div style={rateText}>{perTrip ?? '—'}</div>
           <div style={{ color: condColor, fontSize: 11, marginTop: 2 }}>
             {aircraft.condition.toFixed(0)}%  ·  {Math.round(route.distanceKm).toLocaleString()} km
           </div>

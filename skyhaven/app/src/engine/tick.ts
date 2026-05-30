@@ -264,15 +264,21 @@ export function tick(state: SaveState, ctx: TickContext): SaveState {
     let legBudget = 50;
     while (progress >= 1 && legBudget-- > 0) {
       progress -= 1;
+      // `direction` here is the leg just flown: outbound (origin→dest)
+      // arrives at destIata; inbound (dest→origin) arrives back at
+      // originIata. Capture before flipping for the next leg.
+      const arrivedAt = direction === 'outbound' ? r.destIata : r.originIata;
       direction = direction === 'outbound' ? 'inbound' : 'outbound';
       const effectiveCondition = Math.max(0, aircraft.condition - conditionDelta);
-      revenueThisTick += legRevenue(
+      const legPay = legRevenue(
         r,
         { ...aircraft, condition: effectiveCondition },
         state.hubs,
         running,
         globalYieldMult,
       );
+      revenueThisTick += legPay;
+      if (legPay > 0) arrivalSink.push({ routeId: r.id, destIata: arrivedAt, amount: legPay });
       hoursAccumulated += gameHoursPerLeg;
       conditionDelta += def.conditionDecayRate * TUNING.conditionDecayMult * gameHoursPerLeg;
     }

@@ -86,3 +86,24 @@ describe('tick — invariants', () => {
     expect(s1.cash).toBe(s.cash);
   });
 });
+
+describe('arrivals output (Arrivals & Time update)', () => {
+  it('emits an arrival with a positive amount when a leg completes', () => {
+    const s0 = loadedTestState();
+    // A large dt guarantees at least one leg lands.
+    tick(s0, { nowMs: 10_000, dtMs: 3_600_000 });
+    const arrivals = drainArrivals();
+    expect(arrivals.length).toBeGreaterThan(0);
+    expect(arrivals[0]!.amount).toBeGreaterThan(0);
+    expect(typeof arrivals[0]!.destIata).toBe('string');
+    // Draining again is empty (buffer cleared).
+    expect(drainArrivals().length).toBe(0);
+  });
+
+  it('clears stale arrivals at the start of each tick', () => {
+    const s0 = loadedTestState();
+    tick(s0, { nowMs: 10_000, dtMs: 3_600_000 }); // fills the buffer
+    tick(s0, { nowMs: 20_000, dtMs: 1 });          // tiny dt: no landing, resets buffer
+    expect(drainArrivals().length).toBe(0);
+  });
+});

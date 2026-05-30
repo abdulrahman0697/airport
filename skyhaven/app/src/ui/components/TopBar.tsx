@@ -8,6 +8,7 @@ import {
   selectCash,
   selectHubs,
   selectLifetime,
+  selectRecentArrivals,
   selectRoutes,
   selectTailColor,
   selectTier,
@@ -15,7 +16,7 @@ import {
 } from '../../state/store';
 import { useUiStore } from '../../state/uiStore';
 import { TierRing } from '../design/TierRing';
-import { formatRate } from '../format';
+import { formatCash } from '../format';
 import { EcoBadge } from './EcoBadge';
 import { usePanelStore } from './PanelHost';
 import { RollingCash } from './RollingCash';
@@ -29,6 +30,7 @@ export function TopBar() {
   const hubs = useGameStore(selectHubs);
   const activeEvents = useGameStore(selectActiveEvents);
   const routes = useGameStore(selectRoutes);
+  const recentArrivals = useGameStore(selectRecentArrivals);
   const state = useGameStore((s) => s.state);
   const open = usePanelStore((s) => s.open);
   const openJourney = useUiStore((s) => s.setEmpireJourneyOpen);
@@ -79,11 +81,16 @@ export function TopBar() {
   // Design Review v3 — point 8. "No active routes" reads as truthful;
   // "0/min" reads as broken.
   const hasIncome = perSec > 0;
-  const rateText = hasIncome
-    ? formatRate(perSec)
+  // Arrivals & Time update: revenue lands on arrival, so the readout
+  // shows the most recent landing ("DOH +$1.2K") instead of a /min rate.
+  const lastArrival = recentArrivals.length > 0 ? recentArrivals[recentArrivals.length - 1]! : null;
+  const rateText = lastArrival
+    ? `${lastArrival.destIata} +$${formatCash(lastArrival.amount)}`
     : routes.length === 0
       ? 'No active routes'
-      : 'Spooling up…';
+      : hasIncome
+        ? 'In flight…'
+        : 'Spooling up…';
 
   // Design Review v5 — point 8. The Beginner Top Bar shows only the
   // three essentials in the very first session: Cash / Income / Next

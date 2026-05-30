@@ -12,6 +12,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { DailyReward } from './components/DailyReward';
 import { FuelAlerts } from './components/FuelAlerts';
 import { FuelEmptyOffer } from './components/FuelEmptyOffer';
+import { ArrivalPops } from './components/ArrivalPops';
 import { GameClock } from './components/GameClock';
 import { MonetizeOffers } from './components/MonetizeOffers';
 import { FirstFlightStory } from './components/FirstFlightStory';
@@ -87,6 +88,7 @@ export function App() {
       <HomeShell />
       <MapLiveTicker />
       <GameClock />
+      <ArrivalPops />
       <MoneyTrailLayer />
       <PanelHost />
       <GoalChainCard />

@@ -55,8 +55,20 @@ import type { UpgradeKind } from '../engine/upgrades';
 
 export type ActionResult = { ok: true } | { ok: false; code: string; message: string };
 
+/** A landing surfaced to the UI (transient — never persisted). */
+export interface RecentArrival extends ArrivalEvent {
+  /** Wall-clock ms of the arrival. */
+  at: number;
+  /** Monotonic key for stable React lists / one-shot animations. */
+  key: number;
+}
+
 interface GameStore {
   state: SaveState | null;
+  /** Rolling tail of the latest arrivals for the UI (capped, transient). */
+  recentArrivals: RecentArrival[];
+  /** Internal monotonic counter backing `RecentArrival.key`. */
+  _arrivalSeq: number;
   setState: (next: SaveState) => void;
   applyTick: (ctx: TickContext) => void;
 
@@ -134,11 +146,25 @@ function normaliseState(next: SaveState): SaveState {
 
 export const useGameStore = create<GameStore>((set, get) => ({
   state: null,
+  recentArrivals: [],
+  _arrivalSeq: 0,
   setState: (next): void => set({ state: normaliseState(next) }),
   applyTick: (ctx): void => {
     const cur = get().state;
     if (!cur) return;
-    set({ state: tick(cur, ctx) });
+    const next = tick(cur, ctx);
+    const arrivals = drainArrivals();
+    if (arrivals.length === 0) {
+      set({ state: next });
+      return;
+    }
+    // Keep a short, transient (non-persisted) tail of recent arrivals for
+    // the UI readout + on-map money pops. Capped so a big offline
+    // catch-up tick (hundreds of legs) can't balloon it.
+    let seq = get()._arrivalSeq;
+    const stamped: RecentArrival[] = arrivals.map((a) => ({ ...a, at: ctx.nowMs, key: ++seq }));
+    const merged = [...get().recentArrivals, ...stamped].slice(-12);
+    set({ state: next, recentArrivals: merged, _arrivalSeq: seq });
   },
   buyAircraft: (defId, hubIata) => runAction(set, get, (s) => buyAircraftAction(s, defId, hubIata)),
   openRoute: (originIata, destIata, aircraftUid, pricing) =>
@@ -233,6 +259,7 @@ export const selectHubs = (s: GameStore) => s.state?.hubs ?? EMPTY_HUBS;
 export const selectUnlockedRegions = (s: GameStore) => s.state?.unlockedRegions ?? EMPTY_NUMBERS;
 export const selectActiveEvents = (s: GameStore) => s.state?.activeEvents ?? EMPTY_EVENTS;
 export const selectCollectibles = (s: GameStore) => s.state?.collectibles ?? EMPTY_COLLECTIBLES;
+export const selectRecentArrivals = (s: GameStore): readonly RecentArrival[] => s.recentArrivals;
 export const selectVintage = (s: GameStore) => s.state?.vintage ?? EMPTY_STRINGS;
 export const selectAchievements = (s: GameStore) => s.state?.achievements ?? EMPTY_STRINGS;
 export const selectDailyMissions = (s: GameStore) => s.state?.dailyMissions ?? null;
