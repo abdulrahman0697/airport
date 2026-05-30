@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from './initialState';
 import { loadedTestState } from './test-fixtures';
-import { TICK_HZ, TICK_MS, tick } from './tick';
+import { TICK_HZ, TICK_MS, drainArrivals, tick } from './tick';
 
 describe('tick constants', () => {
   it('runs at 10 Hz', () => {
