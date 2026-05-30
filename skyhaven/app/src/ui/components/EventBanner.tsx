@@ -82,7 +82,9 @@ export function EventBanner() {
 // ─── Styles ──────────────────────────────────────────────────────────
 const shell: React.CSSProperties = {
   position: 'fixed',
-  top: 'calc(var(--world-top) + 8px)',
+  // Pushed below the centered GameClock chip (which sits at +8px) so the
+  // event banner row doesn't cover the Day/time readout.
+  top: 'calc(var(--world-top) + 44px)',
   left: 10,
   right: 64, // leave space for FuelGauge on the right
   display: 'flex',
