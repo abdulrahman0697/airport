@@ -102,6 +102,12 @@ interface UiStore {
    */
   routesTabIntent: 'routes' | 'hubs' | 'regions' | null;
   setRoutesTabIntent: (v: UiStore['routesTabIntent']) => void;
+  /**
+   * When true, RoutesPanel opens straight onto the New Route screen and
+   * resets this. Set by the map-view "+ Add route" shortcut.
+   */
+  openNewRoute: boolean;
+  setOpenNewRoute: (v: boolean) => void;
 }
 
 export const useUiStore = create<UiStore>((set) => ({
@@ -133,4 +139,6 @@ export const useUiStore = create<UiStore>((set) => ({
   setFleetTabIntent: (v): void => set({ fleetTabIntent: v }),
   routesTabIntent: null,
   setRoutesTabIntent: (v): void => set({ routesTabIntent: v }),
+  openNewRoute: false,
+  setOpenNewRoute: (v): void => set({ openNewRoute: v }),
 }));

@@ -46,6 +46,16 @@ export function RoutesPanel() {
       setRoutesTabIntent(null);
     }
   }, [routesTabIntent, setRoutesTabIntent]);
+  // Map-view "+ Add route" shortcut opens straight onto the New Route screen.
+  const openNewRoute = useUiStore((s) => s.openNewRoute);
+  const setOpenNewRoute = useUiStore((s) => s.setOpenNewRoute);
+  useEffect(() => {
+    if (openNewRoute) {
+      setTab('routes');
+      setShowNew(true);
+      setOpenNewRoute(false);
+    }
+  }, [openNewRoute, setOpenNewRoute]);
 
   return (
     <div style={shell}>

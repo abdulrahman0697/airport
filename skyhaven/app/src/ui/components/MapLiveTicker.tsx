@@ -21,6 +21,9 @@ import {
 } from '../../state/store';
 import { useUiStore } from '../../state/uiStore';
 import { cashPerSecond } from '../../engine/economy';
+import { usePanelStore } from './PanelHost';
+import { haptics } from '../juice/haptics';
+import { sfx } from '../juice/sfx';
 
 interface TickerItem {
   id: string;
@@ -36,6 +39,8 @@ export function MapLiveTicker() {
   const hubs = useGameStore(selectHubs);
   const tailColor = useGameStore(selectTailColor);
   const activeEvents = useGameStore(selectActiveEvents);
+  const openPanel = usePanelStore((s) => s.open);
+  const setOpenNewRoute = useUiStore((s) => s.setOpenNewRoute);
 
   const liveCount = routes.length;
 
@@ -98,6 +103,21 @@ export function MapLiveTicker() {
         <span style={pillText}>{liveCount} ACTIVE {liveCount === 1 ? 'ROUTE' : 'ROUTES'}</span>
       </div>
 
+      {/* Quick "+ Add route" shortcut — jumps straight to the New Route
+          screen (also reachable from Home / Operations). */}
+      <button
+        onClick={(): void => {
+          haptics.light();
+          sfx.tick();
+          setOpenNewRoute(true);
+          openPanel('routes');
+        }}
+        style={addRouteBtn(tailColor)}
+        aria-label="Add a new route"
+      >
+        + Add route
+      </button>
+
       {/* Ticker bar at the bottom of the map (above tabs + goal chain). */}
       <div style={tickerBar} data-popover-block-bottom>
         <div style={tickerLabel(tailColor)}>LIVE NETWORK</div>
@@ -112,7 +132,10 @@ export function MapLiveTicker() {
 
 const pill = (tail: string): React.CSSProperties => ({
   position: 'fixed',
-  top: 'calc(env(safe-area-inset-top, 0px) + 76px)',
+  // Sit just below the top bar (`--world-top`) so it's no longer clipped
+  // behind it. The event banner is to the left (right: 64), so the
+  // top-right corner stays clear.
+  top: 'calc(var(--world-top) + 8px)',
   right: 12,
   background: 'rgba(11,17,32,0.85)',
   border: `1px solid ${tail}55`,
@@ -122,6 +145,24 @@ const pill = (tail: string): React.CSSProperties => ({
   zIndex: 18,
   backdropFilter: 'blur(8px)',
   boxShadow: `0 4px 12px rgba(0,0,0,0.4)`,
+});
+const addRouteBtn = (tail: string): React.CSSProperties => ({
+  position: 'fixed',
+  top: 'calc(var(--world-top) + 46px)',
+  right: 12,
+  background: 'rgba(11,17,32,0.85)',
+  border: `1px solid ${tail}`,
+  color: tail,
+  borderRadius: 999,
+  padding: '7px 14px',
+  fontSize: 11,
+  fontWeight: 800,
+  letterSpacing: '0.06em',
+  fontFamily: 'inherit',
+  cursor: 'pointer',
+  zIndex: 18,
+  backdropFilter: 'blur(8px)',
+  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
 });
 const pillDot = (tail: string): React.CSSProperties => ({
   width: 7, height: 7, borderRadius: 999,
