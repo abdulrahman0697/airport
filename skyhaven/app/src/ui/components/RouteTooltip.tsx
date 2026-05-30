@@ -11,7 +11,7 @@ import { cyclePayout, formatDuration } from '../routeRevenue';
 /**
  * Popover for a tapped in-flight plane glyph. Mirrors AirportTooltip
  * but surfaces route info: aircraft type, condition, origin → dest,
- * distance, leg time, and live cash/min.
+ * distance, cycle time, ETA to arrival, and per-cycle payout.
  */
 interface Props {
   route: Route;

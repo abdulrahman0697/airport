@@ -20,7 +20,8 @@ import {
   useGameStore,
 } from '../../state/store';
 import { useUiStore } from '../../state/uiStore';
-import { cashPerSecond } from '../../engine/economy';
+import { formatCash } from '../format';
+import { cyclePayout } from '../routeRevenue';
 import { usePanelStore } from './PanelHost';
 import { haptics } from '../juice/haptics';
 import { sfx } from '../juice/sfx';
@@ -59,7 +60,7 @@ export function MapLiveTicker() {
       else if (kindRot === 1) out.push({ id: `${r.id}-f-${i}`, kind: 'flight',
         text: `${name} en route ${r.originIata} → ${r.destIata} · ${Math.round(r.distanceKm)}km · ${(r.loadFactor * 100).toFixed(0)}% load` });
       else if (kindRot === 2) out.push({ id: `${r.id}-a-${i}`, kind: 'arrival',
-        text: `${name} arrived ${r.destIata} · paid +$${Math.round(cashPerSecond(r, a!, hubs, activeEvents) * 60)} this cycle` });
+        text: `${name} arrived ${r.destIata} · paid +$${formatCash(cyclePayout(r, a!, hubs, activeEvents))} this cycle` });
       else out.push({ id: `${r.id}-l-${i}`, kind: 'load',
         text: `${r.originIata} terminal: passenger flow steady · ${r.pricing} class · turnaround 21s` });
       i++;
