@@ -18,8 +18,9 @@
  */
 import { useMemo, useState } from 'react';
 import { loadTopAirports } from '../../data/airports';
+import { fleetSlotsForLevel } from '../../engine/hubs';
 import type { AircraftDef } from '../../engine/types';
-import { selectCash, selectHubs, selectTailColor, useGameStore } from '../../state/store';
+import { selectCash, selectFleet, selectHubs, selectTailColor, useGameStore } from '../../state/store';
 import { useUiStore } from '../../state/uiStore';
 import { Button } from '../design/Button';
 import { Chip } from '../design/Chip';
@@ -46,6 +47,7 @@ export function HangarShowroomCard({
   const cash = useGameStore(selectCash);
   const tailColor = useGameStore(selectTailColor);
   const hubs = useGameStore(selectHubs);
+  const fleet = useGameStore(selectFleet);
   const buy = useGameStore((s) => s.buyAircraft);
   const setPendingDelivery = useUiStore((s) => s.setPendingDelivery);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +76,16 @@ export function HangarShowroomCard({
   const role = roleFor(def);
   const reasons = whyBuy(def);
 
+  // Fleet-slot capacity of the hub this purchase would land at. Mirrors
+  // the engine's buyAircraft gate so the player sees the limit before
+  // trying. Only meaningful once at least one hub exists.
+  const targetHub = hubs.find((h) => h.iata === hubIata) ?? hubs[0];
+  const slotsTotal = targetHub ? fleetSlotsForLevel(targetHub.level) : 0;
+  const slotsUsed = targetHub
+    ? fleet.filter((a) => a.homeHubIata === targetHub.iata).length
+    : 0;
+  const hubFull = !!targetHub && slotsUsed >= slotsTotal;
+
   const tryBuy = (): void => {
     const res = buy(def.id, hubs.length > 0 ? hubIata : undefined);
     if (res.ok) {
@@ -97,13 +109,15 @@ export function HangarShowroomCard({
 
   const buttonLabel = !unlocked
     ? `Locked · Tier ${isCargo ? 5 : def.tier}`
-    : !afford
-      ? `Need $${formatCash(def.basePurchaseCost - cash, 1)}`
-      : justBought
-        ? 'Delivered ✓'
-        : 'Buy + deliver';
+    : hubFull
+      ? `${targetHub?.iata ?? 'Hub'} full · level it up`
+      : !afford
+        ? `Need $${formatCash(def.basePurchaseCost - cash, 1)}`
+        : justBought
+          ? 'Delivered ✓'
+          : 'Buy + deliver';
 
-  const buttonVariant = !unlocked
+  const buttonVariant = !unlocked || hubFull
     ? 'ghost'
     : !afford
       ? 'secondary'
@@ -155,6 +169,16 @@ export function HangarShowroomCard({
           <Stat label="Range" value={`${def.rangeKm.toLocaleString()} km`} />
         </div>
 
+        {/* Fleet-slot readout for the target hub — tells the player how
+            much room is left before they hit the cap (and the buy button
+            locks). Shown whenever a hub exists. */}
+        {targetHub && (
+          <div style={slotLine(hubFull, tailColor)}>
+            {targetHub.iata} fleet slots: {slotsUsed} / {slotsTotal}
+            {hubFull && ' · level up the hub for more'}
+          </div>
+        )}
+
         {/* Hub selector — only when there are 2+ hubs to choose between.
             With a single hub the aircraft is auto-based there. */}
         {hubs.length >= 2 && (
@@ -188,7 +212,7 @@ export function HangarShowroomCard({
           variant={buttonVariant}
           size="lg"
           fullWidth
-          disabled={!unlocked || !afford}
+          disabled={!unlocked || !afford || hubFull}
           hapticOnPress="heavy"
           onClick={tryBuy}
           {...(isTutorialTarget ? { 'data-tutorial': 'buy-aircraft-atr42' } : {})}
@@ -392,6 +416,16 @@ const statValue: React.CSSProperties = {
 };
 
 /* Hub selector chips (multi-hub only). */
+const slotLine = (full: boolean, tail: string): React.CSSProperties => ({
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: '0.02em',
+  color: full ? COLOR.warn : tail,
+  background: 'rgba(11,17,32,0.55)',
+  border: `1px solid ${full ? `${COLOR.warn}55` : COLOR.border.soft}`,
+  borderRadius: RADIUS.s,
+  padding: '6px 10px',
+});
 const hubPickerWrap: React.CSSProperties = {
   background: 'rgba(11,17,32,0.55)',
   border: `1px solid ${COLOR.border.soft}`,

@@ -20,6 +20,37 @@ export const HUB_BONUS_PER_LEVEL = 0.05;
 
 export const MAX_HUB_LEVEL = 10;
 
+/**
+ * Fleet-slot capacity of a hub by level (anti-swarm lever).
+ *
+ * Every aircraft is based at a home hub; a hub can only host so many.
+ * Capacity = FLEET_SLOTS_BASE + FLEET_SLOTS_PER_LEVEL × level, so:
+ *   L1 = 7 · L5 = 15 · L10 = 25 slots.
+ * Leveling a hub both boosts route revenue (network bonus) AND unlocks
+ * more fleet slots, so hub investment — not cheap-plane spam — is the
+ * path to a bigger airline. Remote-Config-tunable like other tuning.
+ */
+export const FLEET_SLOTS_BASE = 5;
+export const FLEET_SLOTS_PER_LEVEL = 2;
+export function fleetSlotsForLevel(level: number): number {
+  return FLEET_SLOTS_BASE + FLEET_SLOTS_PER_LEVEL * Math.max(1, level);
+}
+
+/** Number of aircraft currently based at `iata`. */
+export function fleetCountAtHub(state: SaveState, iata: string): number {
+  let n = 0;
+  for (const a of state.fleet) {
+    if (a.homeHubIata === iata) n++;
+  }
+  return n;
+}
+
+/** Total fleet slots a hub provides, or 0 if it isn't a hub. */
+export function fleetSlotsAtHub(state: SaveState, iata: string): number {
+  const hub = state.hubs.find((h) => h.iata === iata);
+  return hub ? fleetSlotsForLevel(hub.level) : 0;
+}
+
 /** Initial hub creation cost by airport size tier. */
 function creationCostForSizeTier(sizeTier: number): number {
   switch (sizeTier) {

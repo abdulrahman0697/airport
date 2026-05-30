@@ -26,6 +26,29 @@ describe('buyAircraft', () => {
     expect(s1.fleet[s1.fleet.length - 1]?.condition).toBe(100);
   });
 
+  it('blocks a purchase when the hub is at its fleet-slot cap', () => {
+    // L1 LHR hub = 7 slots (5 + 2×1). The fixture's starter is hubless,
+    // so 7 LHR-based buys fill it and the 8th is rejected.
+    let s = freshState();
+    for (let i = 0; i < 7; i++) s = buyAircraft(s, 't1.atr42', 'LHR');
+    expect(s.fleet.filter((a) => a.homeHubIata === 'LHR').length).toBe(7);
+    try {
+      buyAircraft(s, 't1.atr42', 'LHR');
+      throw new Error('expected HUB_FULL');
+    } catch (e) {
+      expect((e as ActionError).code).toBe('HUB_FULL');
+    }
+  });
+
+  it('a higher hub level grants more fleet slots', () => {
+    let s = freshState();
+    // Bump LHR to L2 (9 slots): nine LHR buys succeed, the tenth fails.
+    s = { ...s, hubs: s.hubs.map((h) => (h.iata === 'LHR' ? { ...h, level: 2 } : h)) };
+    for (let i = 0; i < 9; i++) s = buyAircraft(s, 't1.atr42', 'LHR');
+    expect(s.fleet.filter((a) => a.homeHubIata === 'LHR').length).toBe(9);
+    expect(() => buyAircraft(s, 't1.atr42', 'LHR')).toThrow(ActionError);
+  });
+
   it('throws INSUFFICIENT_CASH when broke', () => {
     const s0 = { ...freshState(), cash: 0 };
     expect(() => buyAircraft(s0, AIRCRAFT_DEFS[0]!.id)).toThrow(ActionError);

@@ -20,6 +20,8 @@ import { haversineKm } from './distance';
 import { aircraftBurnRate, hasFuelHeadroom, withRecomputedDemand } from './fuel';
 import {
   emptyHubManagers,
+  fleetCountAtHub,
+  fleetSlotsAtHub,
   hubCreationCost,
   hubUpgradeCost,
   MAX_HUB_LEVEL,
@@ -95,6 +97,17 @@ export function buyAircraft(state: SaveState, defId: string, hubIata?: string): 
   } else {
     throw new ActionError('NO_HUB_SELECTED',
       'Pick a hub for the aircraft before purchasing');
+  }
+  // Fleet-slot gate: a hub can only host so many aircraft (grows with
+  // hub level). Block the purchase when the resolved hub is full so the
+  // player levels the hub (or sells/relocates) instead of swarming cheap
+  // planes. The hubless starter (resolvedHub === null) is exempt.
+  if (resolvedHub !== null) {
+    const slots = fleetSlotsAtHub(state, resolvedHub);
+    if (fleetCountAtHub(state, resolvedHub) >= slots) {
+      throw new ActionError('HUB_FULL',
+        `${resolvedHub} is full (${slots} fleet slots). Level up the hub or free a slot first.`);
+    }
   }
   const aircraft: OwnedAircraft = {
     uid: nextAircraftUid(state),
