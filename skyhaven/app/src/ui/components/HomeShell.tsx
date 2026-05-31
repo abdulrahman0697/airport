@@ -510,7 +510,9 @@ const shell: React.CSSProperties = {
   top: 'calc(env(safe-area-inset-top, 0px) + 70px)',
   left: 0,
   right: 0,
-  bottom: 'calc(72px + env(safe-area-inset-bottom, 0px))',
+  // Anchor to the shared tab-bar height so no sliver of the world view
+  // behind shows through the seam above the tabs.
+  bottom: 'var(--tab-bottom)',
   zIndex: 14,
   display: 'flex',
   flexDirection: 'column',

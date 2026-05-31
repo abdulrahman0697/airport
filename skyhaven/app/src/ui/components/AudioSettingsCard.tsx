@@ -8,16 +8,18 @@
  */
 import { useState } from 'react';
 import { sfx } from '../juice/sfx';
+import { haptics } from '../juice/haptics';
 import { COLOR, RADIUS } from '../design/tokens';
 
 export function AudioSettingsCard() {
   const [sfxOn, setSfxOn] = useState(sfx.isSfxOn());
   const [musicOn, setMusicOn] = useState(sfx.isMusicOn());
   const [volume, setVolume] = useState(sfx.getVolume());
+  const [hapticsOn, setHapticsOn] = useState(haptics.isEnabled());
 
   return (
     <section style={card}>
-      <div style={head}>Sound</div>
+      <div style={head}>Sound &amp; Haptics</div>
 
       <Row
         label="Sound effects"
@@ -37,6 +39,17 @@ export function AudioSettingsCard() {
         onChange={(v): void => {
           sfx.setMusicOn(v);
           setMusicOn(v);
+        }}
+      />
+
+      <Row
+        label="Vibration"
+        hint="Haptic feedback on taps, purchases, and alerts."
+        checked={hapticsOn}
+        onChange={(v): void => {
+          haptics.setEnabled(v);
+          setHapticsOn(v);
+          if (v) haptics.medium();
         }}
       />
 

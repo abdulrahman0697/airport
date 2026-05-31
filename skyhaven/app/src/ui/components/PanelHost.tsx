@@ -81,7 +81,7 @@ function PanelFallback(): ReactNode {
 
 const panelShell: React.CSSProperties = {
   position: 'fixed',
-  bottom: 64,
+  bottom: 'var(--tab-bottom)',
   left: 0,
   right: 0,
   top: 'var(--world-top)',

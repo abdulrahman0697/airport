@@ -41,6 +41,9 @@ export function PanelHeader({
           {subtitle && <div style={subtitleText}>{subtitle}</div>}
         </div>
         {right && <div style={rightSlot}>{right}</div>}
+        {/* The panel host renders a fixed close (×) button in the top-
+            right corner. When a panel supplies its own `right` CTA we
+            reserve clearance so the two never overlap. */}
       </div>
       {tabs && <div style={tabsRow}>{tabs}</div>}
     </header>
@@ -80,6 +83,10 @@ const subtitleText: React.CSSProperties = {
 const rightSlot: React.CSSProperties = {
   flexShrink: 0,
   marginTop: 2,
+  // Clear the panel-host close (×) button (occupies ~48px at the top-
+  // right). The header's own right padding is SPACE.l (16px), so reserve
+  // the remaining ~36px here so a header CTA never sits under the ×.
+  marginRight: 36,
 };
 const tabsRow: React.CSSProperties = {
   display: 'flex',

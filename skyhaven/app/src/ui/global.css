@@ -21,6 +21,11 @@
      this so the top bar lives in its own dedicated section. */
   --world-top: calc(env(safe-area-inset-top, 0px) + 100px);
 
+  /* Height the bottom tab bar occupies (64px button + 1px top border +
+     the device safe-area inset). Surfaces that sit ABOVE the tabs anchor
+     their bottom to this so no lower layer peeks through the seam. */
+  --tab-bottom: calc(65px + env(safe-area-inset-bottom, 0px));
+
   color-scheme: dark;
 }
 
